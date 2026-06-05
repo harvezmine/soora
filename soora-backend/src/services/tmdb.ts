@@ -9,6 +9,14 @@ const client: AxiosInstance = axios.create({
 
 export const hasTMDBKey = () => !!config.tmdbKey;
 
+// Generic passthrough — forward an arbitrary TMDB path + query with the server
+// API key. Lets the frontend hit TMDB without baking a key into its bundle.
+export async function passthrough(path: string, query: Record<string, any> = {}) {
+  const clean = '/' + String(path).replace(/^\/+/, '');
+  const res = await client.get(clean, { params: query });
+  return res.data;
+}
+
 // ========== NORMALIZE ==========
 
 interface TMDBItem {

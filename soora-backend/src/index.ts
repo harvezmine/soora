@@ -107,6 +107,21 @@ app.post('/report-error', (req, res) => {
   res.json({ ok: true });
 });
 
+// ========== TMDB PASSTHROUGH (server-side key) ==========
+// Frontend hits /tmdb/* instead of api.themoviedb.org directly, so the API key
+// stays server-side (Vercel build doesn't carry VITE_TMDB_API_KEY).
+app.get('/tmdb/*', async (req, res) => {
+  try {
+    const tmdbSvc = await import('./services/tmdb');
+    const path = req.originalUrl.replace(/^\/tmdb/, '').split('?')[0];
+    const data = await tmdbSvc.passthrough(path, req.query as Record<string, any>);
+    res.setHeader('Cache-Control', 'public, max-age=600');
+    res.json(data);
+  } catch (err: any) {
+    res.status(err.response?.status || 502).json(err.response?.data || { error: 'TMDB error' });
+  }
+});
+
 // ========== GLOBAL PASSTHROUGH ==========
 // Any route not handled by orchestrated routes gets forwarded to Consumet directly.
 // This ensures existing frontend calls still work during migration.

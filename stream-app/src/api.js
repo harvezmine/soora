@@ -2,15 +2,14 @@ import axios from 'axios';
 
 // ========== CONFIG ==========
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-const TMDB_BASE = 'https://api.themoviedb.org/3';
-const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY || '';
 const TMDB_IMG = 'https://image.tmdb.org/t/p';
 
 const api = axios.create({ baseURL: API_BASE, timeout: 12000 });
+// TMDB goes through our backend (/tmdb/*) which holds the API key server-side,
+// so the key never needs to be baked into the frontend bundle / Vercel env.
 const tmdb = axios.create({
-  baseURL: TMDB_BASE,
+  baseURL: `${API_BASE}/tmdb`,
   timeout: 15000,
-  params: { api_key: TMDB_KEY },
 });
 
 // ========== ERROR REPORTING TO TELEGRAM ==========
@@ -147,7 +146,7 @@ export const tmdbImg = (path, size = 'w500') =>
 export const tmdbBackdrop = (path) =>
   path ? `${TMDB_IMG}/original${path}` : null;
 
-export const hasTMDBKey = () => !!TMDB_KEY;
+export const hasTMDBKey = () => true; // TMDB key lives on the backend now
 
 const normalizeTMDB = (item) => ({
   id: item.id,
@@ -441,7 +440,6 @@ export const getTVSeasonTMDB = (id, season) =>
 // Used to enrich Goku data with TMDB metadata (cast images, recs, backdrop, etc.)
 export const findTMDBDetailsByTitle = (title, mediaType = 'movie', year = '') =>
   cachedGet(`tmdb:find:${title}:${mediaType}:${year}`, async () => {
-    if (!TMDB_KEY) return { data: null };
     try {
       const searchType = mediaType === 'tv' ? 'tv' : 'movie';
       const searchRes = await tmdb.get(`/search/${searchType}`, {
