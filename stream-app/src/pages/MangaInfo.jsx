@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   getMangaInfo, normalizeMangaTitle, mangaImgProxy, isMangaNovel, getMangaContentType,
-  getKomikuInfo, searchKomiku, getKomikuChapterPages, getMangaChapterPages,
+  getKomikuInfo, searchKomiku, searchManga, getKomikuChapterPages, getMangaChapterPages,
 } from '../api';
 import { useSEO, buildMangaSchema, buildMangaUrl, detectMangaProvider } from '../utils/seo';
 import { downloadChapter, isChapterDownloaded, getDownloadedChapters, deleteChapter } from '../utils/mangaDB';
@@ -155,7 +155,17 @@ export default function MangaInfo() {
         if (!res.data || (!res.data.title && !res.data.description)) {
           throw new Error('No data found');
         }
-        setInfo(res.data);
+        const data = { ...res.data };
+        // mangapill /info omits the cover; the tokened cover only comes from
+        // search results — grab it by title so the poster isn't blank.
+        if (!data.image && provider === 'mangapill' && data.title) {
+          try {
+            const sr = await searchManga(normalizeMangaTitle(data.title));
+            const hit = (sr.data?.results || []).find((r) => r.id === id) || (sr.data?.results || [])[0];
+            if (hit?.image) data.image = hit.image;
+          } catch { /* optional */ }
+        }
+        setInfo(data);
         setUsedProvider(provider);
       } catch (err) {
         setError(err.response?.data?.message || err.message || 'Failed to load manga info');
