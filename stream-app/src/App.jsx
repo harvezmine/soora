@@ -6,8 +6,6 @@ import { MiniPlayerProvider } from './context/MiniPlayerContext';
 import { AuthProvider } from './context/AuthContext';
 import { LegacyAnimeRedirect, LegacyMovieRedirect, LegacyMangaRedirect } from './components/LegacyRedirect';
 import { usePWAMobileOptimizations } from './hooks/usePWAMobile';
-import Companion from './components/Companion';
-import CompanionSettings, { useCompanionState } from './components/CompanionSettings';
 import './App.css';
 
 /* ── Route-level code splitting: each page loads its own JS chunk on demand ── */
@@ -34,7 +32,6 @@ function RouteFallback() {
 
 function AppLayout() {
   const location = useLocation();
-  const { animal, setAnimal, visible, setVisible } = useCompanionState();
 
   // PWA mobile optimizations (overscroll, back button, orientation, etc.)
   usePWAMobileOptimizations();
@@ -101,12 +98,6 @@ function AppLayout() {
       </Routes>
       </Suspense>
       {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && <MiniPlayer />}
-      {!isLanding && !isAuthPage && !isSooramicsPlus && (
-        <>
-          <Companion animal={animal} visible={visible} onHide={() => setVisible(false)} />
-          <CompanionSettings animal={animal} setAnimal={setAnimal} visible={visible} setVisible={setVisible} />
-        </>
-      )}
     </MiniPlayerProvider>
   );
 }

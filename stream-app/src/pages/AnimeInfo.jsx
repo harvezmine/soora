@@ -126,7 +126,9 @@ export default function AnimeInfo() {
         try {
           const sh = await getSamehadakuAnimeInfo(id);
           if (cancelled) return;
-          if (!sh || (!sh.title && !sh.episodeList)) throw new Error('No data found');
+          // samehadaku returns title="" — real title lives in english/synonyms/japanese
+          const shTitle = sh.title || sh.english || sh.synonyms || sh.japanese || 'Unknown';
+          if (!sh || (shTitle === 'Unknown' && !sh.episodeList)) throw new Error('No data found');
           const syn = sh.synopsis?.paragraphs?.join('\n\n') || (typeof sh.synopsis === 'string' ? sh.synopsis : '');
           const eps = (sh.episodeList || [])
             .map((e) => {
@@ -136,9 +138,9 @@ export default function AnimeInfo() {
             .filter((e) => e.number != null)
             .sort((a, b) => a.number - b.number);
           const genres = (sh.genreList || []).map((g) => g.title || g);
-          const score = parseFloat(sh.score);
+          const score = parseFloat(sh.score?.value ?? sh.score); // score can be an object
           setInfo({
-            title: sh.title || 'Unknown',
+            title: shTitle,
             description: syn,
             image: sh.poster,
             cover: sh.poster,

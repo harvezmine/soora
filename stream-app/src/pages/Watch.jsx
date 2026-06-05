@@ -570,11 +570,11 @@ export default function Watch() {
           const syn = info.synopsis?.paragraphs?.join('\n\n') || (typeof info.synopsis === 'string' ? info.synopsis : '');
           const genres = (info.genreList || []).map((g) => g.title || g);
           setAnimeInfo({
-            title: info.title || title,
+            title: info.title || info.english || info.synonyms || info.japanese || title,
             japaneseTitle: info.japanese || '',
             description: syn,
             genres,
-            rating: Number.isFinite(parseFloat(info.score)) ? parseFloat(info.score) * 10 : null,
+            rating: Number.isFinite(parseFloat(info.score?.value ?? info.score)) ? parseFloat(info.score?.value ?? info.score) * 10 : null,
             totalEpisodes: info.episodes || (info.episodeList || []).length,
             status: info.status,
             image: info.poster,
