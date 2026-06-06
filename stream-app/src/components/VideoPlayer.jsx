@@ -36,6 +36,8 @@ const VideoPlayer = forwardRef(function VideoPlayer(
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState('main'); // 'main' | 'quality' | 'brightness' | 'subtitles'
   const [seeking, setSeeking] = useState(false);
+  const [hoverPct, setHoverPct] = useState(null);  // 0..1 cursor position on bar (null = no tooltip)
+  const [hoverTime, setHoverTime] = useState(0);   // seconds at cursor/scrub
   const [activeSubtitle, setActiveSubtitle] = useState(-1); // -1 = off, index = active track
   const [textTracks, setTextTracks] = useState([]); // discovered subtitle tracks {index,label,lang}
   // Subtitle appearance (persisted)
@@ -429,19 +431,57 @@ const VideoPlayer = forwardRef(function VideoPlayer(
     };
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSeekStart = () => setSeeking(true);
-  const handleSeek = (e) => {
-    const rect = progressRef.current.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  // ── Scrubbable progress bar (mouse + touch), with a live time tooltip ──
+  const pctFromX = (clientX) => {
+    const rect = progressRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return 0;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  };
+
+  // hover preview (not dragging) — shows time tooltip following the cursor
+  const handleProgressHover = (e) => {
+    const pct = pctFromX(e.clientX);
+    setHoverPct(pct);
+    setHoverTime(pct * duration);
+  };
+  const clearHover = () => { if (!seeking) setHoverPct(null); };
+
+  // drag scrubbing — bind move/up on window so it keeps tracking outside the bar
+  const startScrub = (clientX) => {
+    setSeeking(true);
+    const pct = pctFromX(clientX);
+    setHoverPct(pct);
+    setHoverTime(pct * duration);
     setCurrentTime(pct * duration);
   };
-  const handleSeekEnd = (e) => {
-    const rect = progressRef.current.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const video = videoRef.current;
-    if (video) video.currentTime = pct * duration;
-    setSeeking(false);
-  };
+  useEffect(() => {
+    if (!seeking) return;
+    const move = (e) => {
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const pct = pctFromX(cx);
+      setHoverPct(pct);
+      setHoverTime(pct * duration);
+      setCurrentTime(pct * duration);
+    };
+    const up = (e) => {
+      const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+      const pct = pctFromX(cx);
+      const video = videoRef.current;
+      if (video && duration) video.currentTime = pct * duration;
+      setSeeking(false);
+      setHoverPct(null);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', up);
+    };
+  }, [seeking, duration]);
 
   const toggleFullscreen = async () => {
     const el = containerRef.current;
@@ -575,17 +615,25 @@ const VideoPlayer = forwardRef(function VideoPlayer(
 
       {/* ===== BOTTOM CONTROLS ===== */}
       <div className="nf-controls">
-        {/* Progress bar */}
+        {/* Progress bar — click-to-seek + drag scrub (mouse & touch) + time tooltip */}
         <div
-          className="nf-progress-wrap"
+          className={`nf-progress-wrap ${seeking ? 'scrubbing' : ''}`}
           ref={progressRef}
-          onMouseDown={(e) => { handleSeekStart(); handleSeek(e); }}
-          onMouseMove={(e) => { if (seeking) handleSeek(e); }}
-          onMouseUp={handleSeekEnd}
-          onMouseLeave={() => { if (seeking) handleSeekEnd({ clientX: 0 }); }}
+          onMouseDown={(e) => { e.preventDefault(); startScrub(e.clientX); }}
+          onMouseMove={(e) => { if (!seeking) handleProgressHover(e); }}
+          onMouseLeave={clearHover}
+          onTouchStart={(e) => { startScrub(e.touches[0].clientX); }}
         >
+          {hoverPct !== null && duration > 0 && (
+            <div className="nf-progress-tooltip" style={{ left: `${hoverPct * 100}%` }}>
+              {fmt(hoverTime)}
+            </div>
+          )}
           <div className="nf-progress-bar">
             <div className="nf-progress-buffered" style={{ width: `${bufferedPct}%` }} />
+            {hoverPct !== null && !seeking && (
+              <div className="nf-progress-hover" style={{ width: `${hoverPct * 100}%` }} />
+            )}
             <div className="nf-progress-filled" style={{ width: `${progressPct}%` }}>
               <div className="nf-progress-thumb" />
             </div>

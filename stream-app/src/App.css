@@ -7748,9 +7748,40 @@ a:hover {
   position: relative;
   margin-bottom: 0.5rem;
   transition: height 0.15s ease;
+  touch-action: none; /* allow horizontal drag-scrub without page scroll */
 }
-.nf-progress-wrap:hover {
+.nf-progress-wrap::before {
+  /* invisible taller hit area so the thin bar is easy to grab/scrub */
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: -10px; bottom: -10px;
+}
+.nf-progress-wrap:hover, .nf-progress-wrap.scrubbing {
   height: 8px;
+}
+.nf-progress-hover {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.nf-progress-tooltip {
+  position: absolute;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(10,10,18,0.92);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 5;
 }
 .nf-progress-bar {
   position: relative;
@@ -7778,6 +7809,7 @@ a:hover {
 .nf-progress-thumb {
   position: absolute;
   top: 50%;
+  left: 100%;
   transform: translate(-50%, -50%) scale(0);
   width: 14px;
   height: 14px;
@@ -7787,7 +7819,8 @@ a:hover {
   transition: transform 0.15s ease;
   pointer-events: none;
 }
-.nf-progress-wrap:hover .nf-progress-thumb {
+.nf-progress-wrap:hover .nf-progress-thumb,
+.nf-progress-wrap.scrubbing .nf-progress-thumb {
   transform: translate(-50%, -50%) scale(1);
 }
 
