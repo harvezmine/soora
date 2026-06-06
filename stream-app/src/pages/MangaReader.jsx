@@ -23,10 +23,17 @@ export default function MangaReader() {
   const [imgErrors, setImgErrors] = useState({});
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(0); // 0=off, 1=slow, 2=medium, 3=fast
+  // ── Infinite chapter scroll (vertical mode) ──
+  // segments: [{ chId, num, title, pages }] appended as the user reaches the end
+  const [segments, setSegments] = useState([]);
+  const [activeChId, setActiveChId] = useState(chapterId); // chapter currently in view
+  const [appending, setAppending] = useState(false);
   const readerRef = useRef(null);
   const pageRefs = useRef([]);
   const autoScrollRef = useRef(null);
   const scrollSpeedRef = useRef(0);
+  const appendingRef = useRef(false);
+  const loadedChIds = useRef(new Set());
 
   // Find current chapter and neighbors
   const chapters = mangaInfo?.chapters || [];
@@ -35,10 +42,23 @@ export default function MangaReader() {
     const numB = parseFloat(b.chapter || b.id?.match(/chapter[_-]?([\d.]+)/)?.[1] || '0');
     return numA - numB;
   });
-  const currentIdx = sortedChapters.findIndex((ch) => ch.id === chapterId);
+  // Nav is based on the chapter CURRENTLY IN VIEW (activeChId), which advances
+  // as the reader infinitely scrolls into appended chapters.
+  const currentIdx = sortedChapters.findIndex((ch) => ch.id === activeChId);
   const prevChapter = currentIdx > 0 ? sortedChapters[currentIdx - 1] : null;
   const nextChapter = currentIdx < sortedChapters.length - 1 ? sortedChapters[currentIdx + 1] : null;
   const currentChapter = sortedChapters[currentIdx] || null;
+
+  // Provider-aware page fetch for one chapter id
+  const fetchPagesFor = useCallback(async (chId) => {
+    if (isOffline) {
+      const blobUrls = await getOfflinePages(chId);
+      return (blobUrls || []).map((url, i) => ({ img: url, page: i + 1, _blob: true }));
+    }
+    if (provider === 'komiku') return (await getKomikuChapterPages(chId)).data || [];
+    if (provider === 'mangadex') return (await getMangaDexChapterPages(chId)).data || [];
+    return (await getMangaChapterPages(chId, provider)).data || [];
+  }, [provider, isOffline]);
 
   // Fetch chapter pages + manga info (or load offline)
   useEffect(() => {
@@ -84,33 +104,27 @@ export default function MangaReader() {
       setError(null);
       setCurrentPage(0);
       setImgErrors({});
+      setActiveChId(chapterId);
+      loadedChIds.current = new Set([chapterId]);
       try {
         const isKomiku = provider === 'komiku';
-        let pagesPromise;
-        let infoPromise;
-
-        if (isKomiku) {
-          pagesPromise = getKomikuChapterPages(chapterId);
-          infoPromise = mangaId ? getKomikuInfo(mangaId) : Promise.reject('no id');
-        } else if (isMangaDex) {
-          pagesPromise = getMangaDexChapterPages(chapterId);
-          infoPromise = mangaId ? getMangaDexInfo(mangaId, selectedLang) : Promise.reject('no id');
-        } else {
-          pagesPromise = getMangaChapterPages(chapterId, provider);
-          infoPromise = mangaId ? getMangaInfo(mangaId, provider) : Promise.reject('no id');
-        }
+        const pagesPromise = fetchPagesFor(chapterId);
+        const infoPromise = mangaId
+          ? (isKomiku ? getKomikuInfo(mangaId) : isMangaDex ? getMangaDexInfo(mangaId, selectedLang) : getMangaInfo(mangaId, provider))
+          : Promise.reject('no id');
 
         const [pagesRes, infoRes] = await Promise.allSettled([pagesPromise, infoPromise]);
 
-        if (pagesRes.status === 'fulfilled') {
-          setPages(pagesRes.value.data || []);
-        } else {
-          throw new Error('Failed to load chapter pages');
-        }
+        if (pagesRes.status !== 'fulfilled') throw new Error('Failed to load chapter pages');
+        const pg = pagesRes.value || [];
+        setPages(pg);
 
-        if (infoRes.status === 'fulfilled') {
-          setMangaInfo(infoRes.value.data);
-        }
+        let info = null;
+        if (infoRes.status === 'fulfilled') { info = infoRes.value.data; setMangaInfo(info); }
+
+        // seed the first segment for infinite scroll
+        const chMeta = (info?.chapters || []).find((c) => c.id === chapterId);
+        setSegments([{ chId: chapterId, num: chMeta?.chapter, title: chMeta?.title, pages: pg }]);
       } catch (err) {
         setError(err.message || 'Failed to load chapter');
       } finally {
@@ -118,7 +132,7 @@ export default function MangaReader() {
       }
     };
     fetchData();
-  }, [chapterId, mangaId, provider, isOffline]);
+  }, [chapterId, mangaId, provider, isOffline, fetchPagesFor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Controls are toggled by click only (no auto-hide timer)
   const toggleControls = useCallback(() => {
@@ -170,6 +184,71 @@ export default function MangaReader() {
   const cycleAutoScroll = () => {
     setScrollSpeed((s) => (s + 1) % 4);
   };
+
+  // ── Infinite chapter scroll: append the next chapter when the user nears the
+  //    end of the last loaded one (1.2s grace so it feels like the chapter just
+  //    extends, not a page jump). ──
+  const appendNextChapter = useCallback(async () => {
+    if (appendingRef.current) return;
+    const last = segments[segments.length - 1];
+    if (!last) return;
+    const lastIdx = sortedChapters.findIndex((c) => c.id === last.chId);
+    const next = lastIdx >= 0 && lastIdx < sortedChapters.length - 1 ? sortedChapters[lastIdx + 1] : null;
+    if (!next || loadedChIds.current.has(next.id)) return;
+    appendingRef.current = true;
+    setAppending(true);
+    loadedChIds.current.add(next.id);
+    try {
+      await new Promise((r) => setTimeout(r, 1200)); // grace delay
+      const pg = await fetchPagesFor(next.id);
+      if (pg.length) {
+        setSegments((prev) => [...prev, { chId: next.id, num: next.chapter, title: next.title, pages: pg }]);
+      } else {
+        loadedChIds.current.delete(next.id); // allow retry
+      }
+    } catch {
+      loadedChIds.current.delete(next.id);
+    } finally {
+      appendingRef.current = false;
+      setAppending(false);
+    }
+  }, [segments, sortedChapters, fetchPagesFor]);
+
+  // Watch a sentinel near the bottom; when visible, append next chapter.
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (readMode !== 'vertical' || isOffline) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) appendNextChapter();
+    }, { rootMargin: '1200px 0px' }); // start loading well before the end
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [readMode, isOffline, appendNextChapter]);
+
+  // Track which chapter is in view → update header + URL (no reload)
+  useEffect(() => {
+    if (readMode !== 'vertical') return;
+    const markers = Array.from(document.querySelectorAll('[data-seg-ch]'));
+    if (!markers.length) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          const chId = e.target.getAttribute('data-seg-ch');
+          if (chId && chId !== activeChId) {
+            setActiveChId(chId);
+            try {
+              const url = `/manga/read?id=${encodeURIComponent(mangaId)}&chapterId=${encodeURIComponent(chId)}&provider=${provider}`;
+              window.history.replaceState(null, '', url);
+            } catch { /* ignore */ }
+          }
+        }
+      });
+    }, { threshold: 0, rootMargin: '-45% 0px -45% 0px' }); // whichever segment crosses mid-viewport
+    markers.forEach((m) => obs.observe(m));
+    return () => obs.disconnect();
+  }, [segments, readMode, activeChId, mangaId, provider]);
 
   // Page mode keyboard navigation
   useEffect(() => {
@@ -309,32 +388,54 @@ export default function MangaReader() {
       <div className="mangareader-content" onClick={handleTap}>
         {readMode === 'vertical' ? (
           <div className="mangareader-vertical">
-            {pages.map((page, i) => (
-              <div
-                key={page.page || i}
-                className="mangareader-img-wrap"
-                ref={(el) => (pageRefs.current[i] = el)}
-                data-page={i}
-              >
-                {imgErrors[i] ? (
-                  <div className="mangareader-img-error">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
-                      <rect x="3" y="3" width="18" height="18" rx="2"/>
-                      <path d="M9 9l6 6M15 9l-6 6"/>
-                    </svg>
-                    <span>Failed to load page {i + 1}</span>
+            {segments.map((seg, si) => (
+              <div key={seg.chId} data-seg-ch={seg.chId} className="mangareader-segment">
+                {/* Chapter divider between appended chapters */}
+                {si > 0 && (
+                  <div className="mangareader-ch-divider">
+                    <span>Chapter {seg.num || (seg.title || '').match(/([\d.]+)/)?.[1] || '?'}</span>
                   </div>
-                ) : (
-                  <img
-                    src={getPageSrc(page)}
-                    alt={`Page ${page.page || i + 1}`}
-                    loading="lazy"
-                    onError={() => handleImgError(i)}
-                    referrerPolicy="no-referrer"
-                  />
                 )}
+                {(seg.pages || []).map((page, i) => {
+                  const key = `${seg.chId}-${page.page || i}`;
+                  return (
+                    <div key={key} className="mangareader-img-wrap">
+                      {imgErrors[key] ? (
+                        <div className="mangareader-img-error">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M9 9l6 6M15 9l-6 6"/>
+                          </svg>
+                          <span>Failed to load page {i + 1}</span>
+                        </div>
+                      ) : (
+                        <img
+                          src={getPageSrc(page)}
+                          alt={`Page ${page.page || i + 1}`}
+                          loading="lazy"
+                          onError={() => handleImgError(key)}
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))}
+            {/* Sentinel + appending indicator */}
+            {!isOffline && nextChapter && (
+              <div ref={sentinelRef} className="mangareader-sentinel">
+                {appending && (
+                  <div className="mangareader-appending">
+                    <div className="subindo-spinner" />
+                    <span>Memuat chapter berikutnya…</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {!isOffline && !nextChapter && segments.length > 0 && (
+              <div className="mangareader-end">Tamat — chapter terakhir</div>
+            )}
           </div>
         ) : (
           <div className="mangareader-single">
