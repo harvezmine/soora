@@ -14,6 +14,8 @@ import mangaRoutes from './routes/manga';
 import doujindesuRoutes from './routes/doujindesu';
 import komikplusRoutes from './routes/komikplus';
 import proxyRoutes from './routes/proxy';
+import authRoutes from './routes/auth';
+import userRoutes from './routes/user';
 
 const app = express();
 
@@ -65,6 +67,8 @@ app.post('/cache/clear', (_req, res) => {
 
 // ========== ORCHESTRATED ROUTES ==========
 // These routes aggregate multiple API calls into single responses
+app.use('/auth', authRoutes);
+app.use('/user', userRoutes);
 app.use('/anime', animeRoutes);
 app.use('/movies', movieRoutes);
 app.use('/manga', mangaRoutes);

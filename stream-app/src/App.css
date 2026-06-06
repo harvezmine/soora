@@ -12200,6 +12200,8 @@ a:hover {
   background: rgba(255,255,255,0.015);
   color: rgba(255,255,255,0.6);
 }
+.auth-social-google { flex: 1 1 100%; }
+.auth-social-chip:disabled { opacity: 0.5; cursor: default; transform: none; }
 .auth-social-chip:hover {
   background: rgba(255,255,255,0.04);
   border-color: rgba(255,255,255,0.1);

@@ -6,6 +6,7 @@ import { MiniPlayerProvider } from './context/MiniPlayerContext';
 import { AuthProvider } from './context/AuthContext';
 import { LegacyAnimeRedirect, LegacyMovieRedirect, LegacyMangaRedirect } from './components/LegacyRedirect';
 import { usePWAMobileOptimizations } from './hooks/usePWAMobile';
+import RequireAuth from './components/RequireAuth';
 import './App.css';
 
 /* ── Route-level code splitting: each page loads its own JS chunk on demand ── */
@@ -68,7 +69,7 @@ function AppLayout() {
         <Route path="/anime/info" element={<LegacyAnimeRedirect />} />
         <Route path="/anime/mylist" element={<MyList section="anime" />} />
         <Route path="/anime/:id" element={<AnimeInfo />} />
-        <Route path="/watch/anime" element={<Watch />} />
+        <Route path="/watch/anime" element={<RequireAuth><Watch /></RequireAuth>} />
 
         {/* sooraflix routes */}
         <Route path="/movies" element={<MovieHome />} />
@@ -78,7 +79,7 @@ function AppLayout() {
         <Route path="/movie/*" element={<MovieInfo mediaType="movie" />} />
         <Route path="/series/*" element={<MovieInfo mediaType="tv" />} />
         <Route path="/movies/*" element={<MovieInfo />} />
-        <Route path="/watch/movie" element={<Watch />} />
+        <Route path="/watch/movie" element={<RequireAuth><Watch /></RequireAuth>} />
 
         {/* sooramics routes */}
         <Route path="/manga" element={<MangaHome />} />
@@ -86,7 +87,7 @@ function AppLayout() {
         <Route path="/manga/info" element={<LegacyMangaRedirect />} />
         <Route path="/manga/mylist" element={<MyList section="manga" />} />
         <Route path="/manga/downloads" element={<MangaDownloads />} />
-        <Route path="/manga/read" element={<MangaReader />} />
+        <Route path="/manga/read" element={<RequireAuth><MangaReader /></RequireAuth>} />
         <Route path="/manga/*" element={<MangaInfo />} />
 
         {/* shared — legacy route redirects to anime mylist */}

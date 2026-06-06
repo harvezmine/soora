@@ -11,6 +11,8 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   telegramBotToken: process.env.BOT_TOKEN || '',
   telegramChatId: process.env.CHAT_ID || '',
+  jwtSecret: process.env.JWT_SECRET || 'soora-dev-secret-change-in-prod',
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   samehadakuBase: 'https://www.sankavollerei.com/anime/samehadaku',
   jikanBase: 'https://api.jikan.moe/v4',
 };
