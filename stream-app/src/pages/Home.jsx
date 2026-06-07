@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getSubIndoHomeBundle, getSubIndoSections } from '../api';
 import Card from '../components/Card';
 import SearchSuggest from '../components/SearchSuggest';
+import ContinueRow from '../components/ContinueRow';
+import Top10Section from '../components/Top10Section';
 import SkeletonHero from '../components/SkeletonHero';
 import SkeletonSection from '../components/SkeletonSection';
 
@@ -117,10 +119,13 @@ export default function Home() {
 
       {!ready && <><SkeletonSection /><SkeletonSection /></>}
 
-      {/* ── SECTION 1: Top 10 — numbered rank rail ── */}
+      {/* ── SECTION 1: Top 10 — same container as Sooraflix (Top10Section) ── */}
       {ready && top10.length > 0 && (
-        <RankRow title="Top 10 Minggu Ini" eyebrow="Paling Ditonton" items={top10} onPick={goWatch} />
+        <Top10Section title="Top 10 Minggu Ini" items={top10} type="anime" />
       )}
+
+      {/* ── SECTION 2: Continue Watching ── */}
+      <ContinueRow section="anime" title="Lanjutkan Nonton" />
 
       {/* ── SECTION 2: Featured spotlight (big cards + synopsis) ── */}
       {ready && ongoing.length > 0 && (

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getMangaChapterPages, getMangaInfo, getMangaDexChapterPages, getMangaDexInfo, getKomikuChapterPages, getKomikuInfo, normalizeMangaTitle, mangaImgProxy } from '../api';
 import { buildMangaUrl } from '../utils/seo';
 import { getOfflinePages, getChapterMeta } from '../utils/mangaDB';
+import { saveProgress } from '../utils/progress';
 import Loading from '../components/Loading';
 
 export default function MangaReader() {
@@ -133,6 +134,24 @@ export default function MangaReader() {
     };
     fetchData();
   }, [chapterId, mangaId, provider, isOffline, fetchPagesFor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Save Continue Reading progress when manga info + active chapter known
+  useEffect(() => {
+    if (!mangaId || !mangaInfo) return;
+    const chNum = currentChapter?.chapter ||
+      (currentChapter?.title || activeChId || '').match(/([\d.]+)/)?.[1] || '';
+    saveProgress({
+      section: 'manga',
+      id: mangaId,
+      title: typeof mangaInfo.title === 'object'
+        ? (mangaInfo.title.english || mangaInfo.title.romaji || mangaInfo.title.userPreferred)
+        : (mangaInfo.title || ''),
+      image: mangaInfo.image || mangaInfo.cover || '',
+      chapter: chNum,
+      chapterId: activeChId,
+      provider,
+    });
+  }, [mangaId, mangaInfo, activeChId, currentChapter, provider]);
 
   // Controls are toggled by click only (no auto-hide timer)
   const toggleControls = useCallback(() => {

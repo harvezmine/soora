@@ -16,6 +16,7 @@ import { buildMangaUrl } from '../utils/seo';
 import Card from '../components/Card';
 import SearchSuggest from '../components/SearchSuggest';
 import Top10Section from '../components/Top10Section';
+import ContinueRow from '../components/ContinueRow';
 import SkeletonHero from '../components/SkeletonHero';
 import SkeletonSection from '../components/SkeletonSection';
 
@@ -544,6 +545,9 @@ export default function MangaHome() {
               type="manga"
             />
           )}
+
+          {/* Continue Reading */}
+          <ContinueRow section="manga" title="Lanjutkan Baca" />
 
           {selectedLang === 'id' ? (
             /* Komiku (Sub Indo) uses real-catalog rows with custom labels */

@@ -18,6 +18,7 @@ import {
 import { buildMovieUrl } from '../utils/seo';
 import Card from '../components/Card';
 import SearchSuggest from '../components/SearchSuggest';
+import ContinueRow from '../components/ContinueRow';
 import Top10Section from '../components/Top10Section';
 import SkeletonHero from '../components/SkeletonHero';
 import SkeletonSection from '../components/SkeletonSection';
@@ -820,6 +821,9 @@ export default function MovieHome() {
               type="movie"
             />
           )}
+
+          {/* Continue Watching */}
+          <ContinueRow section="movie" title="Lanjutkan Nonton" />
 
           {/* Base sections — show skeleton while loading */}
           {sectionsReady ? (

@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { syncMyListWithBackend } from '../utils/mylist';
+import { syncProgressWithBackend } from '../utils/progress';
+
+const syncUserData = () => { syncMyListWithBackend(); syncProgressWithBackend(); };
 
 const AuthContext = createContext(null);
 
@@ -33,7 +37,7 @@ export function AuthProvider({ children }) {
     if (!t) { setLoading(false); return; }
     setToken(t);
     authFetch('/auth/me', { token: t })
-      .then((d) => { setUser(d.user); localStorage.setItem(USER_KEY, JSON.stringify(d.user)); })
+      .then((d) => { setUser(d.user); localStorage.setItem(USER_KEY, JSON.stringify(d.user)); syncUserData(); })
       .catch(() => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); setToken(null); setUser(null); })
       .finally(() => setLoading(false));
   }, []);
@@ -42,6 +46,7 @@ export function AuthProvider({ children }) {
     setToken(tok); setUser(usr);
     localStorage.setItem(TOKEN_KEY, tok);
     localStorage.setItem(USER_KEY, JSON.stringify(usr));
+    syncUserData(); // merge local mylist/progress up + pull remote
   }, []);
 
   const login = useCallback(async (email, password) => {

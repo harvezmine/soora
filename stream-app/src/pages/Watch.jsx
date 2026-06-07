@@ -33,6 +33,7 @@ import {
 } from '../api';
 import Card from '../components/Card';
 import SkeletonWatch from '../components/SkeletonWatch';
+import { saveProgress } from '../utils/progress';
 
 export default function Watch() {
   const [searchParams] = useSearchParams();
@@ -756,6 +757,49 @@ export default function Watch() {
     };
     fetchAnimeData();
   }, [episodeId, animeId, isAnime, retryKey, useSubIndo, subIndoParam]);
+
+  // ── Save Continue Watching progress ──
+  // Records as soon as content is identified, then refreshes the timestamp +
+  // playhead every 15s while watching (and once on unmount).
+  useEffect(() => {
+    const buildEntry = () => {
+      if (isAnime && (animeInfo || title)) {
+        const id = samehadakuId || animeId;
+        if (!id) return null;
+        return {
+          section: 'anime', id,
+          title: (animeInfo?.title) || title,
+          image: animeInfo?.image || '',
+          ep: parseInt(epNum) || 1,
+          samehadakuId: samehadakuId || undefined,
+          animeId: animeId || undefined,
+          sub: !!samehadakuId,
+        };
+      }
+      if (isMovie && movieDetails) {
+        const id = effectiveTmdbId || gokuId || lk21Id;
+        if (!id) return null;
+        return {
+          section: 'movie', id,
+          title: movieDetails.title || movieDetails.name || title,
+          image: movieDetails.poster_path ? tmdbImg(movieDetails.poster_path) : (movieDetails._lk21PosterImg || movieDetails._gokuImage || ''),
+          mediaType, season, episode,
+          tmdbId: effectiveTmdbId || undefined,
+          gokuId: gokuId || undefined, lk21Id: lk21Id || undefined,
+        };
+      }
+      return null;
+    };
+    const entry = buildEntry();
+    if (!entry) return;
+    const save = () => {
+      const t = playerRef.current?.getCurrentTime?.() || 0;
+      saveProgress({ ...entry, time: Math.floor(t) });
+    };
+    save(); // initial record
+    const iv = setInterval(save, 15000);
+    return () => { save(); clearInterval(iv); };
+  }, [isAnime, isMovie, animeInfo, movieDetails, epNum, episode, season, samehadakuId, animeId, effectiveTmdbId, gokuId, lk21Id, mediaType, title]);
 
   const handlePlayerError = useCallback((msg) => {
     console.warn('Player error:', msg);
