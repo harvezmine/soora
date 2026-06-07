@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getMyList } from '../utils/mylist';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({ section = 'sooranime' }) {
   const navigate = useNavigate();
@@ -8,6 +9,9 @@ export default function Navbar({ section = 'sooranime' }) {
   const [scrolled, setScrolled] = useState(false);
   const [listCount, setListCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+  const { user, logout } = useAuth();
 
   const isSooraflix = section === 'sooraflix';
   const isSooramics = section === 'sooramics';
@@ -35,7 +39,16 @@ export default function Navbar({ section = 'sooranime' }) {
   // Close menu on route change
   useEffect(() => {
     setMenuOpen(false);
+    setProfileOpen(false);
   }, [location.pathname]);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onClick = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [profileOpen]);
 
   // Lock body scroll when menu open
   useEffect(() => {
@@ -134,6 +147,45 @@ export default function Navbar({ section = 'sooranime' }) {
           My List
           {listCount > 0 && <span className="nav-badge">{listCount}</span>}
         </a>
+
+        {/* Profile / login — shown inside nav so it collapses into the mobile menu too */}
+        {user ? (
+          <div className="nav-profile" ref={profileRef}>
+            <button className="nav-profile-btn" onClick={() => setProfileOpen((v) => !v)} aria-label="Profil" aria-expanded={profileOpen}>
+              <img src={user.avatar} alt="" referrerPolicy="no-referrer" onError={(e) => { e.target.style.visibility = 'hidden'; }} />
+              <span className="nav-profile-name">{(user.name || '').split(' ')[0]}</span>
+              <svg className={`nav-profile-chev ${profileOpen ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="14" height="14"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+            {profileOpen && (
+              <div className="nav-profile-menu">
+                <div className="nav-profile-head">
+                  <img src={user.avatar} alt="" referrerPolicy="no-referrer" />
+                  <div>
+                    <div className="nav-profile-head-name">{user.name}</div>
+                    <div className="nav-profile-head-email">{user.email}</div>
+                  </div>
+                </div>
+                <button onClick={() => handleNav('/profile')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                  Profil
+                </button>
+                <button onClick={() => handleNav(mylistPath)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+                  My List
+                </button>
+                <button className="danger" onClick={() => { logout(); setProfileOpen(false); navigate('/'); }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+                  Keluar
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <a className="nav-login-btn" onClick={() => handleNav(`/login?next=${encodeURIComponent(location.pathname)}`)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" /></svg>
+            Masuk
+          </a>
+        )}
       </nav>
     </div>
   );

@@ -16,6 +16,7 @@ import komikplusRoutes from './routes/komikplus';
 import proxyRoutes from './routes/proxy';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
+import adminRoutes from './routes/admin';
 
 const app = express();
 
@@ -69,12 +70,13 @@ app.post('/cache/clear', (_req, res) => {
 // These routes aggregate multiple API calls into single responses
 // Never cache auth/user responses (Cloudflare would otherwise cache a logged-in
 // GET like /auth/me and serve one user's data to everyone — auth leak).
-app.use(['/auth', '/user'], (_req, res, next) => {
+app.use(['/auth', '/user', '/admin'], (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, private, max-age=0');
   next();
 });
 app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
+app.use('/admin', adminRoutes);
 app.use('/anime', animeRoutes);
 app.use('/movies', movieRoutes);
 app.use('/manga', mangaRoutes);

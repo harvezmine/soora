@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { LegacyAnimeRedirect, LegacyMovieRedirect, LegacyMangaRedirect } from './components/LegacyRedirect';
 import { usePWAMobileOptimizations } from './hooks/usePWAMobile';
 import RequireAuth from './components/RequireAuth';
+import useHeartbeat from './hooks/useHeartbeat';
 import './App.css';
 
 /* ── Route-level code splitting: each page loads its own JS chunk on demand ── */
@@ -25,6 +26,8 @@ const MovieInfo = lazy(() => import('./pages/MovieInfo'));
 const Watch = lazy(() => import('./pages/Watch'));
 const MyList = lazy(() => import('./pages/MyList'));
 const SooramicsPlus = lazy(() => import('./pages/SooramicsPlus'));
+const Admin = lazy(() => import('./pages/Admin'));
+const Profile = lazy(() => import('./pages/Profile'));
 
 /* Minimal route-transition fallback (no spinner — skeleton in each page handles UX) */
 function RouteFallback() {
@@ -36,10 +39,13 @@ function AppLayout() {
 
   // PWA mobile optimizations (overscroll, back button, orientation, etc.)
   usePWAMobileOptimizations();
+  // Track active time on Soora (no-op when logged out)
+  useHeartbeat();
 
   const isLanding = location.pathname === '/';
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
   const isSooramicsPlus = location.pathname === '/33';
+  const isAdmin = location.pathname === '/adminkicawkicaw';
 
   // Detect which "app" we're in based on path
   const isMovieSection = location.pathname.startsWith('/movies') || location.pathname.startsWith('/movie/') || location.pathname.startsWith('/series/') || location.pathname.startsWith('/watch/movie');
@@ -54,7 +60,7 @@ function AppLayout() {
 
   return (
     <MiniPlayerProvider>
-      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && <Navbar section={section} />}
+      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && !isAdmin && <Navbar section={section} />}
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -62,6 +68,10 @@ function AppLayout() {
         <Route path="/register" element={<Register />} />
         {/* sooramics+ hidden route */}
         <Route path="/33" element={<SooramicsPlus />} />
+        {/* hidden admin monitoring */}
+        <Route path="/adminkicawkicaw" element={<Admin />} />
+        {/* user profile */}
+        <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
         {/* sooranime routes */}
         <Route path="/anime" element={<Home />} />
@@ -98,7 +108,7 @@ function AppLayout() {
         <Route path="/series/info" element={<LegacyMovieRedirect />} />
       </Routes>
       </Suspense>
-      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && <MiniPlayer />}
+      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && !isAdmin && <MiniPlayer />}
     </MiniPlayerProvider>
   );
 }

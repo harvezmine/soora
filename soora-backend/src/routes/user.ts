@@ -26,6 +26,14 @@ router.delete('/progress/:key', async (req, res) => {
   catch (e: any) { reportRouteError(req, e, 'user/progress:del'); res.status(500).json({ error: 'failed' }); }
 });
 
+// ── Heartbeat (active-time tracking) ──
+router.post('/heartbeat', async (req, res) => {
+  try {
+    await store.recordHeartbeat(uid(req), Date.now(), req.body?.path);
+    res.json({ ok: true });
+  } catch (e: any) { reportRouteError(req, e, 'user/heartbeat'); res.status(500).json({ error: 'failed' }); }
+});
+
 // ── History ──
 router.get('/history', async (req, res) => {
   try { res.json({ items: await store.getHistory(uid(req)) }); }
