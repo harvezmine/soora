@@ -67,6 +67,12 @@ app.post('/cache/clear', (_req, res) => {
 
 // ========== ORCHESTRATED ROUTES ==========
 // These routes aggregate multiple API calls into single responses
+// Never cache auth/user responses (Cloudflare would otherwise cache a logged-in
+// GET like /auth/me and serve one user's data to everyone — auth leak).
+app.use(['/auth', '/user'], (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, private, max-age=0');
+  next();
+});
 app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
 app.use('/anime', animeRoutes);
