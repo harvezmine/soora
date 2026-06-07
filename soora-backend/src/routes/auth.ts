@@ -9,18 +9,25 @@ import { reportRouteError } from '../services/telegram';
 const router = Router();
 const googleClient = new OAuth2Client(config.googleClientId);
 
-const sign = (id: string) => jwt.sign({ id }, config.jwtSecret, { expiresIn: '60d' });
+const sign = (id: string, tv = 0) => jwt.sign({ id, tv }, config.jwtSecret, { expiresIn: '60d' });
 const newId = () => `u_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 const avatarFor = (name: string) =>
   `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=7c5cfc`;
 
 // ── JWT middleware (attaches req.userId) ──
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const h = req.headers.authorization || '';
   const token = h.startsWith('Bearer ') ? h.slice(7) : '';
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    const payload = jwt.verify(token, config.jwtSecret) as { id: string };
+    const payload = jwt.verify(token, config.jwtSecret) as { id: string; tv?: number };
+    const user = await getUserById(payload.id);
+    if (!user) return res.status(401).json({ error: 'Invalid token' });
+    if (user.banned) return res.status(403).json({ error: 'Akun diblokir', banned: true });
+    // tokenVersion mismatch → session was terminated by admin
+    if ((user.tokenVersion || 0) !== (payload.tv || 0)) {
+      return res.status(401).json({ error: 'Sesi berakhir', expired: true });
+    }
     (req as any).userId = payload.id;
     next();
   } catch {
@@ -47,7 +54,7 @@ router.post('/register', async (req: Request, res: Response) => {
       createdAt: Date.now(),
     };
     await saveUser(user);
-    res.json({ token: sign(user.id), user: publicUser(user) });
+    res.json({ token: sign(user.id, user.tokenVersion), user: publicUser(user) });
   } catch (err: any) {
     reportRouteError(req, err, 'auth/register');
     res.status(500).json({ error: 'Gagal mendaftar' });
@@ -63,7 +70,8 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!user || !user.passHash || !(await bcrypt.compare(password, user.passHash))) {
       return res.status(401).json({ error: 'Email atau password salah' });
     }
-    res.json({ token: sign(user.id), user: publicUser(user) });
+    if (user.banned) return res.status(403).json({ error: 'Akun ini diblokir' });
+    res.json({ token: sign(user.id, user.tokenVersion), user: publicUser(user) });
   } catch (err: any) {
     reportRouteError(req, err, 'auth/login');
     res.status(500).json({ error: 'Gagal masuk' });
@@ -94,7 +102,8 @@ router.post('/google', async (req: Request, res: Response) => {
       if (p.picture) user.avatar = p.picture;
       await saveUser(user);
     }
-    res.json({ token: sign(user.id), user: publicUser(user) });
+    if (user.banned) return res.status(403).json({ error: 'Akun ini diblokir' });
+    res.json({ token: sign(user.id, user.tokenVersion), user: publicUser(user) });
   } catch (err: any) {
     reportRouteError(req, err, 'auth/google');
     res.status(401).json({ error: 'Verifikasi Google gagal' });

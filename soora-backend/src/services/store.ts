@@ -24,6 +24,9 @@ export interface UserRecord {
   passHash?: string;
   googleSub?: string;
   createdAt: number;
+  tokenVersion?: number; // bump to invalidate all existing JWTs (terminate session)
+  banned?: boolean;
+  bannedAt?: number;
 }
 
 const uKey = (id: string) => `user:${id}`;
@@ -55,6 +58,39 @@ export async function listAllUsers(): Promise<UserRecord[]> {
 
 export async function countUsers(): Promise<number> {
   return redis.scard(USERS_SET);
+}
+
+// ── Admin actions ──
+/** Bump tokenVersion → every JWT signed with the old version is rejected. */
+export async function bumpTokenVersion(id: string): Promise<number> {
+  const u = await getUserById(id);
+  if (!u) return 0;
+  u.tokenVersion = (u.tokenVersion || 0) + 1;
+  await saveUser(u);
+  return u.tokenVersion;
+}
+
+export async function setBanned(id: string, banned: boolean): Promise<boolean> {
+  const u = await getUserById(id);
+  if (!u) return false;
+  u.banned = banned;
+  u.bannedAt = banned ? Date.now() : undefined;
+  if (banned) u.tokenVersion = (u.tokenVersion || 0) + 1; // also kick active sessions
+  await saveUser(u);
+  return true;
+}
+
+/** Hard-delete a user and all their data. */
+export async function deleteUser(id: string): Promise<boolean> {
+  const u = await getUserById(id);
+  if (!u) return false;
+  const pipe = redis.pipeline();
+  pipe.del(uKey(id));
+  if (u.email) pipe.del(emailKey(u.email));
+  pipe.srem(USERS_SET, id);
+  pipe.del(progKey(id), histKey(id), listKey(id), prefsKey(id), statsKey(id));
+  await pipe.exec();
+  return true;
 }
 
 // publicly-safe user view (no passHash)
