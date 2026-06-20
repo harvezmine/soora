@@ -851,7 +851,8 @@ const normalizeMangaTitle = (title) => {
 // Proxy manga images through our server to add required Referer header
 export const mangaImgProxy = (url) => {
   if (!url) return '';
-  if (url.includes('readdetectiveconan.com') || url.includes('mangapill')) {
+  // komiku's CDN (img/thumbnail.komiku.org) 403s hotlinks → must proxy w/ Referer.
+  if (url.includes('readdetectiveconan.com') || url.includes('mangapill') || url.includes('komiku.')) {
     return `/manga-img?url=${encodeURIComponent(url)}`;
   }
   return url;

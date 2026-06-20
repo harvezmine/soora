@@ -92,10 +92,17 @@ app.get('/manga-img', async (req, res) => {
   const targetUrl = String(req.query.url || '');
   if (!targetUrl) return res.status(400).send('Missing url');
   if (!isUrlAllowed(targetUrl)) return res.status(403).send('Forbidden target');
+  // Per-host Referer — komiku's CDN 403s hotlinks unless Referer is its own origin.
+  let referer = 'https://mangapill.com/';
+  try {
+    const host = new URL(targetUrl).hostname.toLowerCase();
+    if (host.endsWith('komiku.org') || host.endsWith('komiku.id')) referer = 'https://komiku.org/';
+    else if (host.endsWith('mangadex.org')) referer = 'https://mangadex.org/';
+  } catch { /* keep default */ }
   try {
     const axios = (await import('axios')).default;
     const response = await axios.get(targetUrl, {
-      headers: { 'Referer': 'https://mangapill.com/', 'User-Agent': 'Mozilla/5.0' },
+      headers: { 'Referer': referer, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
       responseType: 'arraybuffer', timeout: 15000,
     });
     res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');

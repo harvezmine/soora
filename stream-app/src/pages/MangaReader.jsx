@@ -347,7 +347,7 @@ export default function MangaReader() {
     // Blob URLs (offline) - return as-is
     if (page._blob || url.startsWith('blob:')) return url;
     if (isMangaDex || url.includes('mangadex.org')) return url;
-    if (provider === 'komiku' || url.includes('komiku.org')) return url;
+    // komiku CDN 403s hotlinks → must go through the Referer proxy
     return mangaImgProxy(url);
   };
 
