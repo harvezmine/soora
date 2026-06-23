@@ -9032,9 +9032,12 @@ a:hover {
     border-left: 1px solid rgba(255,255,255,0.06);
     flex-direction: column;
     align-items: stretch;
-    padding: 4.5rem 1.5rem 2rem;
+    padding: 4.5rem 1.25rem calc(2rem + env(safe-area-inset-bottom));
     gap: 0.25rem;
     z-index: 1001;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -9066,6 +9069,37 @@ a:hover {
   .navbar nav .nav-exit {
     opacity: 0.5;
     font-size: 0.82rem;
+  }
+
+  /* Profile lives at the bottom of the drawer. Render its menu inline
+     (not as an absolute dropdown) so it never falls off-screen on mobile. */
+  .navbar nav .nav-profile {
+    width: 100%;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 0.6rem;
+    margin-top: 0.4rem;
+  }
+  .navbar nav .nav-profile-btn {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 12px;
+    padding: 0.55rem 0.7rem;
+  }
+  .navbar nav .nav-profile-btn .nav-profile-name {
+    display: inline;
+    flex: 1;
+    max-width: none;
+    font-size: 0.95rem;
+  }
+  .navbar nav .nav-profile-btn .nav-profile-chev { margin-left: auto; }
+  .navbar nav .nav-profile-menu {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    margin: 0.5rem 0 0;
+    box-shadow: none;
+    background: rgba(255,255,255,0.03);
+    animation: none;
   }
 
   .navbar {
@@ -12895,14 +12929,18 @@ a:hover {
 /* ════════════════════════════════════════════════
    Profile page
    ════════════════════════════════════════════════ */
-.profile-page { max-width: 920px; margin: 0 auto; padding: 0 1.2rem 4rem; }
-.profile-hero { position: relative; border-radius: 0 0 24px 24px; overflow: hidden; margin: 0 -1.2rem 1.5rem; }
+.profile-page { max-width: 920px; margin: 0 auto; padding: 72px 1.2rem calc(4rem + env(safe-area-inset-bottom)); }
+.profile-hero { position: relative; border-radius: 24px; overflow: hidden; margin: 0 0 1.5rem; }
 .profile-hero-bg { height: 150px; background: linear-gradient(135deg, #7c5cfc 0%, #4c2fb5 60%, #1a1a2e 100%); }
 .profile-hero-inner { display: flex; align-items: flex-end; gap: 1.2rem; padding: 0 1.5rem 1.4rem; margin-top: -52px; }
-.profile-avatar { width: 104px; height: 104px; border-radius: 50%; object-fit: cover; border: 4px solid #0d0d14; background: #2a2a3e; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-.profile-id { padding-bottom: 0.4rem; }
-.profile-name { font-size: 1.6rem; font-weight: 800; color: #fff; margin: 0; }
-.profile-email { color: rgba(255,255,255,0.55); font-size: 0.92rem; margin: 0.2rem 0 0; }
+.profile-avatar { width: 104px; height: 104px; border-radius: 50%; object-fit: cover; border: 4px solid #0d0d14; background: #2a2a3e; box-shadow: 0 8px 24px rgba(0,0,0,0.5); flex: 0 0 auto; }
+.profile-avatar-fallback { display: grid; place-items: center; font-size: 2.2rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #7c5cfc, #ff6b9d); }
+.profile-id { padding-bottom: 0.4rem; min-width: 0; }
+.profile-name { font-size: 1.6rem; font-weight: 800; color: #fff; margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.profile-email { color: rgba(255,255,255,0.55); font-size: 0.92rem; margin: 0.2rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-hero-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.55rem; font-size: 0.82rem; color: rgba(255,255,255,0.55); }
+.profile-hero-stats b { color: #fff; font-weight: 700; }
+.profile-stat-dot { opacity: 0.4; }
 .profile-section { margin-top: 2rem; }
 .profile-section-title { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.45); font-weight: 700; margin: 0 0 0.9rem; }
 .profile-quick-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.9rem; }
@@ -12929,6 +12967,28 @@ a:hover {
 .profile-row.danger { color: #f87171; }
 .profile-row.danger .profile-row-icon { color: #f87171; }
 .profile-row.danger:hover { background: rgba(239,68,68,0.1); }
+.profile-row:disabled { opacity: 0.4; cursor: not-allowed; }
+.profile-row:disabled:hover { background: rgba(255,255,255,0.04); }
+.profile-row-count { font-size: 0.82rem; font-weight: 700; color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.06); border-radius: 999px; padding: 2px 9px; min-width: 22px; text-align: center; }
+.profile-confirm { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); border-radius: 12px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.85rem; }
+.profile-confirm-text { color: rgba(255,255,255,0.85); font-size: 0.9rem; line-height: 1.5; }
+.profile-confirm-actions { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.profile-confirm-cancel, .profile-confirm-ok { font-family: inherit; font-size: 0.88rem; font-weight: 600; border-radius: 10px; padding: 0.55rem 1.1rem; cursor: pointer; border: 1px solid transparent; min-height: 44px; transition: background 0.15s ease; }
+.profile-confirm-cancel { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: #fff; }
+.profile-confirm-cancel:hover { background: rgba(255,255,255,0.12); }
+.profile-confirm-ok { background: #ef4444; color: #fff; }
+.profile-confirm-ok:hover { background: #dc2626; }
+.profile-footer { text-align: center; color: rgba(255,255,255,0.3); font-size: 0.78rem; margin-top: 2.5rem; }
+@media (max-width: 560px) {
+  .profile-page { padding-top: 64px; }
+  .profile-hero { border-radius: 18px; }
+  .profile-hero-inner { flex-direction: column; align-items: center; text-align: center; gap: 0.7rem; padding: 0 1.1rem 1.3rem; }
+  .profile-avatar { width: 88px; height: 88px; }
+  .profile-id { padding-bottom: 0; max-width: 100%; }
+  .profile-email { white-space: normal; word-break: break-word; }
+  .profile-hero-stats { justify-content: center; }
+  .profile-row { min-height: 48px; }
+}
 
 /* ════════════════════════════════════════════════
    Admin monitoring page
