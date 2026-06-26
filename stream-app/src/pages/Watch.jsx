@@ -1017,7 +1017,15 @@ export default function Watch() {
               onMinimize={isAnime ? handleMinimize : isMovie ? handleMinimizeMovie : undefined}
               onLevelsLoaded={(levels) => {
                 setAnimeHlsLevels(levels);
-                setAnimeSelectedLevel(-1);
+                // Default to the highest available resolution (levels are sorted
+                // desc, so [0] is the top — 1080p when the manifest has it).
+                const top = levels?.[0];
+                if (top && top.index >= 0) {
+                  setAnimeSelectedLevel(top.index);
+                  playerRef.current?.setLevel(top.index);
+                } else {
+                  setAnimeSelectedLevel(-1);
+                }
                 // Manifest parsed successfully — this source works
                 lastWorkingSource.current = currentSource;
               }}
@@ -1082,33 +1090,10 @@ export default function Watch() {
       {/* ===== CONTENT BELOW PLAYER ===== */}
       <div className="watch-content">
 
-        {/* Player controls — auto by default. Server fallback is automatic; we
-            only surface (a) LK21's distinct server list, and (b) a small Sub Indo
-            toggle for anime since it's a different content source. No Direct/Embed
-            choice — the player picks and auto-rotates silently. */}
-        {lk21Id && sources.length > 1 ? (
-          <div className="watch-player-mode">
-            <span className="watch-player-mode-label">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                <polygon points="10 8 16 11 10 14 10 8" fill="currentColor"/>
-              </svg>
-              Server
-            </span>
-            <div className="watch-player-mode-pills">
-              {sources.map((src, i) => (
-                <button
-                  key={i}
-                  className={`watch-quality-pill ${currentSource?.url === src.url ? 'active' : ''}`}
-                  onClick={() => { setUseEmbedPlayer(false); setCurrentSource(src); }}
-                  title={src.provider || `Server ${i + 1}`}
-                >
-                  {src.provider || `Server ${i + 1}`}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : isAnime ? (
+        {/* Player controls — fully automatic. Servers auto-failover silently on
+            error (no manual server picker), so the only choice we surface below
+            the player is the resolution selector. Anime keeps a Sub Indo tag. */}
+        {isAnime ? (
           <div className="watch-sub-select">
             <span className="watch-sub-label">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 12h4M14 12h4M6 16h8"/></svg>
@@ -1156,8 +1141,10 @@ export default function Watch() {
           </div>
         )}
 
-        {/* Source quality selector (for non-HLS multi-source streams like AnimePahe) */}
-        {animeHlsLevels.length <= 1 && sources.length > 1 && (
+        {/* Source quality selector (for non-HLS multi-source streams like
+            AnimePahe). Excluded for movies — LK21's multiple "sources" are
+            servers, not resolutions, and must not appear as quality options. */}
+        {!isMovie && animeHlsLevels.length <= 1 && sources.length > 1 && (
           <div className="watch-quality-section">
             <span className="watch-quality-label">Quality</span>
             <div className="watch-quality-pills">
