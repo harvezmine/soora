@@ -733,14 +733,14 @@ export const searchGoku = async (query) => {
   const res = await api.get('/movies/search', { params: { q: query, page: 1 } });
   const d = res.data || {};
   const tmdbItems = d.tmdb?.results || [];               // already card-ready
-  const gokuItems = (d.goku?.results || []).map((r) => (r.gokuId || r.tmdbId ? r : normalizeGoku(r)));
   const lk21Items = d.lk21?.results || [];               // already normalized by backend
-  // TMDB first (richest metadata + working posters), then scraper fallbacks. Dedup.
+  // Goku dropped from the pool (dead). TMDB first (richest metadata + working
+  // posters), then LK21 (Indonesian). Dedup.
   const seen = new Set();
   const merged = [];
-  for (const item of [...tmdbItems, ...gokuItems, ...lk21Items]) {
+  for (const item of [...tmdbItems, ...lk21Items]) {
     if (!item) continue;
-    const key = String(item.tmdbId ?? item.gokuId ?? item.lk21Id ?? item.id ?? item.title);
+    const key = String(item.tmdbId ?? item.lk21Id ?? item.id ?? item.title);
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(item);

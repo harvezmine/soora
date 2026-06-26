@@ -75,19 +75,15 @@ const MOVIE_GENRE_SECTIONS = [
 router.get('/home', async (req: Request, res: Response) => {
   try {
     const data = await cachedSWR('movies:home', async () => {
-      // Phase 1: Core sections (all in parallel)
+      // Phase 1: Core sections (all in parallel). Goku is dead (502/empty) —
+      // removed from the pool. EN home is served by TMDB, ID home by LK21.
       const [
         trendingRes, popularMoviesRes, popularTVRes,
-        gokuTrendMovie, gokuTrendTV, gokuRecentMovie, gokuRecentTV,
         lk21PopularRes, lk21RecentRes, lk21SeriesRes,
       ] = await parallel(
         tmdb.trending('all', 'week'),
         tmdb.popularMovies(1),
         tmdb.popularTV(1),
-        consumet.movieTrending('movie', 'goku').catch(() => null),
-        consumet.movieTrending('tv', 'goku').catch(() => null),
-        consumet.movieRecentMovies('goku').catch(() => null),
-        consumet.movieRecentShows('goku').catch(() => null),
         consumet.lk21Popular(1).catch(() => null),
         consumet.lk21Recent(1).catch(() => null),
         consumet.lk21LatestSeries(1).catch(() => null),
@@ -114,10 +110,6 @@ router.get('/home', async (req: Request, res: Response) => {
         trending: filterAvailable('movie', trendingRes?.results || []),
         popularMovies: filterAvailable('movie', popularMoviesRes?.results || []),
         popularTV: filterAvailable('movie', popularTVRes?.results || []),
-        gokuTrendingMovies: filterAvailable('movie', (Array.isArray(gokuTrendMovie) ? gokuTrendMovie : extractResults(gokuTrendMovie)).map(normalizeGoku)),
-        gokuTrendingTV: filterAvailable('movie', (Array.isArray(gokuTrendTV) ? gokuTrendTV : extractResults(gokuTrendTV)).map(normalizeGoku)),
-        gokuRecentMovies: filterAvailable('movie', (Array.isArray(gokuRecentMovie) ? gokuRecentMovie : extractResults(gokuRecentMovie)).map(normalizeGoku)),
-        gokuRecentTV: filterAvailable('movie', (Array.isArray(gokuRecentTV) ? gokuRecentTV : extractResults(gokuRecentTV)).map(normalizeGoku)),
         lk21Popular: filterAvailable('movie', (Array.isArray(lk21PopularRes) ? lk21PopularRes : []).map(normalizeLK21)),
         lk21Recent: filterAvailable('movie', (Array.isArray(lk21RecentRes) ? lk21RecentRes : []).map(normalizeLK21)),
         lk21Series: filterAvailable('movie', (Array.isArray(lk21SeriesRes) ? lk21SeriesRes : []).map(normalizeLK21)),
@@ -182,23 +174,23 @@ router.get('/search', async (req: Request, res: Response) => {
     if (!query) return res.status(400).json({ error: 'Missing query' });
 
     const data = await cached(`movies:search:${query}:${page}`, async () => {
-      const [tmdbRes, gokuRes, lk21Res] = await parallel(
+      // Goku removed from the pool (dead). Search = TMDB + LK21.
+      const [tmdbRes, lk21Res] = await parallel(
         tmdb.searchMulti(query, page),
-        consumet.movieSearch(query, 'goku').catch(() => null),
         consumet.lk21Search(query).catch(() => null),
       );
 
       // Indonesian-original films (original_language 'id') don't exist on the
-      // international embed pool (VidLink/VidSrc) and can't be played there.
-      // Drop them from the TMDB branch — Indonesian titles are served by LK21
-      // (direct HLS) instead, so search only surfaces playable results.
+      // international embed pool (VidLink) and can't be played there. Drop them
+      // from the TMDB branch — Indonesian titles are served by LK21 (direct
+      // HLS) instead, so search only surfaces playable results.
       const tmdbResults = (tmdbRes?.results || []).filter(
         (r: any) => r.originalLanguage !== 'id'
       );
 
       return {
         tmdb: { results: tmdbResults, totalPages: tmdbRes?.totalPages || 0 },
-        goku: { results: extractResults(gokuRes).map(normalizeGoku) },
+        goku: { results: [] },
         lk21: { results: extractResults(lk21Res).map(normalizeLK21) },
       };
     }, CACHE_TTL.SEARCH);

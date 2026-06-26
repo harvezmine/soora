@@ -6,9 +6,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
  */
 
 /**
- * Movie/TV embed servers — curated 2026-06-27. Dead domains removed
- * (vidsrc.icu NXDOMAIN, player.autoembed.cc NXDOMAIN, vidsrc.cc 403 from VPS/geo).
- * `sandbox: true` blocks ad pop-ups/redirects; only on servers that play sandboxed.
+ * Movie/TV embed backup — curated 2026-06-27. VixSrc (raw HLS in our own
+ * player) is the ad-free primary; this iframe is the fallback.
+ * Removed: vidsrc.icu/player.autoembed.cc (NXDOMAIN), vidsrc.cc (403 from VPS),
+ * vidsrc.su (served alchemmauls popunder ads + popup tab — dropped).
+ * Only VidLink remains: tested clean (0 ad-network requests, 0 popups) and
+ * `sandbox: true` blocks any pop-up/redirect.
  */
 const EMBED_SERVERS = [
   {
@@ -18,14 +21,6 @@ const EMBED_SERVERS = [
         ? `https://vidlink.pro/tv/${tmdbId}/${season}/${ep}?primaryColor=7c5cfc&secondaryColor=7c5cfc&autoplay=true&iconColor=7c5cfc`
         : `https://vidlink.pro/movie/${tmdbId}?primaryColor=7c5cfc&secondaryColor=7c5cfc&autoplay=true&iconColor=7c5cfc`,
     sandbox: true,
-  },
-  {
-    name: 'VidSrc.su',
-    buildUrl: (tmdbId, type, season, ep) =>
-      type === 'tv'
-        ? `https://vidsrc.su/embed/tv/${tmdbId}/${season}/${ep}`
-        : `https://vidsrc.su/embed/movie/${tmdbId}`,
-    sandbox: false, // needs top-nav for some sources
   },
 ];
 

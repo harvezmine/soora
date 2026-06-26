@@ -1,17 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getGokuTrendingMovies,
-  getGokuTrendingTV,
-  getGokuRecentMovies,
-  getGokuRecentTV,
   getTMDBGenres,
   getTrendingTMDB,
   getPopularMovies,
   getPopularTV,
   discoverByGenre,
   discoverTMDB,
-  getMovieHomeBundle,
   getLK21HomeBundle,
   searchLK21,
 } from '../api';
@@ -139,18 +134,6 @@ export default function MovieHome() {
       setHeroIdx(0);
     }
 
-    const normalizeGokuItem = (item) => ({
-      id: item.id,
-      title: item.title || 'Unknown',
-      image: item.image || '',
-      type: item.type || 'Movie',
-      releaseDate: item.releaseDate || '',
-      duration: item.duration || '',
-      mediaType: item.type === 'TV Series' ? 'tv' : 'movie',
-      season: item.season || '',
-      latestEpisode: item.latestEpisode || '',
-    });
-
     // ── LK21 (Indonesia) mode ──
     const fetchLK21 = async () => {
       try {
@@ -204,140 +187,7 @@ export default function MovieHome() {
       }
     };
 
-    // ── Goku/TMDB (English) mode ──
-    const fetchViaBundle = async () => {
-      try {
-        const [bundleRes, genresRes] = await Promise.all([
-          getMovieHomeBundle(),
-          getTMDBGenres().catch(() => ({ data: [] })),
-        ]);
-        const d = bundleRes.data || bundleRes;
-        if (cancelled) return false;
-
-        // Normalize Goku items from bundle
-        const normList = (arr) => (arr || []).map(normalizeGokuItem);
-
-        const tm = normList(d.trendingMovies);
-        const rm = normList(d.recentMovies);
-        const ttv = normList(d.trendingTV);
-        const rtv = normList(d.recentTV);
-        const genres = genresRes.data || [];
-
-        // If bundle returned completely empty, signal caller to try fallback
-        const hasData = tm.length > 0 || rm.length > 0 || ttv.length > 0 || rtv.length > 0;
-        if (!hasData) return false;
-
-        // Apply all data at once (no staggering needed)
-        setTrendingMovies(tm);
-        setHeroReady(true);
-        setRecentMovies(rm);
-        setTrendingTV(ttv);
-        setRecentTV(rtv);
-        setSectionsReady(true);
-        if (genres.length) setAllGenres(genres);
-
-        // Genre sections in background
-        const allGenreResults = await Promise.allSettled(
-          GENRE_SECTIONS.map((g) => discoverByGenre(g.id, 1, 'movie'))
-        );
-        if (cancelled) return true;
-        const gd = {};
-        GENRE_SECTIONS.forEach((g, i) => {
-          if (allGenreResults[i].status === 'fulfilled') {
-            gd[g.id] = allGenreResults[i].value.data?.results || [];
-          }
-        });
-        setGenreData(gd);
-        setGenresReady(true);
-
-        // Save to page cache
-        _saveMoviePageCache('en', {
-          trendingMovies: tm,
-          trendingTV: ttv,
-          recentMovies: rm,
-          recentTV: rtv,
-          genreData: gd,
-          allGenres: genres,
-        });
-
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
-    // eslint-disable-next-line no-unused-vars
-    const fetchIndividual = async () => {
-      let hasAnyData = false;
-      let _tm = [], _rm = [], _ttv = [], _rtv = [], _gd = {}, _ag = [];
-
-      // Phase 1: Hero (trending movies) — fastest
-      try {
-        const tmRes = await getGokuTrendingMovies();
-        if (cancelled) return false;
-        _tm = tmRes.data || [];
-        if (_tm.length > 0) {
-          hasAnyData = true;
-          setTrendingMovies(_tm);
-          setHeroReady(true);
-        }
-      } catch { /* Goku hero failed — outer handler will set ready */ }
-
-      // Phase 2: Rest of base sections + genres list in parallel
-      try {
-        const [baseResults, genresRes] = await Promise.all([
-          Promise.allSettled([
-            getGokuRecentMovies(),
-            getGokuTrendingTV(),
-            getGokuRecentTV(),
-          ]),
-          getTMDBGenres().catch(() => ({ data: [] })),
-        ]);
-        if (cancelled) return false;
-
-        _rm = baseResults[0].status === 'fulfilled' ? baseResults[0].value.data || [] : [];
-        _ttv = baseResults[1].status === 'fulfilled' ? baseResults[1].value.data || [] : [];
-        _rtv = baseResults[2].status === 'fulfilled' ? baseResults[2].value.data || [] : [];
-        if (_rm.length || _ttv.length || _rtv.length) hasAnyData = true;
-        setRecentMovies(_rm);
-        setTrendingTV(_ttv);
-        setRecentTV(_rtv);
-        _ag = genresRes.data || [];
-        if (_ag.length) setAllGenres(_ag);
-      } catch { /* ignore */ }
-      if (hasAnyData) setSectionsReady(true);
-
-      // If no data at all (WARP down), skip genre fetch and signal failure
-      if (!hasAnyData) return false;
-
-      // Phase 3: All genre sections in parallel
-      try {
-        const genreResults = await Promise.allSettled(
-          GENRE_SECTIONS.map((g) => discoverByGenre(g.id, 1, 'movie'))
-        );
-        if (cancelled) return true;
-        GENRE_SECTIONS.forEach((g, i) => {
-          if (genreResults[i].status === 'fulfilled') {
-            _gd[g.id] = genreResults[i].value.data?.results || [];
-          }
-        });
-        setGenreData(_gd);
-      } catch { /* ignore */ }
-      setGenresReady(true);
-
-      // Save to page cache with local variables
-      _saveMoviePageCache('en', {
-        trendingMovies: _tm,
-        trendingTV: _ttv,
-        recentMovies: _rm,
-        recentTV: _rtv,
-        genreData: _gd,
-        allGenres: _ag,
-      });
-      return true;
-    };
-
-    // ── TMDB fallback for EN mode when Goku is unreachable ──
+    // ── TMDB (English) mode ──
     const fetchTMDBFallback = async () => {
       let _tm = [], _rm = [], _ttv = [], _rtv = [], _gd = {}, _ag = [];
       try {
@@ -400,35 +250,14 @@ export default function MovieHome() {
     if (selectedLang === 'id') {
       fetchLK21();
     } else {
-      (async () => {
-        // Run Goku and TMDB in parallel — first success wins
-        let gokuOk = false;
-
-        const gokuRace = (async () => {
-          const bundleOk = await fetchViaBundle();
-          if (bundleOk) { gokuOk = true; return; }
-          if (cancelled) return;
-          const indOk = await fetchIndividual();
-          if (indOk) gokuOk = true;
-        })().catch(() => {});
-
-        // Start TMDB after a short delay (give Goku a head start)
-        // so we don't fire two full fetches when Goku works fine
-        const tmdbRace = new Promise((r) => setTimeout(r, 2000)).then(async () => {
-          // If Goku already loaded, skip TMDB
-          if (gokuOk || cancelled) return;
-          await fetchTMDBFallback();
-        }).catch(() => {});
-
-        await Promise.allSettled([gokuRace, tmdbRace]);
-
-        // After both attempts, ensure ready flags are set
+      // Goku removed from the pool (dead 502/empty). TMDB is the EN source.
+      fetchTMDBFallback().finally(() => {
         if (!cancelled) {
           setHeroReady(true);
           setSectionsReady(true);
           setGenresReady(true);
         }
-      })();
+      });
     }
 
     return () => { cancelled = true; };
