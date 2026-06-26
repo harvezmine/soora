@@ -111,6 +111,7 @@ export default function Watch() {
   const playerRef = useRef(null);
   const lastWorkingSource = useRef(null); // track last source that played successfully
   const userForcedDirect = useRef(false); // true when user explicitly clicks Direct pill
+  const triedSources = useRef(new Set()); // source urls already attempted this session (auto-failover)
   const lastFetchedEpisodeId = useRef(null); // detect real episode change vs retry
 
   // Effective TMDB ID — from URL param or resolved from Goku enrichment
@@ -138,6 +139,7 @@ export default function Watch() {
       setSubtitles([]);
       setReferer('');
       setCurrentSource(null);
+      triedSources.current = new Set();
       try {
         let details;
 
@@ -230,8 +232,13 @@ export default function Watch() {
             }
             const lkSources = streamRes.data?.sources || [];
             if (lkSources.length > 0) {
-              // Separate HLS (direct) and embed sources
-              const hlsSources = lkSources.filter((s) => s.type === 'hls' && s.directUrl);
+              // Separate HLS (direct) and embed sources. Deprioritize
+              // hownetwork.xyz — it currently 302-redirects to Cloudflare
+              // (dead manifest); turbovip plays. Try the reliable one first.
+              const isDeadHost = (u) => /hownetwork/i.test(u || '');
+              const hlsSources = lkSources
+                .filter((s) => s.type === 'hls' && s.directUrl)
+                .sort((a, b) => isDeadHost(a.directUrl) - isDeadHost(b.directUrl));
               const embedOnly = lkSources.filter((s) => s.type !== 'hls');
 
               const allSources = [
@@ -814,6 +821,26 @@ export default function Watch() {
       return;
     }
 
+    // Movie/LK21: a server died (e.g. hownetwork manifestParsingError) — auto
+    // failover to the next untried source (TURBOVIP HLS, then CAST embed)
+    // before giving up. Walks every source once via triedSources.
+    if (isMovie) {
+      if (currentSource?.url) triedSources.current.add(currentSource.url);
+      const next = sources.find((s) => s?.url && !triedSources.current.has(s.url));
+      if (next) {
+        console.info('[Watch] Movie source failed, trying next:', next.provider || next.url);
+        triedSources.current.add(next.url);
+        if (next.isEmbed) {
+          setReferer('');
+        } else {
+          try { setReferer(new URL(next.url).origin); } catch { setReferer(''); }
+        }
+        setError(null);
+        setCurrentSource(next);
+        return;
+      }
+    }
+
     // Current source itself can't play (codec error, network etc.).
     // Auto-switch to embed if available — UNLESS user explicitly clicked Direct.
     if ((malId || alId) && !userForcedDirect.current) {
@@ -828,7 +855,7 @@ export default function Watch() {
     // User forced Direct or no embed available — show error UI
     setError(msg);
     setCurrentSource(null);
-  }, [currentSource, malId, subLang]);
+  }, [currentSource, malId, alId, subLang, sources, isMovie]);
 
   // ===== MINIMIZE HANDLER (YouTube-style) =====
   const handleMinimize = useCallback(() => {
