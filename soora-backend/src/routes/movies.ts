@@ -188,8 +188,16 @@ router.get('/search', async (req: Request, res: Response) => {
         consumet.lk21Search(query).catch(() => null),
       );
 
+      // Indonesian-original films (original_language 'id') don't exist on the
+      // international embed pool (VidLink/VidSrc) and can't be played there.
+      // Drop them from the TMDB branch — Indonesian titles are served by LK21
+      // (direct HLS) instead, so search only surfaces playable results.
+      const tmdbResults = (tmdbRes?.results || []).filter(
+        (r: any) => r.originalLanguage !== 'id'
+      );
+
       return {
-        tmdb: tmdbRes || { results: [], totalPages: 0 },
+        tmdb: { results: tmdbResults, totalPages: tmdbRes?.totalPages || 0 },
         goku: { results: extractResults(gokuRes).map(normalizeGoku) },
         lk21: { results: extractResults(lk21Res).map(normalizeLK21) },
       };

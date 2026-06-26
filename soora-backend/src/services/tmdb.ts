@@ -31,6 +31,7 @@ interface TMDBItem {
   media_type?: string;
   number_of_seasons?: number;
   overview?: string;
+  original_language?: string;
 }
 
 export function normalizeTMDB(item: TMDBItem) {
@@ -45,6 +46,7 @@ export function normalizeTMDB(item: TMDBItem) {
     type: item.media_type === 'tv' || item.number_of_seasons || item.first_air_date ? 'TV Series' : 'Movie',
     mediaType: item.media_type || (item.number_of_seasons || item.first_air_date ? 'tv' : 'movie'),
     overview: item.overview || '',
+    originalLanguage: item.original_language || '',
   };
 }
 

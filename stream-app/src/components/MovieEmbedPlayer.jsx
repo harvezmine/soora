@@ -6,8 +6,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
  */
 
 /**
- * Movie/TV embed servers — curated 2026-05-30. Dead domains removed
- * (vidsrc.icu NXDOMAIN, player.autoembed.cc NXDOMAIN).
+ * Movie/TV embed servers — curated 2026-06-27. Dead domains removed
+ * (vidsrc.icu NXDOMAIN, player.autoembed.cc NXDOMAIN, vidsrc.cc 403 from VPS/geo).
  * `sandbox: true` blocks ad pop-ups/redirects; only on servers that play sandboxed.
  */
 const EMBED_SERVERS = [
@@ -17,14 +17,6 @@ const EMBED_SERVERS = [
       type === 'tv'
         ? `https://vidlink.pro/tv/${tmdbId}/${season}/${ep}?primaryColor=7c5cfc&secondaryColor=7c5cfc&autoplay=true&iconColor=7c5cfc`
         : `https://vidlink.pro/movie/${tmdbId}?primaryColor=7c5cfc&secondaryColor=7c5cfc&autoplay=true&iconColor=7c5cfc`,
-    sandbox: true,
-  },
-  {
-    name: 'VidSrc',
-    buildUrl: (tmdbId, type, season, ep) =>
-      type === 'tv'
-        ? `https://vidsrc.cc/v2/embed/tv/${tmdbId}/${season}/${ep}?autoPlay=true`
-        : `https://vidsrc.cc/v2/embed/movie/${tmdbId}?autoPlay=true`,
     sandbox: true,
   },
   {
