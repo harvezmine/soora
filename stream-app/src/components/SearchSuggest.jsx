@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { searchSamehadaku, searchMoviesTMDB, searchManga, searchKomiku } from '../api';
+import { searchSamehadaku, searchMoviesTMDB, searchManga, searchKomiku, searchLK21 } from '../api';
+import { buildMovieUrl } from '../utils/seo';
 
 /**
  * SearchSuggest — search box with a YouTube-style live suggestion dropdown
@@ -43,6 +44,14 @@ export default function SearchSuggest({ kind = 'anime', placeholder, className =
           image: m.image, year: '', type: m.type || '', _manga: true,
         }));
         setItems(list);
+      } else if (localStorage.getItem('soora_movie_lang') === 'id') {
+        // Sub Indo mode → LK21 pool ONLY (never TMDB/English films).
+        const r = await searchLK21(term);
+        const list = (r.data?.results || []).slice(0, 6).map((m) => ({
+          id: m.lk21Id || m.id, lk21Id: m.lk21Id || m.id, title: m.title, image: m.image,
+          year: '', type: m.type, mediaType: m.mediaType, provider: 'lk21',
+        }));
+        setItems(list);
       } else {
         const r = await searchMoviesTMDB(term, 1);
         const list = (r.data?.results || []).slice(0, 6).map((m) => ({
@@ -77,6 +86,8 @@ export default function SearchSuggest({ kind = 'anime', placeholder, className =
       navigate(`/anime/${encodeURIComponent(it.id)}?sub=1`);
     } else if (kind === 'manga') {
       navigate(`/manga/${encodeURIComponent(it.id)}`);
+    } else if (it.provider === 'lk21') {
+      navigate(buildMovieUrl(it.lk21Id || it.id, it.mediaType || 'movie'));
     } else {
       const mt = it.mediaType || 'movie';
       navigate(`/${mt === 'tv' ? 'series' : 'movie'}/${it.id}`);

@@ -729,23 +729,14 @@ export const getVixsrcStream = (type, tmdbId, season, episode) =>
 // returned nothing whenever the Goku scraper was down — this endpoint falls
 // back to TMDB (always available server-side) so search keeps working.
 // Backend already card-normalizes tmdb results; goku/lk21 come as raw results.
+// English movie pool = TMDB ONLY. LK21 is a fully separate Sub-Indo pool
+// (searched via searchLK21 when soora_movie_lang === 'id'). Keeping LK21 out
+// here guarantees the English filter never surfaces LK21 films, and vice
+// versa. Backend /movies/search already strips id-language films from TMDB.
 export const searchGoku = async (query) => {
   const res = await api.get('/movies/search', { params: { q: query, page: 1 } });
-  const d = res.data || {};
-  const tmdbItems = d.tmdb?.results || [];               // already card-ready
-  const lk21Items = d.lk21?.results || [];               // already normalized by backend
-  // Goku dropped from the pool (dead). TMDB first (richest metadata + working
-  // posters), then LK21 (Indonesian). Dedup.
-  const seen = new Set();
-  const merged = [];
-  for (const item of [...tmdbItems, ...lk21Items]) {
-    if (!item) continue;
-    const key = String(item.tmdbId ?? item.lk21Id ?? item.id ?? item.title);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(item);
-  }
-  return { data: { results: merged } };
+  const tmdbItems = res.data?.tmdb?.results || [];       // already card-ready
+  return { data: { results: tmdbItems } };
 };
 
 // ========== LK21 (Indonesian movie/series provider) ==========
