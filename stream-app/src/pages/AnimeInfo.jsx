@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { getAnimeInfo, getHiAnimeInfo, getSamehadakuAnimeInfo, getSubIndoGenre } from '../api';
 import { useSEO, buildAnimeSchema, buildAnimeUrl } from '../utils/seo';
 
@@ -95,8 +95,13 @@ function ExpandableDescription({ html }) {
 export default function AnimeInfo() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const isSub = searchParams.get('sub') === '1'; // Sub Indo (samehadaku) source
+  // Listing image carried via router state — instant fallback if the provider
+  // info endpoint returns empty/blocked images.
+  const navImg = location.state?._img || '';
+  const navCover = location.state?._cover || location.state?._img || '';
 
   const [info, setInfo] = useState(null);
   const [recs, setRecs] = useState([]);
@@ -304,10 +309,20 @@ export default function AnimeInfo() {
       {/* Cinematic backdrop with fade-in */}
       <div className={`info-backdrop ${backdropLoaded ? 'loaded' : ''}`}>
         <img
-          src={info.cover || info.image}
+          src={info.cover || info.image || navCover || navImg}
           alt=""
           loading="eager"
+          referrerPolicy="no-referrer"
           onLoad={() => setBackdropLoaded(true)}
+          onError={(e) => {
+            // Don't leave the backdrop hidden forever — fall back to the
+            // listing image, then reveal.
+            if ((navCover || navImg) && e.target.src !== (navCover || navImg)) {
+              e.target.src = navCover || navImg;
+            } else {
+              setBackdropLoaded(true);
+            }
+          }}
         />
       </div>
 
@@ -320,11 +335,19 @@ export default function AnimeInfo() {
         <div className="info-header">
           <div className={`info-poster ${posterLoaded ? 'loaded' : ''}`}>
             <img
-              src={info.image || info.cover}
+              src={info.image || info.cover || navImg || navCover}
               alt={title}
               loading="eager"
+              referrerPolicy="no-referrer"
               onLoad={() => setPosterLoaded(true)}
-              onError={(e) => { e.target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320"><rect fill="%231a1a2e" width="220" height="320"/><text x="110" y="160" text-anchor="middle" fill="%23666" font-family="system-ui" font-size="13">No Image</text></svg>')}`; }}
+              onError={(e) => {
+                if ((navImg || navCover) && e.target.src !== (navImg || navCover)) {
+                  e.target.src = navImg || navCover;
+                } else {
+                  setPosterLoaded(true);
+                  e.target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320"><rect fill="%231a1a2e" width="220" height="320"/><text x="110" y="160" text-anchor="middle" fill="%23666" font-family="system-ui" font-size="13">No Image</text></svg>')}`;
+                }
+              }}
             />
             {/* Rating overlay on poster */}
             {ratingStars && (

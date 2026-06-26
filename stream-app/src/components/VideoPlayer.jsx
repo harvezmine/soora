@@ -295,18 +295,23 @@ const VideoPlayer = forwardRef(function VideoPlayer(
     return () => clearTimeout(hideTimer.current);
   }, [playing, showSettings]);
 
-  // In fullscreen the player is in the browser's top layer; the container's
-  // React onMouseMove can miss moves there, so controls only reappeared on
-  // pause. Bind a document-level mousemove while fullscreen so any movement
-  // shows the controls/progress bar (and the idle timer hides them again).
+  // Reveal controls on mouse movement over the player. Bound as NATIVE
+  // listeners on the container (the element that goes fullscreen) because in
+  // the browser's fullscreen top layer React's synthetic onMouseMove can miss
+  // events — which left controls only appearing on pause. While fullscreen we
+  // also listen on document so any movement reveals them. The idle timer
+  // hides them again after 3s.
   useEffect(() => {
-    if (!isFullscreen) return;
+    const el = containerRef.current;
+    if (!el) return;
     const onMove = () => resetHideTimer();
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchstart', onMove, { passive: true });
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('pointermove', onMove);
+    if (isFullscreen) document.addEventListener('mousemove', onMove);
     return () => {
+      el.removeEventListener('mousemove', onMove);
+      el.removeEventListener('pointermove', onMove);
       document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('touchstart', onMove);
     };
   }, [isFullscreen, resetHideTimer]);
 

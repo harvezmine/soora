@@ -82,29 +82,31 @@ export default function CardPopup({ item, type, style: posStyle, onMouseEnter, o
   const coverImg = info?.cover || info?.image || item?.cover || item?.image || '';
   const posterImg = info?.image || item?.image || '';
 
+  const navState = { state: { _img: posterImg, _cover: coverImg } };
+
   const handlePlay = useCallback((e) => {
     e.stopPropagation();
     if (type === 'anime') {
       if (episodes.length > 0) {
         navigate(`/watch/anime?episodeId=${encodeURIComponent(episodes[0].id)}&title=${encodeURIComponent(title)}&ep=${episodes[0].number || 1}&animeId=${encodeURIComponent(item.id)}`);
       } else {
-        navigate(buildAnimeUrl(item.id));
+        navigate(buildAnimeUrl(item.id), navState);
       }
     } else {
       const mt = item.mediaType || 'movie';
-      navigate(buildMovieUrl(item.id || item.tmdbId, mt));
+      navigate(buildMovieUrl(item.id || item.tmdbId, mt), navState);
     }
-  }, [type, episodes, title, item, navigate]);
+  }, [type, episodes, title, item, navigate, navState]);
 
   const handleInfo = useCallback((e) => {
     e.stopPropagation();
     if (type === 'anime') {
-      navigate(buildAnimeUrl(item.id));
+      navigate(buildAnimeUrl(item.id), navState);
     } else {
       const mt = item.mediaType || 'movie';
-      navigate(buildMovieUrl(item.id || item.tmdbId, mt));
+      navigate(buildMovieUrl(item.id || item.tmdbId, mt), navState);
     }
-  }, [type, item, navigate]);
+  }, [type, item, navigate, navState]);
 
   const toggleList = useCallback((e) => {
     e.stopPropagation();

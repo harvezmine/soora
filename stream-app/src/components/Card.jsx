@@ -24,19 +24,23 @@ export default function Card({ item, type = 'anime' }) {
   }, [item.id, type]);
 
   const handleClick = () => {
+    // Carry the (working) listing image so the detail page always has an
+    // instant poster/backdrop fallback — provider info endpoints sometimes
+    // return empty images, and TMDB enrichment is async/may miss.
+    const nav = { state: { _img: item.image || '', _cover: item.cover || item.image || '' } };
     if (type === 'anime' && (item._subIndo || item.provider === 'samehadaku')) {
       // Sub Indo (samehadaku) — open the info page first (synopsis + episodes)
-      navigate(`/anime/${encodeURIComponent(item.animeId || item.id || '')}?sub=1`);
+      navigate(`/anime/${encodeURIComponent(item.animeId || item.id || '')}?sub=1`, nav);
     } else if (type === 'anime') {
-      navigate(buildAnimeUrl(item.id));
+      navigate(buildAnimeUrl(item.id), nav);
     } else if (type === 'manga') {
-      navigate(buildMangaUrl(item.id));
+      navigate(buildMangaUrl(item.id), nav);
     } else if (item.provider === 'lk21') {
       const mt = item.mediaType || 'movie';
-      navigate(buildMovieUrl(item.lk21Id || item.id, mt));
+      navigate(buildMovieUrl(item.lk21Id || item.id, mt), nav);
     } else {
       const mt = item.mediaType || 'movie';
-      navigate(buildMovieUrl(item.id, mt));
+      navigate(buildMovieUrl(item.id, mt), nav);
     }
   };
 

@@ -190,16 +190,20 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   const title = isAlt
     ? (info.title || 'Unknown')
     : (info.title || info.name || 'Unknown');
-  const poster = isLK21
+  // Listing image carried via router state — instant fallback when the
+  // provider info endpoint returns empty images (e.g. LK21 posterImg = '').
+  const navImg = location.state?._img || '';
+  const navCover = location.state?._cover || location.state?._img || '';
+  const poster = (isLK21
     ? (tmdbData?.poster_path ? tmdbImg(tmdbData.poster_path, 'w500') : info.posterImg || '')
     : isGoku
       ? (tmdbData?.poster_path ? tmdbImg(tmdbData.poster_path, 'w500') : gokuLargeImg(info.image))
-      : tmdbImg(info.poster_path, 'w500');
-  const backdrop = isLK21
+      : tmdbImg(info.poster_path, 'w500')) || navImg;
+  const backdrop = (isLK21
     ? (tmdbData?.backdrop_path ? tmdbBackdrop(tmdbData.backdrop_path) : info.posterImg || '')
     : isGoku
       ? (tmdbData?.backdrop_path ? tmdbBackdrop(tmdbData.backdrop_path) : gokuLargeImg(info.cover || info.image))
-      : tmdbBackdrop(info.backdrop_path);
+      : tmdbBackdrop(info.backdrop_path)) || navCover || navImg;
   const year = isAlt
     ? (info.releaseDate || '')
     : (info.release_date || info.first_air_date || '').split('-')[0];
@@ -294,7 +298,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
     <div className="info-page">
       {/* Cinematic backdrop */}
       <div className="info-backdrop">
-        <img src={backdrop || poster} alt="" />
+        <img src={backdrop || poster} alt="" referrerPolicy="no-referrer" />
       </div>
 
       <button className="back-btn" onClick={() => navigate(-1)}>
@@ -310,6 +314,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
             <img
               src={poster}
               alt={title}
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 e.target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320"><rect fill="%231a1a2e" width="220" height="320"/><text x="110" y="160" text-anchor="middle" fill="%23666" font-family="system-ui" font-size="13">No Image</text></svg>')}`;
               }}

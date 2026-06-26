@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   getMangaInfo, normalizeMangaTitle, mangaImgProxy, isMangaNovel, getMangaContentType,
   getKomikuInfo, searchKomiku, searchManga, getKomikuChapterPages, getMangaChapterPages,
@@ -71,6 +71,9 @@ export default function MangaInfo() {
   const id = params['*'] || ''; // splat captures the full ID including slashes
   const provider = detectMangaProvider(id); // auto-detect: digit-prefix → mangapill, slug → komiku
   const navigate = useNavigate();
+  const location = useLocation();
+  // Listing image carried via router state — fallback when info.image is empty.
+  const navImg = location.state?._img || location.state?._cover || '';
 
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -312,9 +315,9 @@ export default function MangaInfo() {
   const status = info.status || '';
   const description = info.description || '';
 
-  // Use API image, fallback to CDN constructed URL
-  // Komiku images don't need the manga proxy
-  const rawImage = info.image || buildCoverUrl(id);
+  // Use API image, fallback to the listing image carried via router state,
+  // then to the CDN-constructed URL. Komiku images don't need the manga proxy.
+  const rawImage = info.image || navImg || buildCoverUrl(id);
   const coverSrc = rawImage
     ? (rawImage.includes('komiku.org') ? rawImage : mangaImgProxy(rawImage))
     : null;
