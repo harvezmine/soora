@@ -26,6 +26,21 @@ import { createMemoryKV, safeKV } from './ports/index.js';
  *   Web → sessionStorage, native → MMKV instance terpisah.
  * @property {PageRefPort} getPage
  *   Lokasi user saat ini, disertakan di laporan error.
+ * @property {'proxy'|'headers'} imageStrategy
+ *   Cara mengambil gambar dari CDN yang mensyaratkan header Referer.
+ *
+ *   'proxy'   — web. Browser melarang menyetel Referer pada <img>, jadi URL
+ *               dialihkan ke proxy server yang menambahkannya.
+ *   'headers' — native. expo-image bisa mengirim Referer sendiri, jadi gambar
+ *               diambil langsung dari CDN: satu hop lebih pendek, dan tidak
+ *               memakai bandwidth proxy sama sekali.
+ *
+ *   Diverifikasi 2026-08-03 terhadap cdn.readdetectiveconan.com: tanpa Referer
+ *   403, dengan Referer 200.
+ * @property {string} imgProxyBase
+ *   Awalan URL proxy gambar saat imageStrategy 'proxy'. Web memakai '' (relatif
+ *   terhadap origin) karena /manga-img adalah fungsi serverless Vercel, bukan
+ *   endpoint di api.soora.fun.
  */
 
 /** @type {CoreRuntime} */
@@ -34,6 +49,8 @@ const DEFAULTS = {
   kv: createMemoryKV(),
   cache: createMemoryKV(),
   getPage: () => '',
+  imageStrategy: 'proxy',
+  imgProxyBase: '',
 };
 
 /** @type {CoreRuntime} */
@@ -64,6 +81,18 @@ export function configureCore(partial = {}) {
       throw new TypeError('configureCore: getPage harus function');
     }
     runtime.getPage = partial.getPage;
+  }
+  if (partial.imageStrategy !== undefined) {
+    if (partial.imageStrategy !== 'proxy' && partial.imageStrategy !== 'headers') {
+      throw new TypeError("configureCore: imageStrategy harus 'proxy' atau 'headers'");
+    }
+    runtime.imageStrategy = partial.imageStrategy;
+  }
+  if (partial.imgProxyBase !== undefined) {
+    if (typeof partial.imgProxyBase !== 'string') {
+      throw new TypeError('configureCore: imgProxyBase harus string');
+    }
+    runtime.imgProxyBase = partial.imgProxyBase.replace(/\/+$/, '');
   }
   return runtime;
 }

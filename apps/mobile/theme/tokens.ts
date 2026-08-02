@@ -1,3 +1,5 @@
+import { BRAND_BG } from './brand';
+
 /**
  * Design token Soora — sumber kebenaran tunggal untuk warna, spasi, tipografi.
  *
@@ -12,7 +14,9 @@
  * keduanya lolos WCAG AA untuk teks normal (4.5:1).
  */
 export const colors = {
-  bg: '#06060e', // latar utama, sama dengan web
+  // Didefinisikan di theme/brand.js supaya app.config.ts bisa memakai nilai
+  // yang sama; lihat komentar di file itu.
+  bg: BRAND_BG,
   surface: '#0e0e1a', // kartu, sheet
   surfaceRaised: '#16162a', // elemen di atas surface
   border: '#23233a',

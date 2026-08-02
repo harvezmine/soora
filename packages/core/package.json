@@ -10,7 +10,8 @@
     "./komikplus": "./src/komikplus/index.js",
     "./user": "./src/user/index.js",
     "./runtime": "./src/runtime.js",
-    "./ports": "./src/ports/index.js"
+    "./ports": "./src/ports/index.js",
+    "./models": "./src/models/index.js"
   },
   "files": [
     "src"

@@ -50,6 +50,10 @@ export const nativeCoreConfig = ({ apiBase, getPage = () => '' }) => ({
   kv: nativePersistentKV,
   cache: nativeCacheKV,
   getPage,
+  // expo-image bisa mengirim header Referer sendiri, jadi gambar diambil
+  // langsung dari CDN — melewati proxy Vercel sepenuhnya. Selain lebih cepat,
+  // ini juga menghindari biaya bandwidth proxy untuk setiap poster.
+  imageStrategy: 'headers',
 });
 
 export { createMMKVKV };

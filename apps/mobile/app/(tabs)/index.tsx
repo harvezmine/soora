@@ -1,194 +1,126 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { getAnimeHomeBundle } from '@soora/core/api';
-import { getToken } from '@soora/core/user';
-import { getCatalogCache } from '../../lib/db';
-import { API_BASE } from '../../lib/config';
-import { colors, font, radius, space, MIN_TOUCH } from '../../theme/tokens';
-
-type Status = 'loading' | 'ok' | 'error';
+import { useCallback, useMemo } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { getAnimeHomeBundle, getMovieHomeBundle } from '@soora/core/api';
+import { buildSections, unwrap } from '@soora/core/models';
+import { useCatalog } from '../../lib/useCatalog';
+import { HeroSpotlight } from '../../components/HeroSpotlight';
+import { SectionRow } from '../../components/SectionRow';
+import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
+import { EmptyState, ErrorState, StaleBanner } from '../../components/States';
+import { colors, font, space } from '../../theme/tokens';
 
 /**
- * Layar Beranda fase 1 — sengaja belum berisi katalog sungguhan.
+ * Beranda — anime dan film dalam satu layar.
  *
- * Tugasnya membuktikan gate fase 1: satu request API asli menembus
- * @soora/core yang dikonfigurasi lewat configureCore(), hasilnya tersimpan di
- * SQLite lewat cache katalog, dan token MMKV terbaca. Kalau layar ini hijau,
- * artinya seluruh 1296 baris api.js dari web berjalan apa adanya di native.
- *
- * Katalog sungguhan dibangun di fase 2.
+ * Dua bundle diambil terpisah dan sengaja tidak saling menggagalkan. Pada
+ * 2026-08-03 seluruh provider anime mengembalikan bundle kosong sementara film
+ * lewat TMDB tetap hidup; kalau keduanya digabung dalam satu request, matinya
+ * anime akan mengosongkan seluruh layar.
  */
 export default function HomeScreen() {
-  const [status, setStatus] = useState<Status>('loading');
-  const [detail, setDetail] = useState('');
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [fromCache, setFromCache] = useState(false);
+  const anime = useCatalog('home', 'anime', useCallback(() => getAnimeHomeBundle(), []));
+  const movie = useCatalog('home', 'movie', useCallback(() => getMovieHomeBundle(), []));
 
-  // Layar tab tetap ter-mount selamanya; callback refresh background bisa
-  // datang setelah layar hilang. Penjaga ini mencegah setState liar.
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+  const animeSections = useMemo(() => {
+    const d = unwrap(anime.data) ?? {};
+    return buildSections([
+      { title: 'Episode Terbaru', items: d.recentEpisodes, kind: 'anime', source: 'hianime' },
+      { title: 'Paling Populer', items: d.mostPopular, kind: 'anime', source: 'hianime' },
+      { title: 'Sedang Tayang', items: d.topAiring, kind: 'anime', source: 'hianime' },
+    ]);
+  }, [anime.data]);
 
-  const load = useCallback(async () => {
-    setStatus('loading');
-    try {
-      const cache = getCatalogCache();
-      const before = cache.getEntry('home', 'anime');
-      setFromCache(Boolean(before));
+  const spotlight = useMemo(() => {
+    const d = unwrap(anime.data) ?? {};
+    const [first] = buildSections([
+      { title: 'Spotlight', items: d.spotlight, kind: 'anime', source: 'hianime' },
+    ]);
+    return first?.items?.[0] ?? null;
+  }, [anime.data]);
 
-      const res = await cache.read(
-        'home',
-        'anime',
-        async () => {
-          const r = await getAnimeHomeBundle();
-          return r?.data ?? r;
-        },
-        (fresh) => summarize(fresh)
-      );
+  const movieSections = useMemo(() => {
+    const d = unwrap(movie.data) ?? {};
+    return buildSections([
+      { title: 'Film Trending', items: d.tmdbTrending, kind: 'movie', source: 'tmdb' },
+      { title: 'Film Populer', items: d.tmdbPopularMovies, kind: 'movie', source: 'tmdb' },
+      { title: 'Serial Populer', items: d.tmdbPopularTV, kind: 'tv', source: 'tmdb' },
+      { title: 'LK21 Populer', items: d.lk21Popular, kind: 'movie', source: 'lk21' },
+    ]);
+  }, [movie.data]);
 
-      summarize(res);
-      setStatus('ok');
-    } catch (e) {
-      setDetail(e instanceof Error ? e.message : String(e));
-      setStatus('error');
-    }
-  }, []);
+  const loading = anime.status === 'loading' && movie.status === 'loading';
+  const sections = [...animeSections, ...movieSections];
+  const bothFailed = anime.status === 'error' && movie.status === 'error';
+  const refreshing = anime.refreshing || movie.refreshing;
 
-  const summarize = (data: unknown) => {
-    if (!alive.current) return;
-    const d = (data ?? {}) as Record<string, unknown>;
-    const next: Record<string, number> = {};
-    for (const k of ['spotlight', 'recentEpisodes', 'mostPopular', 'topAiring']) {
-      const v = d[k];
-      if (Array.isArray(v)) next[k] = v.length;
-    }
-    setCounts(next);
-  };
+  const refresh = useCallback(() => {
+    anime.refresh();
+    movie.refresh();
+  }, [anime, movie]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  if (loading) {
+    return (
+      <ScrollView style={s.screen}>
+        <SkeletonHero />
+        <SkeletonRow />
+        <SkeletonRow />
+      </ScrollView>
+    );
+  }
+
+  if (bothFailed) {
+    return (
+      <View style={s.screen}>
+        <ErrorState message={anime.error || movie.error} onRetry={refresh} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
       style={s.screen}
       contentContainerStyle={s.content}
       refreshControl={
-        <RefreshControl
-          refreshing={status === 'loading'}
-          onRefresh={() => {
-            void load();
-          }}
-          tintColor={colors.accent}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />
       }
     >
-      <Text style={s.title}>Soora</Text>
-      <Text style={s.subtitle}>Fase 1 — pemeriksaan fondasi</Text>
+      {(anime.stale || movie.stale) && <StaleBanner />}
 
-      <Row label="API base" value={API_BASE} />
-      <Row label="Token MMKV" value={getToken() ? 'ada' : 'belum login'} />
-      <Row label="Sumber data" value={fromCache ? 'cache SQLite' : 'jaringan'} />
+      {spotlight ? <HeroSpotlight item={spotlight} /> : null}
 
-      <View style={s.card}>
-        {status === 'loading' && (
-          <View style={s.center}>
-            <ActivityIndicator color={colors.accent} />
-            <Text style={s.muted}>Memuat bundle anime…</Text>
-          </View>
-        )}
+      {sections.length === 0 ? (
+        <EmptyState
+          title="Belum ada konten"
+          body={
+            'Semua penyedia sedang tidak mengembalikan data. Ini biasanya sementara — ' +
+            'coba beberapa saat lagi.'
+          }
+          onRetry={refresh}
+        />
+      ) : (
+        sections.map((sec) => <SectionRow key={sec.title} title={sec.title} items={sec.items} />)
+      )}
 
-        {status === 'ok' && (
-          <>
-            <Text style={s.ok}>Bundle diterima lewat @soora/core</Text>
-            {Object.keys(counts).length === 0 ? (
-              <Text style={s.muted}>Terhubung, tapi semua bagian kosong.</Text>
-            ) : (
-              Object.entries(counts).map(([k, n]) => <Row key={k} label={k} value={String(n)} />)
-            )}
-          </>
-        )}
-
-        {status === 'error' && (
-          <>
-            <Text style={s.err}>Request gagal</Text>
-            <Text style={s.muted}>{detail}</Text>
-            {/* Layar tab tidak pernah di-unmount, jadi tanpa tombol ini
-                satu-satunya cara pulih setelah kehilangan jaringan adalah
-                menutup paksa app. */}
-            <Pressable
-              style={({ pressed }) => [s.retry, pressed && { opacity: 0.7 }]}
-              onPress={() => {
-                void load();
-              }}
-            >
-              <Text style={s.retryText}>Coba lagi</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Kalau salah satu sumber mati sementara yang lain hidup, katakan —
+          jangan biarkan user mengira katalognya memang sekecil itu. */}
+      {animeSections.length === 0 && movieSections.length > 0 ? (
+        <Text style={s.note}>Penyedia anime sedang tidak tersedia.</Text>
+      ) : null}
+      {movieSections.length === 0 && animeSections.length > 0 ? (
+        <Text style={s.note}>Penyedia film sedang tidak tersedia.</Text>
+      ) : null}
     </ScrollView>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={s.row}>
-      <Text style={s.rowLabel}>{label}</Text>
-      <Text style={s.rowValue} numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
   );
 }
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: space.lg, gap: space.sm },
-  title: { color: colors.text, fontSize: font.size.xxl, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: font.size.md, marginBottom: space.lg },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-    marginTop: space.lg,
-    gap: space.sm,
+  content: { paddingBottom: space.xxxl },
+  note: {
+    color: colors.textDim,
+    fontSize: font.size.sm,
+    textAlign: 'center',
+    paddingHorizontal: space.xl,
+    paddingTop: space.xl,
   },
-  center: { alignItems: 'center', gap: space.sm },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: space.md,
-    paddingVertical: space.xs,
-  },
-  rowLabel: { color: colors.textDim, fontSize: font.size.sm },
-  rowValue: { color: colors.text, fontSize: font.size.sm, flexShrink: 1 },
-  ok: { color: colors.success, fontSize: font.size.base, fontWeight: '600' },
-  err: { color: colors.danger, fontSize: font.size.base, fontWeight: '600' },
-  muted: { color: colors.textMuted, fontSize: font.size.sm },
-  retry: {
-    minHeight: MIN_TOUCH,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: space.sm,
-  },
-  retryText: { color: colors.text, fontSize: font.size.md, fontWeight: '600' },
 });

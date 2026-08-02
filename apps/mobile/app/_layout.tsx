@@ -30,6 +30,11 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* Layar detail: header standar, judul diisi layarnya sendiri
+            lewat <Stack.Screen options={{ title }} /> setelah data tiba. */}
+        <Stack.Screen name="anime/[id]" options={{ title: '' }} />
+        <Stack.Screen name="movie/[id]" options={{ title: '' }} />
+        <Stack.Screen name="manga/[id]" options={{ title: '' }} />
         {/* Watch dan Read immersive: tanpa header, tanpa tab bar. */}
         <Stack.Screen name="watch/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="read/[chapter]" options={{ headerShown: false }} />

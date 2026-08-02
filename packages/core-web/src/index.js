@@ -72,4 +72,10 @@ export const webCoreConfig = (apiBase) => ({
   kv: webPersistentKV,
   cache: webSessionKV,
   getPage: webPageRef,
+  // Browser tidak mengizinkan JavaScript menyetel Referer pada <img>, jadi
+  // gambar dari CDN yang memblokir hotlink harus lewat proxy. imgProxyBase
+  // dibiarkan kosong: /manga-img adalah fungsi serverless Vercel di origin
+  // yang sama, bukan endpoint di api.soora.fun.
+  imageStrategy: 'proxy',
+  imgProxyBase: '',
 });
