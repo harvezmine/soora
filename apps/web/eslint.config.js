@@ -5,7 +5,15 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    // Salinan hasil `npx cap sync` — bundle minified dari dist/, bukan sumber.
+    // Sebelumnya ikut di-lint dan menyumbang ~326 error palsu.
+    'ios/App/App/public',
+    'android/app/src/main/assets/public',
+    // Output bubblewrap/TWA, juga bukan sumber.
+    'twa-build',
+  ]),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
