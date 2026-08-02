@@ -20,16 +20,16 @@ export default function MangaScreen() {
   const { data, status, error, stale, refreshing, refresh } = useCatalog(
     'home',
     'manga',
-    useCallback(() => getMangaHomeBundle(), [])
+    useCallback(async () => unwrap(await getMangaHomeBundle()), [])
   );
 
   const hero = useMemo(() => {
-    const d = unwrap(data) ?? {};
+    const d = data ?? {};
     return normalizeList(d.heroItems, 'manga', 'mangapill')[0] ?? null;
   }, [data]);
 
   const sections = useMemo(() => {
-    const d = unwrap(data) ?? {};
+    const d = data ?? {};
     const raw = d.sections;
     if (!raw || typeof raw !== 'object') return [];
     return buildSections(

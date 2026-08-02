@@ -60,10 +60,27 @@ export default function SearchScreen() {
         ? normalizeList(unwrap(movieRes.value)?.results, 'movie', 'tmdb')
         : [];
 
-    return { animeItems, movieItems };
+    // Kegagalan parsial tidak boleh diam-diam ter-cache 15 menit.
+    //
+    // Kalau anime mati saat pencarian dijalankan, hasilnya tetap "sukses"
+    // (hanya film). Menyimpannya berarti saat anime pulih 30 detik kemudian,
+    // kueri yang sama tetap mengembalikan hasil tanpa anime selama sisa TTL,
+    // dan user tidak punya cara memaksa muat ulang dari layar ini.
+    if (animeRes.status === 'rejected' || movieRes.status === 'rejected') {
+      return { animeItems, movieItems, partial: true };
+    }
+
+    return { animeItems, movieItems, partial: false };
   }, [query]);
 
-  const { data, status, error, refresh } = useCatalog('search', query, fetcher, enabled);
+  const { data, status, error, refresh } = useCatalog(
+    'search',
+    query,
+    fetcher,
+    enabled,
+    // Jangan simpan hasil yang salah satu penyedianya gagal.
+    (d) => !d?.partial
+  );
 
   const items = useMemo(() => {
     if (!data) return [];

@@ -33,7 +33,12 @@ export function useCatalog<T>(
   kind: string,
   key: string,
   fetcher: () => Promise<T>,
-  enabled = true
+  enabled = true,
+  /**
+   * Kembalikan false untuk menolak menyimpan hasil ini ke cache.
+   * Dipakai layar Cari untuk kegagalan parsial.
+   */
+  shouldCache?: (data: T) => boolean
 ): CatalogResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [status, setStatus] = useState<Status>('loading');
@@ -51,43 +56,72 @@ export function useCatalog<T>(
     };
   }, []);
 
-  // Menghindari balapan saat key berubah cepat (mis. mengetik di pencarian):
-  // hanya hasil untuk key terakhir yang boleh masuk state.
-  const latestKey = useRef(key);
-  latestKey.current = key;
+  // Token request monoton, bukan perbandingan key.
+  //
+  // Menulis `latestKey.current = key` di badan render tidak aman di React 19:
+  // render yang dibatalkan tetap meninggalkan nilainya, sehingga load yang
+  // sudah commit bisa membuang hasilnya sendiri dan layar tertahan di
+  // status 'loading' selamanya. Token hanya dinaikkan di dalam `load`, yang
+  // pasti berjalan setelah commit.
+  const requestToken = useRef(0);
 
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
+  const shouldCacheRef = useRef(shouldCache);
+  shouldCacheRef.current = shouldCache;
 
   const load = useCallback(
     async (isRefresh: boolean) => {
-      const myKey = key;
+      const myToken = ++requestToken.current;
+      const isCurrent = () => alive.current && requestToken.current === myToken;
+
       if (isRefresh) setRefreshing(true);
       else setStatus('loading');
       setError('');
 
       try {
         const cache = getCatalogCache();
-        const cached = cache.getEntry(kind, myKey);
-        setStale(Boolean(cached) && !cached?.fresh);
 
-        const result = (await cache.read(kind, myKey, () => fetcherRef.current(), (fresh) => {
+        // Penyegaran eksplisit harus benar-benar menembus jaringan.
+        //
+        // Tanpa baris ini, `read()` mengembalikan entri yang masih fresh tanpa
+        // memanggil fetcher sama sekali — sehingga tombol "Coba lagi" dan
+        // tarik-untuk-segarkan tidak berefek apa pun sampai TTL habis. Untuk
+        // kind 'title' itu berarti 7 hari: kalau sebuah judul sempat ter-cache
+        // saat penyedia setengah mati (mis. daftar episode kosong), user tidak
+        // punya cara apa pun memaksa muat ulang.
+        if (isRefresh) cache.invalidate(kind, key);
+
+        const cached = cache.getEntry(kind, key);
+        if (isCurrent()) setStale(Boolean(cached) && !cached?.fresh);
+
+        const result = (await cache.read(kind, key, () => fetcherRef.current(), (fresh) => {
           // Penyegaran background selesai. Diabaikan kalau layar sudah hilang
-          // atau user sudah berpindah ke key lain.
-          if (!alive.current || latestKey.current !== myKey) return;
+          // atau sudah ada request yang lebih baru.
+          if (!isCurrent()) return;
           setData(fresh as T);
           setStale(false);
+          setRefreshing(false);
+        }, {
+          shouldCache: (d) =>
+            typeof shouldCacheRef.current === 'function'
+              ? shouldCacheRef.current(d as T)
+              : true,
         })) as T;
 
-        if (!alive.current || latestKey.current !== myKey) return;
+        if (!isCurrent()) return;
         setData(result);
         setStatus('ready');
+
+        // Kalau data yang dikembalikan basi, penyegaran masih berjalan di
+        // belakang — spinner dibiarkan sampai callback di atas mendarat, supaya
+        // daftar tidak berubah setelah indikator sudah hilang.
+        if (!(cached && !cached.fresh)) setRefreshing(false);
       } catch (e) {
-        if (!alive.current || latestKey.current !== myKey) return;
+        if (!isCurrent()) return;
         setError(e instanceof Error ? e.message : String(e));
         setStatus('error');
-      } finally {
-        if (alive.current) setRefreshing(false);
+        setRefreshing(false);
       }
     },
     [kind, key]
@@ -95,8 +129,14 @@ export function useCatalog<T>(
 
   useEffect(() => {
     if (!enabled) {
+      // Naikkan token supaya hasil request sebelumnya tidak mendarat setelah
+      // layar berpindah ke keadaan nonaktif.
+      requestToken.current += 1;
       setStatus('ready');
       setData(null);
+      setError('');
+      setStale(false);
+      setRefreshing(false);
       return;
     }
     void load(false);

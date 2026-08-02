@@ -357,3 +357,69 @@ describe('regresi audit', () => {
     expect(c.getEntry('title', 'a')).toBeNull();
   });
 });
+
+describe('shouldCache', () => {
+  it('menolak menyimpan hasil yang ditandai pemanggil', async () => {
+    const c = mk();
+    const fetcher = vi.fn().mockResolvedValue({ partial: true, items: [1] });
+
+    // Kegagalan parsial: request "sukses" tapi salah satu penyedia mati.
+    // Menyimpannya berarti hasil timpang bertahan sepanjang TTL.
+    const out = await c.read('search', 'q', fetcher, undefined, {
+      shouldCache: (d) => !d.partial,
+    });
+
+    expect(out).toEqual({ partial: true, items: [1] }); // tetap dikembalikan
+    expect(c.getEntry('search', 'q')).toBeNull(); // tapi tidak tersimpan
+  });
+
+  it('tetap menyimpan hasil yang lolos predikat', async () => {
+    const c = mk();
+    await c.read('search', 'q', vi.fn().mockResolvedValue({ partial: false }), undefined, {
+      shouldCache: (d) => !d.partial,
+    });
+    expect(c.getEntry('search', 'q').data).toEqual({ partial: false });
+  });
+
+  it('predikat yang melempar tidak menjatuhkan pengambilan data', async () => {
+    const c = mk();
+    const out = await c.read('title', 'x', vi.fn().mockResolvedValue({ v: 1 }), undefined, {
+      shouldCache: () => {
+        throw new Error('predikat rusak');
+      },
+    });
+    expect(out).toEqual({ v: 1 });
+    expect(c.getEntry('title', 'x')).toBeNull(); // gagal-aman: tidak disimpan
+  });
+
+  it('juga berlaku di jalur refresh background', async () => {
+    const c = mk();
+    c.putEntry('home', 'b', { v: 1, partial: false });
+    clock += TTL.home + 1;
+
+    await c.read('home', 'b', vi.fn().mockResolvedValue({ v: 2, partial: true }), undefined, {
+      shouldCache: (d) => !d.partial,
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Data lama tidak boleh tertimpa hasil parsial.
+    expect(c.getEntry('home', 'b').data).toEqual({ v: 1, partial: false });
+  });
+});
+
+describe('invalidate lalu read — jalur tombol "Coba lagi"', () => {
+  it('setelah invalidate, fetcher benar-benar dipanggil ulang', async () => {
+    const c = mk();
+    const fetcher = vi.fn().mockResolvedValueOnce({ v: 1 }).mockResolvedValueOnce({ v: 2 });
+
+    await c.read('title', 'x', fetcher); // TTL title = 7 hari
+    expect(await c.read('title', 'x', fetcher)).toEqual({ v: 1 }); // masih fresh
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // Inilah yang dilakukan useCatalog.refresh(). Tanpa invalidate, tombol
+    // "Coba lagi" tidak menghasilkan request apa pun selama 7 hari.
+    c.invalidate('title', 'x');
+    expect(await c.read('title', 'x', fetcher)).toEqual({ v: 2 });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { FlashList } from '@shopify/flash-list';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { getMangaInfo } from '@soora/core/api';
@@ -18,11 +19,11 @@ export default function MangaInfoScreen() {
   const { data, status, error, refresh } = useCatalog(
     'title',
     `manga:${id}`,
-    useCallback(() => getMangaInfo(id), [id]),
+    useCallback(async () => unwrap(await getMangaInfo(id)), [id]),
     Boolean(id)
   );
 
-  const info = useMemo(() => unwrap(data) ?? {}, [data]);
+  const info = useMemo(() => data ?? {}, [data]);
   const title = typeof info?.title === 'string' ? info.title : 'Manga';
 
   const chapters: Chapter[] = useMemo(() => {
@@ -48,37 +49,45 @@ export default function MangaInfoScreen() {
     );
   }
 
+  // Divirtualisasi karena alasan yang sama dengan layar anime: One Piece punya
+  // ~1.130 chapter, dan merender semuanya sekaligus membekukan UI.
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.content}>
+    <View style={s.screen}>
       <Stack.Screen options={{ title }} />
-
-      <DetailHeader
-        title={title}
-        poster={resolveImage(info?.image)}
-        meta={[info?.status, info?.type, chapters.length ? `${chapters.length} chapter` : ''].filter(
-          Boolean
-        )}
-        synopsis={info?.description?.replace(/<[^>]*>/g, '')}
-      />
-
-      <SectionTitle>Chapter</SectionTitle>
-
-      {chapters.length === 0 ? (
-        <EmptyState
-          title="Belum ada chapter"
-          body="Penyedia tidak mengembalikan daftar chapter untuk judul ini."
-          onRetry={refresh}
-        />
-      ) : (
-        chapters.map((ch, i) => (
+      <FlashList
+        data={chapters}
+        keyExtractor={(ch, i) => ch.id ?? `ch-${i}`}
+        contentContainerStyle={s.content}
+        ListHeaderComponent={
+          <>
+            <DetailHeader
+              title={title}
+              poster={resolveImage(info?.image)}
+              meta={[
+                info?.status,
+                info?.type,
+                chapters.length ? `${chapters.length} chapter` : '',
+              ].filter(Boolean)}
+              synopsis={info?.description?.replace(/<[^>]*>/g, '')}
+            />
+            <SectionTitle>Chapter</SectionTitle>
+          </>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            title="Belum ada chapter"
+            body="Penyedia tidak mengembalikan daftar chapter untuk judul ini."
+            onRetry={refresh}
+          />
+        }
+        renderItem={({ item: ch, index }) => (
           <ListRow
-            key={ch.id ?? `${i}`}
-            label={ch.title || `Chapter ${ch.chapterNumber ?? i + 1}`}
+            label={ch.title || `Chapter ${ch.chapterNumber ?? index + 1}`}
             onPress={() => router.push(`/read/${encodeURIComponent(ch.id ?? '')}` as never)}
           />
-        ))
-      )}
-    </ScrollView>
+        )}
+      />
+    </View>
   );
 }
 

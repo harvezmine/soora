@@ -10,8 +10,7 @@ import { BRAND_BG } from './brand';
 
 /**
  * Palet gelap. App ini dark-only — sama seperti web.
- * Kontras sudah dicek terhadap `bg`: `text` 15.8:1, `textMuted` 5.9:1,
- * keduanya lolos WCAG AA untuk teks normal (4.5:1).
+ * Angka kontras aktual ada di komentar dalam objek di bawah.
  */
 export const colors = {
   // Didefinisikan di theme/brand.js supaya app.config.ts bisa memakai nilai
@@ -21,9 +20,17 @@ export const colors = {
   surfaceRaised: '#16162a', // elemen di atas surface
   border: '#23233a',
 
-  text: '#f3f4f8', // teks primer
-  textMuted: '#9a9ab0', // teks sekunder, minimal 3:1
-  textDim: '#6b6b85', // label, timestamp
+  // Kontras terhadap `bg` (#06060e), diukur dengan rumus WCAG:
+  //   text      18.37:1  — lolos AAA
+  //   textMuted  7.33:1  — lolos AAA
+  //   textDim    5.06:1  — lolos AA untuk teks normal
+  //
+  // textDim sebelumnya #6b6b85 (3.96:1) dan gagal ambang AA 4.5:1, padahal
+  // dipakai untuk teks isi sungguhan: placeholder kolom pencarian, kalimat
+  // petunjuk di layar kosong, dan label tab nonaktif.
+  text: '#f3f4f8',
+  textMuted: '#9a9ab0',
+  textDim: '#7d7d99',
 
   accent: '#e11d48', // CTA, indikator tab aktif
   accentPressed: '#be123c',

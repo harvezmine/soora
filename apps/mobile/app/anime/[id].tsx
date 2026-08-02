@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { FlashList } from '@shopify/flash-list';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { getAnimeInfo } from '@soora/core/api';
@@ -18,11 +19,11 @@ export default function AnimeInfoScreen() {
   const { data, status, error, refresh } = useCatalog(
     'title',
     `anime:${id}`,
-    useCallback(() => getAnimeInfo(id), [id]),
+    useCallback(async () => unwrap(await getAnimeInfo(id)), [id]),
     Boolean(id)
   );
 
-  const info = useMemo(() => unwrap(data) ?? {}, [data]);
+  const info = useMemo(() => data ?? {}, [data]);
 
   const episodes: Episode[] = useMemo(() => {
     const eps = info?.episodes;
@@ -52,36 +53,50 @@ export default function AnimeInfoScreen() {
     );
   }
 
+  // FlashList, bukan ScrollView + map.
+  //
+  // One Piece mengembalikan ~1.100 episode. Merendernya sebagai 1.100 Pressable
+  // dalam satu commit membekukan UI beberapa detik di perangkat kelas bawah,
+  // dan berisiko kehabisan memori. Header ikut masuk ke dalam daftar supaya
+  // hanya ada satu wadah yang menggulir.
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.content}>
+    <View style={s.screen}>
       <Stack.Screen options={{ title }} />
-
-      <DetailHeader
-        title={title}
-        poster={resolveImage(info?.image)}
-        backdrop={info?.cover ? resolveImage(info.cover) : undefined}
-        meta={[info?.type, info?.status, info?.releaseDate].filter(Boolean)}
-        synopsis={info?.description?.replace(/<[^>]*>/g, '')}
-      />
-
-      <SectionTitle>Episode</SectionTitle>
-
-      {episodes.length === 0 ? (
-        <EmptyState
-          title="Belum ada episode"
-          body="Penyedia tidak mengembalikan daftar episode untuk judul ini."
-          onRetry={refresh}
-        />
-      ) : (
-        episodes.map((ep, i) => (
+      <FlashList
+        data={episodes}
+        keyExtractor={(ep, i) => ep.id ?? `ep-${i}`}
+        contentContainerStyle={s.content}
+        ListHeaderComponent={
+          <>
+            <DetailHeader
+              title={title}
+              poster={resolveImage(info?.image)}
+              backdrop={info?.cover ? resolveImage(info.cover) : undefined}
+              meta={[info?.type, info?.status, info?.releaseDate].filter(Boolean)}
+              synopsis={info?.description?.replace(/<[^>]*>/g, '')}
+            />
+            <SectionTitle>Episode</SectionTitle>
+          </>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            title="Belum ada episode"
+            body="Penyedia tidak mengembalikan daftar episode untuk judul ini."
+            onRetry={refresh}
+          />
+        }
+        renderItem={({ item: ep, index }) => (
           <ListRow
-            key={ep.id ?? `${i}`}
-            label={ep.title ? `${ep.number ?? i + 1}. ${ep.title}` : `Episode ${ep.number ?? i + 1}`}
+            label={
+              ep.title
+                ? `${ep.number ?? index + 1}. ${ep.title}`
+                : `Episode ${ep.number ?? index + 1}`
+            }
             onPress={() => router.push(`/watch/${encodeURIComponent(ep.id ?? '')}` as never)}
           />
-        ))
-      )}
-    </ScrollView>
+        )}
+      />
+    </View>
   );
 }
 

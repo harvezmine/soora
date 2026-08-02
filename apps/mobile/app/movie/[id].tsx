@@ -6,7 +6,7 @@ import { resolveImage, tmdbSize, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
-import { ErrorState } from '../../components/States';
+import { EmptyState, ErrorState } from '../../components/States';
 import { colors, space } from '../../theme/tokens';
 
 /**
@@ -18,18 +18,30 @@ import { colors, space } from '../../theme/tokens';
  * tanpa error apa pun.
  */
 export default function MovieInfoScreen() {
-  const { id, kind } = useLocalSearchParams<{ id: string; kind?: string }>();
+  const { id, kind, source } = useLocalSearchParams<{
+    id: string;
+    kind?: string;
+    source?: string;
+  }>();
   const router = useRouter();
   const isTV = kind === 'tv';
+
+  // Hanya judul TMDB yang punya layar detail di fase 2. LK21 dan Goku memakai
+  // slug, bukan id TMDB, jadi memanggil endpoint TMDB dengan slug itu hanya
+  // menghasilkan 404 dan layar error yang membingungkan.
+  const supported = !source || source === 'tmdb';
 
   const { data, status, error, refresh } = useCatalog(
     'title',
     `${isTV ? 'tv' : 'movie'}:${id}`,
-    useCallback(() => (isTV ? getTVDetailsTMDB(id) : getMovieDetailsTMDB(id)), [id, isTV]),
-    Boolean(id)
+    useCallback(
+      async () => unwrap(await (isTV ? getTVDetailsTMDB(id) : getMovieDetailsTMDB(id))),
+      [id, isTV]
+    ),
+    Boolean(id) && supported
   );
 
-  const info = useMemo(() => unwrap(data) ?? {}, [data]);
+  const info = useMemo(() => data ?? {}, [data]);
   const title = info?.title || info?.name || (isTV ? 'Serial' : 'Film');
 
   const seasons = useMemo(() => {
@@ -39,6 +51,20 @@ export default function MovieInfoScreen() {
     // stream; menampilkannya hanya menghasilkan jalan buntu.
     return list.filter((se: { season_number?: number }) => (se?.season_number ?? 0) > 0);
   }, [info]);
+
+  // Semua hook di atas dipanggil tanpa syarat — return lebih awal baru boleh
+  // setelah titik ini.
+  if (!supported) {
+    return (
+      <View style={s.screen}>
+        <Stack.Screen options={{ title: 'Belum didukung' }} />
+        <EmptyState
+          title="Sumber ini belum didukung"
+          body={`Judul dari penyedia "${source}" belum punya halaman detail di aplikasi. Untuk sekarang, buka lewat soora.fun.`}
+        />
+      </View>
+    );
+  }
 
   if (status === 'loading') {
     return (

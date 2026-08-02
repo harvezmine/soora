@@ -10,6 +10,12 @@ import { colors, font, space } from '../theme/tokens';
  * baris berisi puluhan item, dan hanya FlashList yang mendaur ulang sel dengan
  * baik pada perangkat kelas bawah.
  */
+// Lihat catatan di MediaGrid: identitas prop menentukan memoisasi sel.
+const renderCard = ({ item }: { item: MediaItem }) => <MediaCard item={item} />;
+const keyOf = (item: MediaItem) => `${item.kind}:${item.id}`;
+const Separator = () => <View style={sep} />;
+const sep = { width: 12 };
+
 export function SectionRow({ title, items }: { title: string; items: MediaItem[] }) {
   if (!items.length) return null;
 
@@ -19,13 +25,13 @@ export function SectionRow({ title, items }: { title: string; items: MediaItem[]
       <FlashList
         data={items}
         horizontal
-        renderItem={({ item }) => <MediaCard item={item} />}
-        keyExtractor={(item) => `${item.kind}:${item.id}`}
+        renderItem={renderCard}
+        keyExtractor={keyOf}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.list}
         // Jarak antar kartu lewat ItemSeparator, bukan margin di kartu:
         // margin merusak perhitungan lebar milik FlashList.
-        ItemSeparatorComponent={() => <View style={{ width: space.md }} />}
+        ItemSeparatorComponent={Separator}
       />
     </View>
   );

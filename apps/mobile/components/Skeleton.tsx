@@ -8,7 +8,7 @@ import Animated, {
   cancelAnimation,
   ReduceMotion,
 } from 'react-native-reanimated';
-import { CARD_HEIGHT, CARD_WIDTH } from './MediaCard';
+import { CARD_HEIGHT, CARD_WIDTH, GRID_ASPECT } from './MediaCard';
 import { colors, motion, radius, space } from '../theme/tokens';
 
 /**
@@ -35,11 +35,28 @@ function useShimmer() {
   return useAnimatedStyle(() => ({ opacity: opacity.value }));
 }
 
-function Block({ w, h, r = radius.md }: { w: number | string; h: number; r?: number }) {
+function Block({
+  w,
+  h,
+  r = radius.md,
+  aspect = false,
+}: {
+  w: number | `${number}%`;
+  h: number;
+  r?: number;
+  /** Pakai rasio poster 2:3 alih-alih tinggi tetap — untuk sel grid. */
+  aspect?: boolean;
+}) {
   const style = useShimmer();
   return (
     <Animated.View
-      style={[{ width: w as number, height: h, borderRadius: r }, s.block, style]}
+      style={[
+        aspect
+          ? { width: w, aspectRatio: 1 / GRID_ASPECT, borderRadius: r }
+          : { width: w, height: h, borderRadius: r },
+        s.block,
+        style,
+      ]}
     />
   );
 }
@@ -63,18 +80,23 @@ export function SkeletonRow({ title = true }: { title?: boolean }) {
 export function SkeletonHero() {
   return (
     <View style={s.hero}>
-      <Block w="100%" h={220} r={radius.lg} />
+      {/* Tinggi harus sama dengan HeroSpotlight (260), kalau tidak seluruh
+          isi Beranda melompat turun saat data mendarat. */}
+      <Block w="100%" h={260} r={radius.lg} />
     </View>
   );
 }
 
 export function SkeletonGrid({ count = 9 }: { count?: number }) {
+  // Tiga kolom, sama dengan MediaGrid. Versi sebelumnya memakai flexWrap
+  // dengan lebar kartu tetap, yang di layar 360dp hanya muat dua kolom —
+  // sehingga grid melompat dari 2 ke 3 kolom saat hasil pencarian mendarat.
   return (
     <View style={s.grid}>
       {Array.from({ length: count }, (_, i) => (
-        <View key={i} style={s.card}>
-          <Block w={CARD_WIDTH} h={CARD_HEIGHT} />
-          <Block w={CARD_WIDTH - 20} h={12} r={radius.sm} />
+        <View key={i} style={s.gridCell}>
+          <Block w="100%" h={0} r={radius.md} aspect />
+          <Block w="70%" h={12} r={radius.sm} />
         </View>
       ))}
     </View>
@@ -83,14 +105,16 @@ export function SkeletonGrid({ count = 9 }: { count?: number }) {
 
 const s = StyleSheet.create({
   block: { backgroundColor: colors.surfaceRaised },
-  section: { gap: space.md, paddingHorizontal: space.lg, paddingTop: space.lg },
+  // paddingTop disamakan dengan SectionRow (space.xl), bukan space.lg.
+  section: { gap: space.md, paddingHorizontal: space.lg, paddingTop: space.xl },
   row: { flexDirection: 'row', gap: space.md },
   card: { gap: space.xs },
   hero: { paddingHorizontal: space.lg, paddingTop: space.lg },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: space.md,
-    padding: space.lg,
+    paddingHorizontal: space.lg,
+    paddingTop: space.lg,
   },
+  gridCell: { width: '33.33%', paddingHorizontal: space.xs, paddingBottom: space.lg, gap: space.xs },
 });

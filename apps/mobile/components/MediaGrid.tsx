@@ -12,6 +12,22 @@ import { space } from '../theme/tokens';
  * kartu yang cukup besar untuk terbaca, tanpa menyisakan ruang kosong lebar di
  * sisi kanan.
  */
+/**
+ * Diangkat ke konstanta modul, bukan arrow inline.
+ *
+ * Komparator memo milik ViewHolder FlashList v2 membandingkan identitas
+ * `renderItem`. Arrow baru tiap render membuat perbandingan itu selalu gagal,
+ * sehingga setiap sel yang terlihat dirender ulang tiap kali induknya render —
+ * `memo` di MediaCard pun tidak menolong.
+ */
+const renderCell = ({ item }: { item: MediaItem }) => (
+  <View style={s.cell}>
+    <MediaCard item={item} fill />
+  </View>
+);
+
+const keyOf = (item: MediaItem) => `${item.kind}:${item.id}`;
+
 export function MediaGrid({
   items,
   ListHeaderComponent,
@@ -29,12 +45,8 @@ export function MediaGrid({
     <FlashList
       data={items}
       numColumns={3}
-      renderItem={({ item }) => (
-        <View style={s.cell}>
-          <MediaCard item={item} />
-        </View>
-      )}
-      keyExtractor={(item) => `${item.kind}:${item.id}`}
+      renderItem={renderCell}
+      keyExtractor={keyOf}
       contentContainerStyle={s.content}
       ListHeaderComponent={ListHeaderComponent}
       ListEmptyComponent={ListEmptyComponent}
@@ -50,5 +62,7 @@ export function MediaGrid({
 
 const s = StyleSheet.create({
   content: { paddingHorizontal: space.lg, paddingBottom: space.xxxl },
-  cell: { paddingBottom: space.lg, alignItems: 'center' },
+  // Padding horizontal di sel, bukan lebar tetap di kartu: FlashList v2
+  // menetapkan lebar sel sendiri dan kartu harus mengikutinya.
+  cell: { paddingBottom: space.lg, paddingHorizontal: space.xs },
 });

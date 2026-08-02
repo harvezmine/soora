@@ -18,11 +18,11 @@ import { colors, font, space } from '../../theme/tokens';
  * anime akan mengosongkan seluruh layar.
  */
 export default function HomeScreen() {
-  const anime = useCatalog('home', 'anime', useCallback(() => getAnimeHomeBundle(), []));
-  const movie = useCatalog('home', 'movie', useCallback(() => getMovieHomeBundle(), []));
+  const anime = useCatalog('home', 'anime', useCallback(async () => unwrap(await getAnimeHomeBundle()), []));
+  const movie = useCatalog('home', 'movie', useCallback(async () => unwrap(await getMovieHomeBundle()), []));
 
   const animeSections = useMemo(() => {
-    const d = unwrap(anime.data) ?? {};
+    const d = anime.data ?? {};
     return buildSections([
       { title: 'Episode Terbaru', items: d.recentEpisodes, kind: 'anime', source: 'hianime' },
       { title: 'Paling Populer', items: d.mostPopular, kind: 'anime', source: 'hianime' },
@@ -31,7 +31,7 @@ export default function HomeScreen() {
   }, [anime.data]);
 
   const spotlight = useMemo(() => {
-    const d = unwrap(anime.data) ?? {};
+    const d = anime.data ?? {};
     const [first] = buildSections([
       { title: 'Spotlight', items: d.spotlight, kind: 'anime', source: 'hianime' },
     ]);
@@ -39,7 +39,7 @@ export default function HomeScreen() {
   }, [anime.data]);
 
   const movieSections = useMemo(() => {
-    const d = unwrap(movie.data) ?? {};
+    const d = movie.data ?? {};
     return buildSections([
       { title: 'Film Trending', items: d.tmdbTrending, kind: 'movie', source: 'tmdb' },
       { title: 'Film Populer', items: d.tmdbPopularMovies, kind: 'movie', source: 'tmdb' },
@@ -49,6 +49,8 @@ export default function HomeScreen() {
   }, [movie.data]);
 
   const loading = anime.status === 'loading' && movie.status === 'loading';
+  // Kedua sumber sudah selesai — barulah boleh menyimpulkan "tidak ada apa-apa".
+  const settled = anime.status !== 'loading' && movie.status !== 'loading';
   const sections = [...animeSections, ...movieSections];
   const bothFailed = anime.status === 'error' && movie.status === 'error';
   const refreshing = anime.refreshing || movie.refreshing;
@@ -88,7 +90,7 @@ export default function HomeScreen() {
 
       {spotlight ? <HeroSpotlight item={spotlight} /> : null}
 
-      {sections.length === 0 ? (
+      {sections.length === 0 && settled ? (
         <EmptyState
           title="Belum ada konten"
           body={
@@ -102,11 +104,13 @@ export default function HomeScreen() {
       )}
 
       {/* Kalau salah satu sumber mati sementara yang lain hidup, katakan —
-          jangan biarkan user mengira katalognya memang sekecil itu. */}
-      {animeSections.length === 0 && movieSections.length > 0 ? (
+          jangan biarkan user mengira katalognya memang sekecil itu.
+          Digate pada status: tanpa itu, sumber yang masih memuat akan
+          diumumkan "tidak tersedia" lalu pesannya hilang sendiri. */}
+      {anime.status !== 'loading' && animeSections.length === 0 && movieSections.length > 0 ? (
         <Text style={s.note}>Penyedia anime sedang tidak tersedia.</Text>
       ) : null}
-      {movieSections.length === 0 && animeSections.length > 0 ? (
+      {movie.status !== 'loading' && movieSections.length === 0 && animeSections.length > 0 ? (
         <Text style={s.note}>Penyedia film sedang tidak tersedia.</Text>
       ) : null}
     </ScrollView>
