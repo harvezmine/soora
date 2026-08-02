@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { getAnimeHomeBundle, getMovieHomeBundle } from '@soora/core/api';
+import { getSubIndoHomeBundle, getMovieHomeBundle } from '@soora/core/api';
 import { buildSections, unwrap } from '@soora/core/models';
 import { useFocusEffect } from 'expo-router';
 import { useCatalog } from '../../lib/useCatalog';
@@ -32,22 +32,31 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const anime = useCatalog('home', 'anime', useCallback(async () => unwrap(await getAnimeHomeBundle()), []));
+  const anime = useCatalog('home', 'anime', useCallback(async () => unwrap(await getSubIndoHomeBundle()), []));
   const movie = useCatalog('home', 'movie', useCallback(async () => unwrap(await getMovieHomeBundle()), []));
 
+  /**
+   * Anime memakai jalur Sub Indo (Samehadaku), bukan consumet.
+   *
+   * Diverifikasi 2026-08-03 dari VPS: hianime.to timeout, animekai.to menolak
+   * koneksi, aniwatchtv.to balas 522 — seluruh penyedia direct English tidak
+   * bisa dijangkau, dan `/anime/home` mengembalikan bundle kosong dengan HTTP
+   * 200. Sementara `/anime/subindo/home` mengembalikan katalog penuh. Ini
+   * arsitektur yang sama dengan web.
+   */
   const animeSections = useMemo(() => {
     const d = anime.data ?? {};
     return buildSections([
-      { title: 'Episode Terbaru', items: d.recentEpisodes, kind: 'anime', source: 'hianime' },
-      { title: 'Paling Populer', items: d.mostPopular, kind: 'anime', source: 'hianime' },
-      { title: 'Sedang Tayang', items: d.topAiring, kind: 'anime', source: 'hianime' },
+      { title: 'Sedang Tayang', items: d.ongoing, kind: 'anime', source: 'samehadaku' },
+      { title: 'Populer', items: d.popular, kind: 'anime', source: 'samehadaku' },
+      { title: 'Terbaru', items: d.recent, kind: 'anime', source: 'samehadaku' },
     ]);
   }, [anime.data]);
 
   const spotlight = useMemo(() => {
     const d = anime.data ?? {};
     const [first] = buildSections([
-      { title: 'Spotlight', items: d.spotlight, kind: 'anime', source: 'hianime' },
+      { title: 'Spotlight', items: d.ongoing ?? d.popular, kind: 'anime', source: 'samehadaku' },
     ]);
     return first?.items?.[0] ?? null;
   }, [anime.data]);

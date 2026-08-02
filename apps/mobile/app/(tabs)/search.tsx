@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Search as SearchIcon, X } from 'lucide-react-native';
-import { searchAnime, searchMoviesTMDB } from '@soora/core/api';
+import { searchSamehadaku, searchMoviesTMDB } from '@soora/core/api';
 import { normalizeList, unwrap } from '@soora/core/models';
 import { getRuntime } from '@soora/core';
 import { useCatalog, useDebounced } from '../../lib/useCatalog';
@@ -46,14 +46,19 @@ export default function SearchScreen() {
   const fetcher = useCallback(async () => {
     // Dua provider dijalankan bersamaan dan kegagalan salah satu tidak
     // membatalkan yang lain — anime sering mati sementara TMDB tetap hidup.
+    // Anime lewat Samehadaku — penyedia English tidak bisa dijangkau dari VPS.
     const [animeRes, movieRes] = await Promise.allSettled([
-      searchAnime(query),
+      searchSamehadaku(query),
       searchMoviesTMDB(query),
     ]);
 
     const animeItems =
       animeRes.status === 'fulfilled'
-        ? normalizeList(unwrap(animeRes.value)?.results, 'anime', 'hianime')
+        ? normalizeList(
+            unwrap(animeRes.value)?.animeList ?? unwrap(animeRes.value)?.results,
+            'anime',
+            'samehadaku'
+          )
         : [];
     const movieItems =
       movieRes.status === 'fulfilled'

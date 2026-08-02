@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { getAnimeInfo } from '@soora/core/api';
+import { getSamehadakuAnimeInfo } from '@soora/core/api';
 import { resolveImage, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
@@ -19,15 +19,23 @@ export default function AnimeInfoScreen() {
   const { data, status, error, refresh } = useCatalog(
     'title',
     `anime:${id}`,
-    useCallback(async () => unwrap(await getAnimeInfo(id)), [id]),
+    useCallback(async () => unwrap(await getSamehadakuAnimeInfo(String(id))), [id]),
     Boolean(id)
   );
 
   const info = useMemo(() => data ?? {}, [data]);
 
+  // Samehadaku memakai `episodeList` dengan field `episodeId`/`title`;
+  // bentuk consumet lama memakai `episodes` dengan `id`/`number`. Keduanya
+  // diterima supaya layar ini tidak pecah kalau penyedia English pulih.
   const episodes: Episode[] = useMemo(() => {
-    const eps = info?.episodes;
-    return Array.isArray(eps) ? eps : [];
+    const list = info?.episodeList ?? info?.episodes;
+    if (!Array.isArray(list)) return [];
+    return list.map((e: Record<string, unknown>, i: number) => ({
+      id: String(e.episodeId ?? e.id ?? ''),
+      number: Number(e.episodeNumber ?? e.number ?? i + 1),
+      title: typeof e.title === 'string' ? e.title : undefined,
+    }));
   }, [info]);
 
   const title =
@@ -70,10 +78,12 @@ export default function AnimeInfoScreen() {
           <>
             <DetailHeader
               title={title}
-              poster={resolveImage(info?.image)}
+              poster={resolveImage(info?.poster ?? info?.image)}
               backdrop={info?.cover ? resolveImage(info.cover) : undefined}
-              meta={[info?.type, info?.status, info?.releaseDate].filter(Boolean)}
-              synopsis={info?.description?.replace(/<[^>]*>/g, '')}
+              meta={[info?.type, info?.status, info?.score, info?.aired].filter(Boolean)}
+              synopsis={String(
+                info?.synopsis?.paragraphs?.join('\n\n') ?? info?.description ?? ''
+              ).replace(/<[^>]*>/g, '')}
             />
             <SectionTitle>Episode</SectionTitle>
           </>

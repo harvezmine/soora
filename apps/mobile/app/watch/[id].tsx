@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
-import { getVixsrcStream, watchAnimeEpisode, fetchAnimeIds } from '@soora/core/api';
+import { getVixsrcStream, getSubIndoPlay, fetchAnimeIds } from '@soora/core/api';
 import { buildAnimeEmbeds, resolvePlayback, shouldRefetchSource } from '@soora/core/player';
 import { NativePlayer } from '../../components/player/NativePlayer';
 import { EmbedPlayer } from '../../components/player/EmbedPlayer';
@@ -59,10 +59,13 @@ export default function WatchScreen() {
         // per 2026-08-03 semua penyedia anime mengembalikan kosong. Strukturnya
         // mengikuti AnimeEmbedPlayer.jsx di web yang sudah terbukti.
         let m3u8: string | undefined;
-        let ref: string | undefined;
+        const ref: string | undefined = undefined;
         try {
-          const w = await watchAnimeEpisode(String(id));
-          m3u8 = w?.data?.sources?.find((s: { url?: string }) => s?.url)?.url;
+          // Sub Indo (Samehadaku) — satu-satunya penyedia anime yang bisa
+          // dijangkau dari VPS. Backend sudah memvalidasi tiap URL dan
+          // membuang yang mati, jadi `sources` di sini sudah tersaring.
+          const play = await getSubIndoPlay(String(id));
+          m3u8 = play?.default?.url ?? play?.sources?.find((x: { url?: string }) => x?.url)?.url;
         } catch {
           /* penyedia mati — lanjut ke embed */
         }

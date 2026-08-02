@@ -51,6 +51,31 @@ export function buildProxyUrl(m3u8, ref, proxyBase) {
 }
 
 /**
+ * Apakah URL ini media yang bisa langsung dimakan pemutar native?
+ *
+ * Penting karena tidak semua "source" dari backend adalah stream. Sub Indo
+ * (Samehadaku) mengembalikan halaman embed — `mega.nz/embed/...`,
+ * `blogger.com/video.g?...` — dan mengirimkannya ke ExoPlayer hanya
+ * menghasilkan layar hitam, karena isinya HTML, bukan video.
+ *
+ * Diverifikasi 2026-08-03: `/anime/subindo/play/<ep>` mengembalikan 4 sumber,
+ * semuanya berupa URL embed mega.nz.
+ *
+ * @param {string} url
+ * @returns {boolean}
+ */
+export function isDirectMedia(url) {
+  if (typeof url !== 'string' || !url) return false;
+  // Buang query sebelum memeriksa ekstensi — URL stream hampir selalu
+  // membawa token, dan `.m3u8?token=...` harus tetap dikenali.
+  const path = url.split('?')[0].split('#')[0].toLowerCase();
+  if (/\.(m3u8|mpd|mp4|mkv|webm|ts)$/.test(path)) return true;
+  // VixSrc menyajikan playlist dari /playlist/<id> tanpa akhiran berkas.
+  if (/\/playlist\/\d+/.test(path)) return true;
+  return false;
+}
+
+/**
  * Memilih mode pemutaran dari kumpulan kandidat sumber.
  *
  * Aturannya sederhana dan sengaja tidak pintar: m3u8 apa pun mengalahkan embed,
@@ -64,7 +89,9 @@ export function buildProxyUrl(m3u8, ref, proxyBase) {
  * @returns {PlaybackSource | null}
  */
 export function resolvePlayback({ m3u8, ref, embeds } = {}) {
-  if (m3u8) {
+  // Hanya media langsung yang boleh masuk pemutar native. URL yang sebenarnya
+  // halaman embed dialihkan ke daftar embed, bukan dipaksa ke ExoPlayer.
+  if (m3u8 && isDirectMedia(m3u8)) {
     return {
       mode: 'native',
       uri: buildProxyUrl(m3u8, ref),
@@ -73,7 +100,12 @@ export function resolvePlayback({ m3u8, ref, embeds } = {}) {
     };
   }
 
-  const first = Array.isArray(embeds) ? embeds.find((e) => e && e.url) : null;
+  const candidates = Array.isArray(embeds) ? [...embeds] : [];
+  // Sumber yang bukan media langsung tetap berguna — sebagai embed, dan
+  // didahulukan karena backend sudah memvalidasi bahwa URL-nya hidup.
+  if (m3u8 && !isDirectMedia(m3u8)) candidates.unshift({ url: m3u8, label: 'Server utama' });
+
+  const first = candidates.find((e) => e && e.url);
   if (first) {
     return {
       mode: 'embed',

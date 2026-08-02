@@ -4,6 +4,7 @@ import {
   resolvePlayback,
   shouldRefetchSource,
   parseVariants,
+  isDirectMedia,
 } from './sources.js';
 import { configureCore, resetCoreRuntime } from '../runtime.js';
 
@@ -120,6 +121,58 @@ describe('shouldRefetchSource', () => {
     expect(shouldRefetchSource({ message: 'Network unreachable' })).toBe(false);
     expect(shouldRefetchSource({})).toBe(false);
     expect(shouldRefetchSource(null)).toBe(false);
+  });
+});
+
+describe('isDirectMedia — memisahkan stream dari halaman embed', () => {
+  it('mengenali m3u8 walau membawa token', () => {
+    expect(isDirectMedia(M3U8)).toBe(true);
+    expect(isDirectMedia('https://cdn.test/a.m3u8')).toBe(true);
+  });
+
+  it('mengenali playlist VixSrc yang tanpa akhiran berkas', () => {
+    expect(isDirectMedia('https://vixsrc.to/playlist/170060?b=1')).toBe(true);
+  });
+
+  it('mengenali mp4 dan ts', () => {
+    expect(isDirectMedia('https://cdn.test/v.mp4')).toBe(true);
+    expect(isDirectMedia('https://cdn.test/seg.ts?x=1')).toBe(true);
+  });
+
+  it('menolak halaman embed', () => {
+    // Sub Indo mengembalikan URL seperti ini; mengirimkannya ke ExoPlayer
+    // hanya menghasilkan layar hitam karena isinya HTML.
+    expect(isDirectMedia('https://mega.nz/embed/jphBVQ5Z#9BdQ')).toBe(false);
+    expect(isDirectMedia('https://blogger.com/video.g?token=abc')).toBe(false);
+    expect(isDirectMedia('https://vidlink.pro/anime/20/1/sub')).toBe(false);
+  });
+
+  it('menolak input yang bukan string', () => {
+    for (const x of [null, undefined, 42, {}, '']) expect(isDirectMedia(x)).toBe(false);
+  });
+});
+
+describe('resolvePlayback dengan sumber embed dari Sub Indo', () => {
+  it('URL embed TIDAK dipaksa ke pemutar native', () => {
+    const s = resolvePlayback({ m3u8: 'https://mega.nz/embed/abc#key' });
+    expect(s.mode).toBe('embed');
+    expect(s.uri).toBe('https://mega.nz/embed/abc#key');
+    // Tidak boleh dibungkus proxy — proxy untuk media, bukan halaman HTML.
+    expect(s.uri).not.toContain('proxy');
+  });
+
+  it('sumber utama embed didahulukan dari daftar embed cadangan', () => {
+    const s = resolvePlayback({
+      m3u8: 'https://mega.nz/embed/abc',
+      embeds: [{ url: 'https://vidlink.pro/x', label: 'VidLink' }],
+    });
+    expect(s.uri).toBe('https://mega.nz/embed/abc');
+    expect(s.label).toBe('Server utama');
+  });
+
+  it('m3u8 asli tetap ke native meski ada embed', () => {
+    const s = resolvePlayback({ m3u8: M3U8, embeds: [{ url: 'https://vidlink.pro/x' }] });
+    expect(s.mode).toBe('native');
   });
 });
 
