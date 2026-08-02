@@ -1,0 +1,6 @@
+# Hasil `npx cap sync` — salinan dari dist/, regenerable, jangan di-commit.
+# Ini menyamakan perilaku dengan android/.gitignore yang sudah mengabaikan
+# app/src/main/assets/public. Sebelumnya folder ini ter-commit dan membawa
+# bundle build basi (menyumbang mayoritas error lint, dan ikut membawa
+# TMDB key hasil inline saat build).
+App/App/public
