@@ -8,3 +8,13 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - sharp
+
+# Satu versi React untuk seluruh workspace.
+#
+# Tanpa ini, apps/web me-resolve react 19.2.8 (rentang ^19.2.0) sementara Expo
+# SDK 57 mensyaratkan tepat 19.2.3, dan hoisting menaruh dua salinan react di
+# node_modules. Di React Native, dua salinan React berujung "Invalid hook call"
+# yang jejak errornya tidak menunjuk penyebabnya sama sekali.
+overrides:
+  react: 19.2.3
+  react-dom: 19.2.3

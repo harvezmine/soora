@@ -3,11 +3,11 @@
 ```
 apps/
   web/              Vite + React 19, di-deploy ke Vercel (soora.fun)
-  mobile/           Expo React Native — dibuat di fase 1
+  mobile/           Expo SDK 57 + React Native 0.86, APK unduhan langsung
 packages/
   core/             Logika platform-agnostic (API, cache, auth) — dipakai web + mobile
   core-web/         Adapter browser untuk port core (localStorage / sessionStorage)
-  core-native/      Adapter React Native (MMKV / SQLite) — dibuat di fase 1
+  core-native/      Adapter React Native (MMKV / expo-sqlite)
 soora-backend/      Backend Express, di-deploy ke VPS (api.soora.fun)
 api.consumet.org/   Fork Consumet, di-deploy ke VPS
 ```
@@ -31,11 +31,33 @@ pnpm install          # install semua workspace sekaligus
 pnpm dev              # dev server web
 pnpm build            # build produksi web
 pnpm lint             # lint web
-pnpm test             # test @soora/core (watch mode)
-pnpm test:run         # test @soora/core (sekali jalan, untuk CI)
+pnpm test:run         # semua unit test (core + core-native)
 ```
 
 Untuk satu package saja: `pnpm --filter @soora/web <script>`.
+
+### App (Android)
+
+```bash
+pnpm --filter @soora/mobile start      # dev server, butuh dev client terpasang
+pnpm --filter @soora/mobile prebuild   # generate proyek android/ dari app.json
+pnpm --filter @soora/mobile android    # build + pasang ke HP/emulator
+pnpm --filter @soora/mobile export     # bundling saja — cek resolusi modul tanpa device
+pnpm --filter @soora/mobile doctor     # cek kesehatan proyek Expo
+```
+
+`expo export` adalah verifikasi terkuat yang bisa dijalankan tanpa perangkat:
+dia benar-benar mem-bundle seluruh app, jadi kesalahan import atau resolusi
+lintas workspace langsung ketahuan.
+
+Folder `apps/mobile/android` sengaja di-gitignore. `app.json` adalah sumber
+kebenaran; proyek native dihasilkan ulang lewat `expo prebuild`.
+
+**Peringatan expo-doctor yang diterima:** pemeriksaan duplikat dependensi
+melaporkan banyak salinan `react-dom`. Semuanya milik jalur web dan tidak ikut
+ke bundle Android — sudah diverifikasi dengan memeriksa isi bundle hasil
+`expo export`. `react` sendiri tunggal (19.2.3), dan itu yang penting: dua
+salinan React di RN menyebabkan "Invalid hook call".
 
 ## Aturan packages/core
 

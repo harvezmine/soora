@@ -323,7 +323,7 @@ Detox / E2E tidak dipakai — biaya setup tidak sepadan untuk tim satu orang.
 | Fase | Isi | Perkiraan | Status |
 |---|---|---|---|
 | 0 | Monorepo + ekstrak `packages/core` + web tetap jalan | 3–5 hari | **selesai** |
-| 1 | Expo scaffold, expo-router, tema, adapter MMKV/SQLite, login Google, **spike header/Referer** | 1–2 minggu | |
+| 1 | Expo scaffold, expo-router, tema, adapter MMKV/SQLite, login Google, **spike header/Referer** | 1–2 minggu | **selesai kecuali verifikasi di perangkat** |
 | 2 | Home / Search / AnimeInfo / MovieInfo + FlashList + cache SWR | 2–3 minggu | |
 | 3 | Watch — NativePlayer + EmbedPlayer + gesture + PiP + MiniPlayer | 3–4 minggu | |
 | 4 | Manga: MangaHome / MangaInfo / MangaReader + offline gambar | 2–3 minggu | |
@@ -346,6 +346,31 @@ Detox / E2E tidak dipakai — biaya setup tidak sepadan untuk tim satu orang.
 | 7 | Keystore hilang | Tinggi kalau terjadi | Backup ke luar mesin + EAS secret. Tanpa keystore, user lama tidak bisa menerima update |
 
 ---
+
+### 7.4 Status Fase 1 (2026-08-03)
+
+Sudah dibangun dan terverifikasi tanpa perangkat:
+
+- `apps/mobile` — Expo SDK 57, RN 0.86.2, expo-router. Bundling Android berhasil
+  (2947 modul), typecheck 0 error, expo-doctor 19/20.
+- `packages/core-native` — adapter MMKV (`kv` + `cache` sebagai dua instance
+  terpisah) dan cache katalog SQLite. 28 unit test, dijalankan dengan engine
+  SQLite asli lewat `node:sqlite` sehingga skema dan SQL ikut tervalidasi.
+- Design token (`theme/tokens.ts`), struktur 5 tab + rute fullscreen,
+  layar login Google, dan harness spike Referer.
+- Terverifikasi lewat isi bundle: `@soora/core` benar-benar ikut ke Android —
+  string `soora_cache:`, `api.soora.fun`, `soora_token`, dan skema SQL katalog
+  semuanya ditemukan di bundle hasil `expo export`.
+
+**Belum terverifikasi — butuh perangkat fisik:**
+
+1. Spike Referer (risiko 3). Harness siap di rute `/spike`; hasilnya menentukan
+   apakah fase 3 memakai proxy atau tidak.
+2. Login Google. Kode siap, tapi `GOOGLE_ANDROID_CLIENT_ID` di
+   `apps/mobile/lib/config.ts` masih kosong — butuh OAuth client bertipe Android
+   dengan SHA-1 dari `soora-keystore.jks` terdaftar di Google Cloud Console.
+3. Perilaku MMKV dan expo-sqlite di runtime (unit test memakai fake dan
+   `node:sqlite`, bukan modul native sesungguhnya).
 
 ## 8. Dekomposisi implementation plan
 

@@ -1,0 +1,29 @@
+{
+  "name": "@soora/core-native",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Adapter React Native (MMKV / expo-sqlite) untuk port @soora/core.",
+  "exports": {
+    ".": "./src/index.js",
+    "./kv": "./src/kv.js",
+    "./catalog": "./src/catalog.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@soora/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "expo-sqlite": "*",
+    "react-native-mmkv": "*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

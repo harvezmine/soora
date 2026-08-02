@@ -1,0 +1,19 @@
+# Expo
+.expo/
+.expo-export/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native project files hasil `expo prebuild` — regenerable, jangan di-commit.
+# Ini pola "continuous native generation": app.json adalah sumber kebenaran.
+/android
+/ios
+
+# Metro / Babel
+.metro-health-check*
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
