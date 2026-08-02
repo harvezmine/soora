@@ -11,7 +11,8 @@
     "./user": "./src/user/index.js",
     "./runtime": "./src/runtime.js",
     "./ports": "./src/ports/index.js",
-    "./models": "./src/models/index.js"
+    "./models": "./src/models/index.js",
+    "./player": "./src/player/index.js"
   },
   "files": [
     "src"

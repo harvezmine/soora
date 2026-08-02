@@ -1,8 +1,11 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getAnimeHomeBundle, getMovieHomeBundle } from '@soora/core/api';
 import { buildSections, unwrap } from '@soora/core/models';
+import { useFocusEffect } from 'expo-router';
 import { useCatalog } from '../../lib/useCatalog';
+import { listProgress, type ProgressEntry } from '../../lib/progress';
+import { ContinueRow } from '../../components/ContinueRow';
 import { HeroSpotlight } from '../../components/HeroSpotlight';
 import { SectionRow } from '../../components/SectionRow';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
@@ -18,6 +21,17 @@ import { colors, font, space } from '../../theme/tokens';
  * anime akan mengosongkan seluruh layar.
  */
 export default function HomeScreen() {
+  // Dibaca ulang tiap layar mendapat fokus, bukan sekali saat mount: user
+  // kembali ke sini tepat setelah menonton, dan posisi terbaru harus langsung
+  // terlihat. Layar tab tidak pernah di-unmount, jadi useEffect biasa tidak
+  // akan pernah berjalan lagi.
+  const [continueItems, setContinueItems] = useState<ProgressEntry[]>([]);
+  useFocusEffect(
+    useCallback(() => {
+      setContinueItems(listProgress());
+    }, [])
+  );
+
   const anime = useCatalog('home', 'anime', useCallback(async () => unwrap(await getAnimeHomeBundle()), []));
   const movie = useCatalog('home', 'movie', useCallback(async () => unwrap(await getMovieHomeBundle()), []));
 
@@ -89,6 +103,8 @@ export default function HomeScreen() {
       {(anime.stale || movie.stale) && <StaleBanner />}
 
       {spotlight ? <HeroSpotlight item={spotlight} /> : null}
+
+      <ContinueRow items={continueItems} />
 
       {sections.length === 0 && settled ? (
         <EmptyState

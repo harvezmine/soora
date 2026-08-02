@@ -117,7 +117,11 @@ export default function MovieInfoScreen() {
               label={se.name ?? `Musim ${se.season_number}`}
               sub={se.episode_count ? `${se.episode_count} episode` : undefined}
               onPress={() =>
-                router.push(`/watch/${encodeURIComponent(`${id}:s${se.season_number}`)}` as never)
+                router.push(
+                  `/watch/${encodeURIComponent(String(id))}?kind=tv&title=${encodeURIComponent(
+                    `${title} — ${se.name ?? `Musim ${se.season_number}`}`
+                  )}` as never
+                )
               }
             />
           ))}
@@ -127,7 +131,13 @@ export default function MovieInfoScreen() {
           <SectionTitle>Tonton</SectionTitle>
           <ListRow
             label="Putar film"
-            onPress={() => router.push(`/watch/${encodeURIComponent(String(id))}` as never)}
+            onPress={() =>
+              router.push(
+                `/watch/${encodeURIComponent(String(id))}?kind=movie&title=${encodeURIComponent(
+                  title
+                )}` as never
+              )
+            }
           />
         </>
       )}

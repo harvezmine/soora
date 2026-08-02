@@ -37,6 +37,11 @@ import { createMemoryKV, safeKV } from './ports/index.js';
  *
  *   Diverifikasi 2026-08-03 terhadap cdn.readdetectiveconan.com: tanpa Referer
  *   403, dengan Referer 200.
+ * @property {string} streamProxy
+ *   URL penuh proxy stream. Semua video wajib lewat sini — token m3u8 terikat
+ *   IP VPS, jadi perangkat tidak bisa mengambil langsung (diverifikasi
+ *   2026-08-03). Dipisah dari `apiBase` karena proxy bisa dipindah ke host
+ *   lain tanpa memindahkan API.
  * @property {string} imgProxyBase
  *   Awalan URL proxy gambar saat imageStrategy 'proxy'. Web memakai '' (relatif
  *   terhadap origin) karena /manga-img adalah fungsi serverless Vercel, bukan
@@ -51,6 +56,7 @@ const DEFAULTS = {
   getPage: () => '',
   imageStrategy: 'proxy',
   imgProxyBase: '',
+  streamProxy: '/api/proxy',
 };
 
 /** @type {CoreRuntime} */
@@ -87,6 +93,12 @@ export function configureCore(partial = {}) {
       throw new TypeError("configureCore: imageStrategy harus 'proxy' atau 'headers'");
     }
     runtime.imageStrategy = partial.imageStrategy;
+  }
+  if (partial.streamProxy !== undefined) {
+    if (typeof partial.streamProxy !== 'string' || partial.streamProxy === '') {
+      throw new TypeError('configureCore: streamProxy harus string tidak kosong');
+    }
+    runtime.streamProxy = partial.streamProxy.replace(/\/+$/, '');
   }
   if (partial.imgProxyBase !== undefined) {
     if (typeof partial.imgProxyBase !== 'string') {

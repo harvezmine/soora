@@ -9,7 +9,7 @@
 
 import { configureCore } from '@soora/core';
 import { nativeCoreConfig } from '@soora/core-native';
-import { API_BASE } from './config';
+import { API_BASE, STREAM_PROXY } from './config';
 
 /**
  * Route saat ini, untuk laporan error ke Telegram.
@@ -24,9 +24,13 @@ export const setCurrentPath = (path: string) => {
   currentPath = path;
 };
 
-configureCore(
-  nativeCoreConfig({
+configureCore({
+  ...nativeCoreConfig({
     apiBase: API_BASE,
     getPage: () => currentPath,
-  })
-);
+  }),
+  // Wajib absolut. Default runtime adalah '/api/proxy' yang relatif — di web
+  // itu resolve ke origin, tapi di native tidak ada origin sama sekali dan
+  // seluruh URL video jadi tidak valid.
+  streamProxy: STREAM_PROXY,
+});
