@@ -3,8 +3,8 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
-import { getVixsrcStream } from '@soora/core/api';
-import { resolvePlayback, shouldRefetchSource } from '@soora/core/player';
+import { getVixsrcStream, watchAnimeEpisode, fetchAnimeIds } from '@soora/core/api';
+import { buildAnimeEmbeds, resolvePlayback, shouldRefetchSource } from '@soora/core/player';
 import { NativePlayer } from '../../components/player/NativePlayer';
 import { EmbedPlayer } from '../../components/player/EmbedPlayer';
 import { ErrorState } from '../../components/States';
@@ -22,10 +22,13 @@ type Source = ReturnType<typeof resolvePlayback>;
  * daftar NEVER_CACHE.
  */
 export default function WatchScreen() {
-  const { id, kind, title } = useLocalSearchParams<{
+  const { id, kind, title, season, ep, animeId } = useLocalSearchParams<{
     id: string;
     kind?: string;
     title?: string;
+    season?: string;
+    ep?: string;
+    animeId?: string;
   }>();
   const router = useRouter();
 
@@ -36,14 +39,62 @@ export default function WatchScreen() {
   // Berapa kali sumber diambil ulang karena token kedaluwarsa. Dibatasi supaya
   // sumber yang benar-benar mati tidak memicu perulangan tanpa akhir.
   const refetches = useRef(0);
-  const resumeAt = useRef(getProgress(String(id))?.position ?? 0);
+
+  // Dibaca sekali lewat inisialisasi malas. `useRef(getProgress(...))`
+  // mengevaluasi argumennya TIAP render, jadi versi sebelumnya membaca MMKV
+  // dan mem-parse seluruh daftar progress di setiap render lalu membuangnya.
+  const resumeAt = useRef<number | null>(null);
+  if (resumeAt.current === null) resumeAt.current = getProgress(String(id))?.position ?? 0;
 
   const load = useCallback(async () => {
     setStatus('loading');
     setError('');
     try {
-      const res = await getVixsrcStream(kind === 'tv' ? 'tv' : 'movie', String(id));
-      const next = resolvePlayback({ m3u8: res?.m3u8, ref: res?.ref });
+      let next = null;
+
+      if (kind === 'anime') {
+        // Anime: coba m3u8 langsung dulu, lalu embed.
+        //
+        // Jalur embed inilah yang dipakai anime, dan BELUM bisa diverifikasi —
+        // per 2026-08-03 semua penyedia anime mengembalikan kosong. Strukturnya
+        // mengikuti AnimeEmbedPlayer.jsx di web yang sudah terbukti.
+        let m3u8: string | undefined;
+        let ref: string | undefined;
+        try {
+          const w = await watchAnimeEpisode(String(id));
+          m3u8 = w?.data?.sources?.find((s: { url?: string }) => s?.url)?.url;
+        } catch {
+          /* penyedia mati — lanjut ke embed */
+        }
+
+        let embeds: Array<{ url: string; label: string }> = [];
+        if (!m3u8 && animeId) {
+          try {
+            const ids = await fetchAnimeIds(String(animeId), String(title || ''));
+            embeds = buildAnimeEmbeds({
+              malId: ids?.malId,
+              alId: ids?.alId,
+              episode: Number(ep) || 1,
+            });
+          } catch {
+            /* tanpa MAL id tidak ada embed yang bisa dibangun */
+          }
+        }
+
+        next = resolvePlayback({ m3u8, ref, embeds });
+      } else {
+        // Film dan serial. Untuk serial, season WAJIB dikirim — tanpa itu
+        // endpoint tv dipanggil tanpa nomor musim dan tidak pernah
+        // mengembalikan sumber.
+        const res = await getVixsrcStream(
+          kind === 'tv' ? 'tv' : 'movie',
+          String(id),
+          season ? Number(season) : undefined,
+          ep ? Number(ep) : kind === 'tv' ? 1 : undefined
+        );
+        next = resolvePlayback({ m3u8: res?.m3u8, ref: res?.ref });
+      }
+
       if (!next) {
         setError(
           'Tidak ada sumber yang bisa diputar untuk judul ini. ' +
@@ -54,11 +105,15 @@ export default function WatchScreen() {
       }
       setSource(next);
       setStatus('ready');
+      // Pemulihan berhasil — kembalikan jatah pengambilan ulang. Tanpa ini,
+      // film panjang dengan token berumur pendek kehabisan jatah lalu
+      // menampilkan layar error padahal percobaan berikutnya pasti berhasil.
+      refetches.current = 0;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStatus('error');
     }
-  }, [id, kind]);
+  }, [id, kind, season, ep, animeId, title]);
 
   useEffect(() => {
     void load();
@@ -68,15 +123,27 @@ export default function WatchScreen() {
   useEffect(() => {
     void ScreenOrientation.unlockAsync();
     return () => {
-      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      // `unlockAsync`, BUKAN lock portrait. Mengunci portrait di sini akan
+      // berlaku untuk seluruh proses, sehingga setelah sekali menonton, semua
+      // layar lain (termasuk pembaca manga) tidak bisa lagi diputar ke
+      // landscape sampai app ditutup paksa.
+      void ScreenOrientation.unlockAsync();
     };
   }, []);
 
   const onProgress = useCallback(
     (position: number, duration: number) => {
+      // Jangkar resume milik sesi ini sendiri.
+      //
+      // Tidak boleh bersandar pada getProgress(): store itu sengaja MENGHAPUS
+      // entri yang lewat 92%. Kalau token mati di menit ke-113 dari film 2 jam,
+      // getProgress mengembalikan null dan pemutaran akan dimulai ulang dari
+      // nol setelah pengambilan sumber baru.
+      if (Number.isFinite(position) && position > 0) resumeAt.current = position;
+
       saveProgress({
         id: String(id),
-        kind: kind === 'tv' ? 'tv' : 'movie',
+        kind: kind === 'anime' ? 'anime' : kind === 'tv' ? 'tv' : 'movie',
         title: String(title || 'Tanpa judul'),
         position,
         duration,
@@ -91,14 +158,15 @@ export default function WatchScreen() {
       // lalu lanjutkan dari posisi terakhir, jangan tampilkan layar error.
       if (shouldRefetchSource({ message }) && refetches.current < 2) {
         refetches.current += 1;
-        resumeAt.current = getProgress(String(id))?.position ?? resumeAt.current;
+        // resumeAt sudah dijaga terkini oleh onProgress; jangan baca ulang
+        // dari store yang memangkas entri hampir-selesai.
         void load();
         return;
       }
       setError(message);
       setStatus('error');
     },
-    [id, load]
+    [load]
   );
 
   return (

@@ -38,7 +38,12 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-sqlite',
     'expo-web-browser',
-    ['expo-video', { supportsPictureInPicture: true }],
+    // supportsBackgroundPlayback WAJIB di sini, bukan cukup menyetel
+    // `staysActiveInBackground` di JS: opsi plugin inilah yang menambahkan
+    // izin dan foreground service media di manifest Android saat prebuild.
+    // Tanpanya audio berhenti begitu app di-background — fitur yang justru
+    // jadi salah satu alasan utama APK ini dibuat.
+    ['expo-video', { supportsPictureInPicture: true, supportsBackgroundPlayback: true }],
     'expo-image',
   ],
   experiments: {

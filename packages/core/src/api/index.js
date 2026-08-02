@@ -751,20 +751,34 @@ export const getGokuRecentTV = () =>
 // VixSrc direct HLS resolver — TMDB id → raw m3u8 (ad-free, our hls.js player).
 // Returns { m3u8, proxiedUrl } where proxiedUrl streams through our /proxy
 // (adds the required Referer). null m3u8 = fall back to embed.
-export const getVixsrcStream = (type, tmdbId, season, episode) =>
-  cachedGet(`vixsrc:${type}:${tmdbId}:${season || ''}:${episode || ''}`, async () => {
-    try {
-      const params = type === 'tv' ? { season, episode } : {};
-      const res = await api.get(`/movies/vixsrc/${type === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, { params });
-      const { m3u8, ref } = res.data || {};
-      if (!m3u8) return { m3u8: null, ref: null };
-      // Return RAW m3u8 + ref. VideoPlayer proxies it once itself (passing
-      // referer); pre-proxying here caused a nested /proxy?url=/proxy → 403.
-      return { m3u8, ref };
-    } catch {
-      return { m3u8: null, ref: null };
-    }
+/**
+ * Resolver HLS langsung VixSrc.
+ *
+ * SENGAJA TIDAK DI-CACHE. Sebelumnya dibungkus `cachedGet` dengan TTL 10 menit,
+ * dan itu merusak dua hal sekaligus:
+ *
+ * 1. URL m3u8 membawa `token` dan `expires`. Saat token mati di tengah tontonan,
+ *    pemutar meminta sumber baru — tapi cache mengembalikan URL kedaluwarsa yang
+ *    sama, jadi seluruh mekanisme pemulihan tidak pernah bisa bekerja.
+ * 2. Kegagalan sesaat ditangkap dan dikembalikan sebagai `{ m3u8: null }`, lalu
+ *    nilai itu ikut ter-cache. Satu gangguan backend sekejap membuat judul itu
+ *    "tidak bisa diputar" selama 10 menit, dan karena cache native bersandar di
+ *    MMKV pada disk, menutup app pun tidak menolong.
+ *
+ * Aturan yang sama sudah ditegakkan di cache katalog lewat daftar NEVER_CACHE;
+ * jalur ini terlewat karena tidak melalui cache tersebut.
+ */
+export const getVixsrcStream = async (type, tmdbId, season, episode) => {
+  const params = type === 'tv' ? { season, episode } : {};
+  const res = await api.get(`/movies/vixsrc/${type === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
+    params,
   });
+  const { m3u8, ref } = res.data || {};
+  if (!m3u8) return { m3u8: null, ref: null };
+  // Return RAW m3u8 + ref. Pemanggil membungkusnya dengan proxy sekali;
+  // pre-proxying di sini pernah menghasilkan /proxy?url=/proxy bersarang → 403.
+  return { m3u8, ref };
+};
 
 // English movie/TV search via the backend multi-provider orchestrator
 // (TMDB + Goku + LK21). The old single-provider /movies/goku/:q passthrough

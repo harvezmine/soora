@@ -118,9 +118,11 @@ export default function MovieInfoScreen() {
               sub={se.episode_count ? `${se.episode_count} episode` : undefined}
               onPress={() =>
                 router.push(
-                  `/watch/${encodeURIComponent(String(id))}?kind=tv&title=${encodeURIComponent(
-                    `${title} — ${se.name ?? `Musim ${se.season_number}`}`
-                  )}` as never
+                  `/watch/${encodeURIComponent(String(id))}?kind=tv` +
+                    `&season=${se.season_number ?? 1}&ep=1` +
+                    `&title=${encodeURIComponent(
+                      `${title} — ${se.name ?? `Musim ${se.season_number}`}`
+                    )}` as never
                 )
               }
             />

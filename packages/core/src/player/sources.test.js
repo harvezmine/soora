@@ -123,6 +123,38 @@ describe('shouldRefetchSource', () => {
   });
 });
 
+describe('regresi audit fase 3', () => {
+  it('id judul yang memuat "403" tidak memicu pengambilan ulang sumber', () => {
+    // URI proxy memuat id judul; pencocokan substring polos akan cocok untuk
+    // TMDB id 4030 dan menghabiskan jatah refetch pada error yang tidak sembuh.
+    expect(
+      shouldRefetchSource({
+        message:
+          'Unable to connect to https://stream.soora.fun/proxy?url=%2Fplaylist%2F4030%3Ftoken%3Dx',
+      })
+    ).toBe(false);
+  });
+
+  it('403 sebagai kode error tetap terdeteksi', () => {
+    expect(shouldRefetchSource({ message: 'Response code: 403' })).toBe(true);
+    expect(shouldRefetchSource({ message: 'HTTP 403 Forbidden' })).toBe(true);
+  });
+
+  it('query expires bawaan m3u8 tidak dianggap kedaluwarsa', () => {
+    expect(
+      shouldRefetchSource({ message: 'Failed to open https://cdn.test/a.m3u8?expires=123' })
+    ).toBe(false);
+  });
+
+  it('AVERAGE-BANDWIDTH tidak dipakai sebagai bitrate varian', () => {
+    const v = parseVariants(
+      '#EXT-X-STREAM-INF:AVERAGE-BANDWIDTH=500000,BANDWIDTH=1200000,CODECS="avc1"\na.m3u8'
+    );
+    expect(v[0].bandwidth).toBe(1200000);
+    expect(v[0].label).toBe('1200 kbps');
+  });
+});
+
 describe('parseVariants', () => {
   const MASTER = `#EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360

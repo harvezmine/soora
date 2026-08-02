@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, font, radius, space } from '../../theme/tokens';
@@ -29,15 +29,18 @@ export function EmbedPlayer({
 }) {
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState(0);
-  const allowedHost = useRef<string>('');
 
-  if (!allowedHost.current) {
+  // useMemo, bukan ref yang ditulis saat render: host harus dihitung ulang
+  // kalau `uri` berganti (mis. saat tombol ganti server ditambahkan nanti),
+  // dan menulis ref di fase render tidak aman di React 19.
+  const allowedHost = useRef('');
+  allowedHost.current = useMemo(() => {
     try {
-      allowedHost.current = new URL(uri).hostname;
+      return new URL(uri).hostname;
     } catch {
-      allowedHost.current = '';
+      return '';
     }
-  }
+  }, [uri]);
 
   return (
     <View style={s.wrap}>
@@ -55,16 +58,26 @@ export function EmbedPlayer({
           // Navigasi awal selalu diizinkan.
           if (req.url === uri) return true;
 
+          // HANYA navigasi frame utama yang dibatasi.
+          //
+          // Penyedia embed bekerja dengan cara meng-iframe player dari host
+          // lain (mis. halaman di vidsrc memuat player di cloudnestra), dan
+          // memblokir semua host berbeda akan menghasilkan layar hitam
+          // permanen. Yang berbahaya adalah frame utama berpindah ke domain
+          // lain — itulah pola pop-under/redirect iklan.
+          if (!req.isTopFrame) return true;
+
+          // Skema non-http (about:blank, data:, blob:) dipakai secara sah oleh
+          // banyak player. Diizinkan, dan tidak dihitung sebagai pop-up.
+          if (!/^https?:/i.test(req.url)) return true;
+
           let host = '';
           try {
             host = new URL(req.url).hostname;
           } catch {
-            return false; // URL tidak bisa diurai — jangan diikuti
+            return false;
           }
 
-          // Sub-resource di host yang sama (player, segmen) diizinkan;
-          // apa pun yang mengarah ke domain lain ditolak. Inilah yang
-          // menggantikan sandbox iframe di web.
           const sameHost = host === allowedHost.current || host.endsWith(`.${allowedHost.current}`);
           if (!sameHost) {
             setBlocked((n) => n + 1);

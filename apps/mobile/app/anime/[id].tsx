@@ -92,7 +92,14 @@ export default function AnimeInfoScreen() {
                 ? `${ep.number ?? index + 1}. ${ep.title}`
                 : `Episode ${ep.number ?? index + 1}`
             }
-            onPress={() => router.push(`/watch/${encodeURIComponent(ep.id ?? '')}` as never)}
+            onPress={() =>
+              router.push(
+                `/watch/${encodeURIComponent(ep.id ?? '')}?kind=anime` +
+                  `&title=${encodeURIComponent(`${title} — Episode ${ep.number ?? index + 1}`)}` +
+                  `&ep=${ep.number ?? index + 1}` +
+                  `&animeId=${encodeURIComponent(String(id))}` as never
+              )
+            }
           />
         )}
       />

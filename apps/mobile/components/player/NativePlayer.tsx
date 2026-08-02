@@ -46,27 +46,48 @@ export function NativePlayer({
     p.showNowPlayingNotification = true;
     // Layar tidak mati saat menonton, tanpa perlu expo-keep-awake terpisah.
     p.keepScreenOnWhilePlaying = true;
-    // Laporan posisi tiap detik — cukup halus untuk menyimpan progress,
-    // tapi tidak sesering frame sehingga tidak membebani bridge.
-    p.timeUpdateEventInterval = 1;
+    // Seek SEBELUM play. Kalau dibalik, user yang melanjutkan dari menit 45
+    // akan melihat dan mendengar beberapa detik adegan pembuka lebih dulu,
+    // baru melompat.
+    if (startAt > 5) {
+      p.currentTime = startAt;
+      seeded.current = true;
+    }
+    // 5 detik, bukan 1. Tiap event memicu penulisan progress; sekali per detik
+    // berarti JSON.parse + JSON.stringify seluruh daftar tiap detik di JS
+    // thread yang sedang merender video.
+    p.timeUpdateEventInterval = 5;
     p.play();
   });
 
   useEventListener(player, 'statusChange', ({ status, error }) => {
     if (status === 'readyToPlay') {
       setReady(true);
-      // Lanjutkan dari posisi terakhir, sekali saja — kalau tidak, tiap
-      // perubahan status akan melempar user kembali ke titik itu.
+      // Cadangan kalau seek di setup belum sempat diterapkan sebelum sumber
+      // siap. Sekali saja — kalau tidak, tiap perubahan status akan melempar
+      // user kembali ke titik itu.
       if (!seeded.current && startAt > 5) {
         seeded.current = true;
         player.currentTime = startAt;
       }
     }
-    if (status === 'error' && error) onError?.(error.message);
+    if (status === 'error') {
+      // `error` bisa kosong. Tanpa pesan cadangan, overlay memuat berputar
+      // selamanya tanpa penjelasan dan tanpa tombol coba lagi.
+      onError?.(error?.message || 'Pemutaran gagal tanpa pesan dari pemutar.');
+    }
   });
 
+  // Posisi terakhir yang diketahui, disimpan di ref supaya tetap terbaca saat
+  // unmount. Membaca `player.currentTime` di cleanup TIDAK bisa diandalkan:
+  // effect internal expo-video yang melepas player terdaftar lebih dulu, jadi
+  // saat cleanup kita berjalan objeknya sudah dilepas.
+  const lastSeen = useRef({ position: 0, duration: 0 });
+
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-    onProgress?.(currentTime, player.duration || 0);
+    const duration = player.duration || 0;
+    lastSeen.current = { position: currentTime, duration };
+    onProgress?.(currentTime, duration);
   });
 
   /**
@@ -120,18 +141,15 @@ export function NativePlayer({
     setSheet(null);
   };
 
-  // Simpan posisi terakhir saat layar ditinggalkan, bukan hanya lewat
-  // timeUpdate — user yang menekan back tepat setelah seek akan kehilangan
-  // beberapa detik terakhir kalau tidak.
+  // Simpan posisi terakhir saat layar ditinggalkan. Memakai nilai ter-cache,
+  // bukan membaca player — lihat catatan di `lastSeen`.
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
   useEffect(() => {
     return () => {
-      try {
-        onProgress?.(player.currentTime, player.duration || 0);
-      } catch {
-        /* player sudah dilepas */
-      }
+      const { position, duration } = lastSeen.current;
+      if (position > 0) onProgressRef.current?.(position, duration);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

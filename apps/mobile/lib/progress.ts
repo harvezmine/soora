@@ -52,11 +52,24 @@ function writeAll(list: ProgressEntry[]) {
  * kalau tidak, daftar itu penuh judul yang sudah tamat.
  */
 export function isFinished(position: number, duration: number) {
-  return duration > 0 && position / duration > 0.92;
+  if (!Number.isFinite(position) || !Number.isFinite(duration)) return false;
+  // Durasi 0 berarti belum diketahui (playlist HLS tanpa EXT-X-ENDLIST, atau
+  // metadata belum siap). Entri seperti itu tidak boleh dianggap selesai —
+  // tapi juga tidak boleh menempel selamanya, jadi dibatasi 4 jam sebagai
+  // pengaman: lebih panjang dari hampir semua film.
+  if (duration <= 0) return position > 4 * 60 * 60;
+  return position / duration > 0.92;
 }
 
 export function saveProgress(entry: Omit<ProgressEntry, 'updatedAt'>) {
   if (!entry.id) return;
+
+  // `NaN < 10` bernilai false, jadi tanpa pemeriksaan finite ini posisi NaN
+  // lolos dan tersimpan sebagai `null` setelah JSON.stringify. Akibatnya kartu
+  // "Lanjut Tonton" menampilkan sisa waktu yang salah dan resume kembali ke 0.
+  // NaN bisa muncul dari `player.currentTime` pada player yang sudah dilepas.
+  if (!Number.isFinite(entry.position)) return;
+  const duration = Number.isFinite(entry.duration) ? entry.duration : 0;
 
   // Jangan simpan posisi yang belum berarti. Menyimpan detik ke-3 hanya
   // membuat "Lanjut Tonton" penuh judul yang sebenarnya cuma dibuka sekilas.
@@ -64,12 +77,12 @@ export function saveProgress(entry: Omit<ProgressEntry, 'updatedAt'>) {
 
   const list = readAll().filter((e) => e.id !== entry.id);
 
-  if (isFinished(entry.position, entry.duration)) {
+  if (isFinished(entry.position, duration)) {
     writeAll(list); // selesai — hapus saja dari daftar
     return;
   }
 
-  writeAll([{ ...entry, updatedAt: Date.now() }, ...list]);
+  writeAll([{ ...entry, duration, updatedAt: Date.now() }, ...list]);
 }
 
 export function getProgress(id: string): ProgressEntry | null {

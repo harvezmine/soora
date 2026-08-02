@@ -100,8 +100,16 @@ export function resolvePlayback({ m3u8, ref, embeds } = {}) {
 export function shouldRefetchSource(err) {
   const status = err?.status;
   if (status === 403 || status === 401 || status === 410) return true;
+
   const msg = String(err?.message || '').toLowerCase();
-  return msg.includes('403') || msg.includes('forbidden') || msg.includes('expired');
+
+  // Pencocokan harus ketat. Pesan error pemutar biasanya memuat URI, dan URI
+  // proxy memuat id judul serta token — sehingga `msg.includes('403')` akan
+  // cocok untuk TMDB id seperti 4030 atau token apa pun yang kebetulan memuat
+  // "403". Akibatnya kegagalan jaringan biasa menghabiskan jatah pengambilan
+  // ulang sumber yang tidak akan menolong.
+  if (/(?:^|[^0-9])(401|403|410)(?:[^0-9]|$)/.test(msg)) return true;
+  return msg.includes('forbidden') || msg.includes('expired');
 }
 
 /**
@@ -121,7 +129,10 @@ export function parseVariants(text) {
   for (const line of lines) {
     if (!line.startsWith('#EXT-X-STREAM-INF')) continue;
     const res = /RESOLUTION=(\d+)x(\d+)/.exec(line);
-    const bw = /BANDWIDTH=(\d+)/.exec(line);
+    // Jangkar di awal atau setelah pemisah supaya tidak cocok dengan
+    // substring di dalam AVERAGE-BANDWIDTH — yang nilainya lebih rendah dan
+    // akan menghasilkan label kualitas yang salah.
+    const bw = /(?:^|[,:])BANDWIDTH=(\d+)/.exec(line);
     const height = res ? Number(res[2]) : 0;
     const bandwidth = bw ? Number(bw[1]) : 0;
     if (!height && !bandwidth) continue;
