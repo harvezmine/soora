@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useRouter } from 'expo-router';
 import { useGoogleSignIn } from '../../lib/auth';
 import { isGoogleLoginConfigured } from '../../lib/config';
-import { colors, font, radius, space, MIN_TOUCH } from '../../theme/tokens';
+import { colors, font, onAccent, radius, space, MIN_TOUCH } from '../../theme/tokens';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export default function LoginScreen() {
           style={({ pressed }) => [s.btn, (pressed || busy || !ready) && s.btnPressed]}
         >
           {busy ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={onAccent} />
           ) : (
             <Text style={s.btnText}>Lanjutkan dengan Google</Text>
           )}
@@ -63,7 +63,7 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg, gap: space.lg },
   heading: { color: colors.text, fontSize: font.size.xl, fontWeight: '700' },
-  body: { color: colors.textMuted, fontSize: font.size.md, lineHeight: font.size.md * 1.5 },
+  body: { color: colors.textMuted, fontSize: font.size.md, lineHeight: font.size.md * font.lineHeight.normal },
   btn: {
     minHeight: MIN_TOUCH,
     backgroundColor: colors.accent,
@@ -72,7 +72,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   btnPressed: { opacity: 0.7 },
-  btnText: { color: '#fff', fontSize: font.size.base, fontWeight: '600' },
+  btnText: { color: onAccent, fontSize: font.size.base, fontWeight: '600' },
   setup: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -82,7 +82,7 @@ const s = StyleSheet.create({
     gap: space.sm,
   },
   setupTitle: { color: colors.warning, fontSize: font.size.base, fontWeight: '600' },
-  setupBody: { color: colors.textMuted, fontSize: font.size.sm, lineHeight: font.size.sm * 1.5 },
+  setupBody: { color: colors.textMuted, fontSize: font.size.sm, lineHeight: font.size.sm * font.lineHeight.normal },
   setupCmd: {
     color: colors.textDim,
     fontSize: font.size.xs,

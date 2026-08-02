@@ -50,6 +50,19 @@ Thumbs.db
 api.consumet.org/src/scripts
 api.consumet.org/test.ts
 
+# ===== Signing / kredensial =====
+# Repo ini PUBLIK. Pola di bawah wajib ada di root, bukan hanya di apps/web —
+# build rilis Android bisa menaruh keystore di mana saja di dalam workspace.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.mobileprovision
+credentials.json
+google-services.json
+GoogleService-Info.plist
+
 # ===== Misc =====
 *.tgz
 coverage/

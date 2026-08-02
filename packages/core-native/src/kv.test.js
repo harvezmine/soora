@@ -44,6 +44,30 @@ describe('createMMKVKV', () => {
     expect(() => createMMKVKV({})).toThrow(TypeError);
   });
 
+  it('menyebutkan method mana yang kurang', () => {
+    expect(() => createMMKVKV({ getString: () => '' })).toThrow(/set, delete/);
+  });
+
+  it('tidak pernah melempar walau MMKV gagal — kontrak KVPort', () => {
+    // Konsumen yang memakai nativePersistentKV langsung tidak lewat safeKV,
+    // jadi perlindungannya harus ada di sini.
+    const broken = {
+      getString: () => {
+        throw new Error('MMKV tertutup');
+      },
+      set: () => {
+        throw new Error('disk penuh');
+      },
+      delete: () => {
+        throw new Error('MMKV tertutup');
+      },
+    };
+    const kv = createMMKVKV(broken);
+    expect(kv.get('x')).toBeNull();
+    expect(() => kv.set('x', 'y')).not.toThrow();
+    expect(() => kv.remove('x')).not.toThrow();
+  });
+
   it('memenuhi kontrak KVPort yang sama dengan adapter web', () => {
     const kv = createMMKVKV(fakeMMKV());
     for (const m of ['get', 'set', 'remove']) expect(typeof kv[m]).toBe('function');

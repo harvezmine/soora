@@ -30,7 +30,20 @@ export const colors = {
 
   /** Scrim modal — cukup pekat supaya konten depan terbaca. */
   scrim: 'rgba(0, 0, 0, 0.6)',
+
+  /** Latar hitam murni untuk area video. Bukan `bg` — player harus benar hitam. */
+  videoBg: '#000000',
 } as const;
+
+/**
+ * Warna teks/ikon di atas `colors.accent`.
+ *
+ * Dipisah sebagai token tersendiri supaya saat aksen diganti, kontras label
+ * tombol bisa diperbaiki di satu tempat. Sebelumnya '#fff' ditulis langsung di
+ * empat berkas, dan mengganti aksen ke warna terang akan menjatuhkan kontras
+ * di bawah 3:1 tanpa satu titik perbaikan.
+ */
+export const onAccent = '#ffffff';
 
 /**
  * Skala spasi kelipatan 4. Pakai nama, bukan angka mentah,
@@ -121,6 +134,7 @@ export const layer = {
 
 export const theme = {
   colors,
+  onAccent,
   space,
   radius,
   iconSize,

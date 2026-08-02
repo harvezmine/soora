@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { getAnimeHomeBundle } from '@soora/core/api';
 import { getToken } from '@soora/core/user';
 import { getCatalogCache } from '../../lib/db';
 import { API_BASE } from '../../lib/config';
-import { colors, font, radius, space } from '../../theme/tokens';
+import { colors, font, radius, space, MIN_TOUCH } from '../../theme/tokens';
 
 type Status = 'loading' | 'ok' | 'error';
 
@@ -23,6 +31,16 @@ export default function HomeScreen() {
   const [detail, setDetail] = useState('');
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [fromCache, setFromCache] = useState(false);
+
+  // Layar tab tetap ter-mount selamanya; callback refresh background bisa
+  // datang setelah layar hilang. Penjaga ini mencegah setState liar.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setStatus('loading');
@@ -50,6 +68,7 @@ export default function HomeScreen() {
   }, []);
 
   const summarize = (data: unknown) => {
+    if (!alive.current) return;
     const d = (data ?? {}) as Record<string, unknown>;
     const next: Record<string, number> = {};
     for (const k of ['spotlight', 'recentEpisodes', 'mostPopular', 'topAiring']) {
@@ -64,7 +83,19 @@ export default function HomeScreen() {
   }, [load]);
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={s.content}>
+    <ScrollView
+      style={s.screen}
+      contentContainerStyle={s.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={status === 'loading'}
+          onRefresh={() => {
+            void load();
+          }}
+          tintColor={colors.accent}
+        />
+      }
+    >
       <Text style={s.title}>Soora</Text>
       <Text style={s.subtitle}>Fase 1 — pemeriksaan fondasi</Text>
 
@@ -95,6 +126,17 @@ export default function HomeScreen() {
           <>
             <Text style={s.err}>Request gagal</Text>
             <Text style={s.muted}>{detail}</Text>
+            {/* Layar tab tidak pernah di-unmount, jadi tanpa tombol ini
+                satu-satunya cara pulih setelah kehilangan jaringan adalah
+                menutup paksa app. */}
+            <Pressable
+              style={({ pressed }) => [s.retry, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                void load();
+              }}
+            >
+              <Text style={s.retryText}>Coba lagi</Text>
+            </Pressable>
           </>
         )}
       </View>
@@ -139,4 +181,14 @@ const s = StyleSheet.create({
   ok: { color: colors.success, fontSize: font.size.base, fontWeight: '600' },
   err: { color: colors.danger, fontSize: font.size.base, fontWeight: '600' },
   muted: { color: colors.textMuted, fontSize: font.size.sm },
+  retry: {
+    minHeight: MIN_TOUCH,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: space.sm,
+  },
+  retryText: { color: colors.text, fontSize: font.size.md, fontWeight: '600' },
 });

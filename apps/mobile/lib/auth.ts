@@ -122,7 +122,32 @@ export function useGoogleSignIn() {
     setError('');
     setBusy(true);
     try {
-      await promptAsync();
+      // `promptAsync` sudah menunggu sampai user kembali dari browser. Kalau
+      // hasilnya bukan success, effect di atas tidak akan pernah jalan untuk
+      // menurunkan `busy` — jadi diturunkan di sini.
+      const result = await promptAsync();
+
+      if (result?.type !== 'success') {
+        setBusy(false);
+        return;
+      }
+
+      // Di native, expo-auth-session memakai alur authorization code dan
+      // menukarnya sendiri di effect internal. Penukaran itu tidak punya
+      // penanganan error: kalau gagal (koneksi putus, client Android salah),
+      // `response` tetap null selamanya dan tombol jadi spinner abadi.
+      // Batas waktu di bawah memastikan user selalu bisa mencoba lagi.
+      setTimeout(() => {
+        setBusy((stillBusy) => {
+          if (stillBusy) {
+            setError(
+              'Login tidak selesai. Periksa koneksi, dan pastikan client ID Android ' +
+                'beserta SHA-1 keystore sudah terdaftar di Google Cloud Console.'
+            );
+          }
+          return false;
+        });
+      }, 30_000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBusy(false);

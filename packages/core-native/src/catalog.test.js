@@ -229,3 +229,131 @@ describe('read (stale-while-revalidate)', () => {
     await expect(c.read('title', 'x', fetcher)).rejects.toThrow('backend mati');
   });
 });
+
+/**
+ * Regresi untuk bug yang ditemukan audit 2026-08-03. Tiap test di bawah gagal
+ * pada implementasi sebelum perbaikan.
+ */
+describe('regresi audit', () => {
+  it('tidak menyajikan baris kind terlarang yang sudah terlanjur ada di DB', () => {
+    // Ditulis versi app lama, saat NEVER_CACHE masih lebih pendek.
+    db.exec(`CREATE TABLE IF NOT EXISTS catalog (
+      kind TEXT NOT NULL, key TEXT NOT NULL, payload TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL, PRIMARY KEY (kind, key));`);
+    db.run('INSERT INTO catalog (kind, key, payload, fetched_at) VALUES (?, ?, ?, ?)', [
+      'stream',
+      'ep-1',
+      JSON.stringify({ url: 'x.m3u8?token=KEDALUWARSA' }),
+      clock,
+    ]);
+
+    const c = mk(); // konstruksi harus membersihkannya
+    expect(c.getEntry('stream', 'ep-1')).toBeNull();
+    expect(db.getFirst('SELECT COUNT(*) AS n FROM catalog WHERE kind = ?', ['stream']).n).toBe(0);
+  });
+
+  it('read pada kind terlarang tetap mengembalikan data, hanya tidak menyimpan', async () => {
+    const c = mk();
+    const fetcher = vi.fn().mockResolvedValue({ url: 'segar.m3u8' });
+    // Dulu putEntry melempar dan menjatuhkan read, padahal datanya sudah ada.
+    await expect(c.read('source', 'ep-1', fetcher)).resolves.toEqual({ url: 'segar.m3u8' });
+    expect(c.getEntry('source', 'ep-1')).toBeNull();
+  });
+
+  it('gagal menulis tidak membatalkan fetch yang sudah sukses', async () => {
+    const c = createCatalogCache(
+      {
+        exec: db.exec,
+        getFirst: db.getFirst,
+        run: (sql, p) => {
+          if (sql.startsWith('INSERT')) throw new Error('SQLITE_FULL');
+          return db.run(sql, p);
+        },
+      },
+      { now: () => clock }
+    );
+    await expect(c.read('title', 'x', vi.fn().mockResolvedValue({ v: 1 }))).resolves.toEqual({
+      v: 1,
+    });
+  });
+
+  it('read bersamaan untuk key sama hanya memicu satu fetch', async () => {
+    const c = mk();
+    let resolveFetch;
+    const fetcher = vi.fn(() => new Promise((r) => (resolveFetch = r)));
+
+    const all = Promise.all([1, 2, 3, 4, 5].map(() => c.read('home', 'b', fetcher)));
+    resolveFetch({ v: 1 });
+    const results = await all;
+
+    // Lima komponen memanggil saat mount; hanya boleh satu request jaringan.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(results).toEqual([{ v: 1 }, { v: 1 }, { v: 1 }, { v: 1 }, { v: 1 }]);
+  });
+
+  it('refresh stale bersamaan juga hanya satu fetch', async () => {
+    const c = mk();
+    c.putEntry('home', 'b', { v: 0 });
+    clock += TTL.home + 1;
+    let resolveFetch;
+    const fetcher = vi.fn(() => new Promise((r) => (resolveFetch = r)));
+
+    await Promise.all([c.read('home', 'b', fetcher), c.read('home', 'b', fetcher)]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    resolveFetch({ v: 1 });
+  });
+
+  it('jam mundur tidak membuat entri fresh selamanya', async () => {
+    const c = mk();
+    c.putEntry('home', 'b', { v: 1 });
+    // NTP mengoreksi jam yang tadinya kelewat maju.
+    clock -= 1_000_000_000;
+
+    const hit = c.getEntry('home', 'b');
+    expect(hit.age).toBeLessThan(0);
+    expect(hit.fresh).toBe(false); // dulu true → cache beku berhari-hari
+
+    const fetcher = vi.fn().mockResolvedValue({ v: 2 });
+    await c.read('home', 'b', fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('fetched_at rusak diperlakukan sebagai miss, bukan NaN', () => {
+    const c = mk();
+    db.run('INSERT OR REPLACE INTO catalog (kind, key, payload, fetched_at) VALUES (?, ?, ?, ?)', [
+      'title',
+      'x',
+      JSON.stringify({ v: 1 }),
+      'bukan-angka',
+    ]);
+    expect(c.getEntry('title', 'x')).toBeNull();
+  });
+
+  it('onRefresh yang melempar tidak jadi unhandled rejection', async () => {
+    const c = mk();
+    c.putEntry('home', 'b', { v: 1 });
+    clock += TTL.home + 1;
+    const onRefresh = vi.fn(() => {
+      throw new Error('setState pada komponen ter-unmount');
+    });
+    await expect(
+      c.read('home', 'b', vi.fn().mockResolvedValue({ v: 2 }), onRefresh)
+    ).resolves.toEqual({ v: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onRefresh).toHaveBeenCalled(); // dipanggil, tapi lemparannya tertelan
+  });
+
+  it('kind bernama seperti properti Object.prototype tidak mengacaukan TTL', () => {
+    const c = mk();
+    c.putEntry('constructor', 'x', { v: 1 });
+    // Dulu TTL['constructor'] berupa function → age < ttl selalu false.
+    expect(c.getEntry('constructor', 'x').fresh).toBe(true);
+  });
+
+  it('invalidate(kind, null) menghapus seluruh kind, bukan diam saja', () => {
+    const c = mk();
+    c.putEntry('title', 'a', 1);
+    c.invalidate('title', null);
+    expect(c.getEntry('title', 'a')).toBeNull();
+  });
+});

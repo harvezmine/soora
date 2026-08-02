@@ -4,7 +4,7 @@
     "slug": "soora",
     "version": "1.0.0",
     "orientation": "default",
-    "scheme": "soora",
+    "scheme": ["soora", "fun.soora.app"],
     "userInterfaceStyle": "dark",
     "backgroundColor": "#06060e",
     "android": {
@@ -12,26 +12,23 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#06060e"
-      },
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "soora.fun"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      }
     },
     "ios": {
       "bundleIdentifier": "fun.soora.app",
       "supportsTablet": true
     },
-    "plugins": ["expo-router", "expo-sqlite", "expo-web-browser"],
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-web-browser",
+      [
+        "expo-video",
+        {
+          "supportsPictureInPicture": true
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

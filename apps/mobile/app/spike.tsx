@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { getVixsrcStream } from '@soora/core/api';
 import { API_BASE, STREAM_PROXY } from '../lib/config';
-import { colors, font, radius, space, MIN_TOUCH } from '../theme/tokens';
+import { colors, font, onAccent, radius, space, MIN_TOUCH } from '../theme/tokens';
 
 /**
  * Spike fase 1 — risiko nomor 3 di design spec.
@@ -27,6 +27,8 @@ type Attempt = {
   name: string;
   uri: string;
   headers?: Record<string, string>;
+  /** Diisi kalau percobaan ini tidak bermakna, mis. backend tidak memberi Referer. */
+  skip?: string;
 };
 
 type Verdict = 'belum' | 'memuat' | 'main' | 'gagal';
@@ -41,13 +43,20 @@ export default function SpikeScreen() {
 
   const say = (line: string) => setLog((l) => [...l, line]);
 
-  const player = useVideoPlayer(
-    active ? { uri: active.uri, headers: active.headers } : null,
-    (p) => {
-      p.loop = false;
-      p.play();
-    }
-  );
+  /**
+   * Player dibuat sekali dengan sumber kosong, lalu diganti secara imperatif.
+   *
+   * Sengaja TIDAK memakai `useVideoPlayer(sumberDinamis)`: hook itu memoisasi
+   * pada `JSON.stringify(source)`, dan `JSON.stringify` membuang key bernilai
+   * undefined. Kalau backend tidak mengembalikan Referer, percobaan 2 akan
+   * menghasilkan objek yang identik dengan percobaan 1, player tidak dibuat
+   * ulang, dan stream percobaan 1 terus berjalan — spike lalu menyimpulkan
+   * "ExoPlayer bisa kirim Referer sendiri" dari pengujian yang tidak pernah
+   * berjalan. Menekan tombol yang sama dua kali juga tidak akan memuat ulang.
+   */
+  const player = useVideoPlayer(null, (p) => {
+    p.loop = false;
+  });
 
   const resolve = useCallback(async () => {
     setLog([]);
@@ -72,6 +81,9 @@ export default function SpikeScreen() {
           name: '2. Langsung + header Referer',
           uri: m3u8,
           headers: ref ? { Referer: ref } : undefined,
+          // Tanpa Referer, percobaan 2 identik dengan percobaan 1 dan tidak
+          // membuktikan apa pun. Ditandai supaya tidak salah dibaca "berhasil".
+          skip: ref ? undefined : 'Backend tidak memberi Referer — percobaan ini sama dengan #1.',
         },
         {
           name: '3. Lewat stream.soora.fun/proxy',
@@ -87,11 +99,24 @@ export default function SpikeScreen() {
     }
   }, [tmdbId]);
 
-  const run = (a: Attempt) => {
+  const run = async (a: Attempt) => {
+    if (a.skip) {
+      say(`⊘ ${a.name} — dilewati. ${a.skip}`);
+      return;
+    }
     setActive(a);
     setVerdict('memuat');
     say(`▶ ${a.name}`);
-    if (a.headers) say(`   header: ${JSON.stringify(a.headers)}`);
+    say(`   header: ${a.headers ? JSON.stringify(a.headers) : '(tidak ada)'}`);
+    try {
+      // Penggantian imperatif: selalu memuat ulang, termasuk saat menekan
+      // tombol yang sama dua kali untuk mencoba lagi.
+      await player.replaceAsync({ uri: a.uri, headers: a.headers });
+      player.play();
+    } catch (e) {
+      setVerdict('gagal');
+      say(`   gagal memuat: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   return (
@@ -120,10 +145,12 @@ export default function SpikeScreen() {
       {attempts.map((a) => (
         <Pressable
           key={a.name}
-          style={({ pressed }) => [s.btnGhost, pressed && s.pressed]}
-          onPress={() => run(a)}
+          style={({ pressed }) => [s.btnGhost, (pressed || a.skip) && s.pressed]}
+          onPress={() => {
+            void run(a);
+          }}
         >
-          <Text style={s.btnGhostText}>{a.name}</Text>
+          <Text style={s.btnGhostText}>{a.skip ? `${a.name} — dilewati` : a.name}</Text>
         </Pressable>
       ))}
 
@@ -171,7 +198,7 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg, gap: space.md },
   heading: { color: colors.text, fontSize: font.size.xl, fontWeight: '700' },
-  body: { color: colors.textMuted, fontSize: font.size.sm, lineHeight: font.size.sm * 1.5 },
+  body: { color: colors.textMuted, fontSize: font.size.sm, lineHeight: font.size.sm * font.lineHeight.normal },
   field: { gap: space.xs },
   label: { color: colors.textDim, fontSize: font.size.sm },
   value: { color: colors.text, fontSize: font.size.sm },
@@ -192,7 +219,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnText: { color: '#fff', fontSize: font.size.base, fontWeight: '600' },
+  btnText: { color: onAccent, fontSize: font.size.base, fontWeight: '600' },
   btnGhost: {
     minHeight: MIN_TOUCH,
     borderWidth: 1,
@@ -206,7 +233,7 @@ const s = StyleSheet.create({
   pressed: { opacity: 0.7 },
   playerWrap: {
     aspectRatio: 16 / 9,
-    backgroundColor: '#000',
+    backgroundColor: colors.videoBg,
     borderRadius: radius.md,
     overflow: 'hidden',
   },

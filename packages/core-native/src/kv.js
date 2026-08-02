@@ -29,15 +29,37 @@
  * @returns {KVPort}
  */
 export function createMMKVKV(storage) {
-  if (!storage || typeof storage.getString !== 'function') {
-    throw new TypeError('createMMKVKV: butuh instance MMKV dengan getString/set/delete');
+  const missing = ['getString', 'set', 'delete'].filter((m) => typeof storage?.[m] !== 'function');
+  if (missing.length) {
+    throw new TypeError(`createMMKVKV: instance MMKV kekurangan method: ${missing.join(', ')}`);
   }
+
+  // try/catch di tiap operasi karena kontrak KVPort mensyaratkan method tidak
+  // pernah melempar (lihat packages/core/src/ports/index.js). `configureCore`
+  // memang membungkus dengan safeKV, tapi ekspor `nativePersistentKV` juga
+  // dipakai langsung — dan di jalur itu tidak ada pembungkus apa pun.
   return {
     get: (key) => {
-      const v = storage.getString(key);
-      return v === undefined ? null : v;
+      try {
+        const v = storage.getString(key);
+        return v === undefined ? null : v;
+      } catch {
+        return null;
+      }
     },
-    set: (key, value) => storage.set(key, value),
-    remove: (key) => storage.delete(key),
+    set: (key, value) => {
+      try {
+        storage.set(key, value);
+      } catch {
+        /* MMKV tertutup, disk penuh, atau kegagalan enkripsi */
+      }
+    },
+    remove: (key) => {
+      try {
+        storage.delete(key);
+      } catch {
+        /* sama seperti di atas */
+      }
+    },
   };
 }

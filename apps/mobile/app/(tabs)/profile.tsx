@@ -1,9 +1,10 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { getToken } from '@soora/core/user';
+import { clearApiMemCache } from '@soora/core/api';
 import { clearNativeCache } from '@soora/core-native';
 import { getCatalogCache } from '../../lib/db';
-import { colors, font, radius, space, MIN_TOUCH } from '../../theme/tokens';
+import { colors, font, onAccent, radius, space, MIN_TOUCH } from '../../theme/tokens';
 
 /**
  * Profil fase 1: status login, dan tombol bersihkan cache.
@@ -16,8 +17,11 @@ export default function ProfileScreen() {
   const loggedIn = Boolean(getToken());
 
   const clearCache = () => {
-    // Dua lapisan terpisah: MMKV untuk respons API, SQLite untuk katalog.
-    // Keduanya dibuang; sesi login (MMKV instance lain) tidak tersentuh.
+    // TIGA lapisan, bukan dua. @soora/core/api juga menyimpan Map in-memory
+    // dengan TTL stale sampai 45 menit; tanpa membersihkannya, tombol ini
+    // tidak berefek apa-apa selama sesi berjalan karena bundle lama tetap
+    // disajikan dari memori.
+    clearApiMemCache();
     clearNativeCache();
     getCatalogCache().clearAll();
   };
@@ -73,7 +77,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnText: { color: '#fff', fontSize: font.size.base, fontWeight: '600' },
+  btnText: { color: onAccent, fontSize: font.size.base, fontWeight: '600' },
   btnGhost: {
     minHeight: MIN_TOUCH,
     borderWidth: 1,
