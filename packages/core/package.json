@@ -1,0 +1,28 @@
+{
+  "name": "@soora/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Logika Soora yang platform-agnostic — dipakai apps/web dan apps/mobile.",
+  "exports": {
+    ".": "./src/index.js",
+    "./api": "./src/api/index.js",
+    "./komikplus": "./src/komikplus/index.js",
+    "./user": "./src/user/index.js",
+    "./runtime": "./src/runtime.js",
+    "./ports": "./src/ports/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "axios": "^1.13.5"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# esbuild dibutuhkan Vite (binary native), sharp dipakai scripts/generate-icons.js.
+# pnpm v10 memblokir postinstall script secara default; dua ini harus diizinkan
+# eksplisit atau build web gagal.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp

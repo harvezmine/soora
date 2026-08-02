@@ -1,0 +1,16 @@
+{
+  "name": "@soora/core-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Adapter browser (localStorage / sessionStorage / window) untuk port @soora/core.",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@soora/core": "workspace:*"
+  }
+}

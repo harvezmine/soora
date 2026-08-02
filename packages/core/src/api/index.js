@@ -1,0 +1,1342 @@
+import axios from 'axios';
+import { getRuntime } from '../runtime.js';
+
+// ========== CONFIG ==========
+const TMDB_IMG = 'https://image.tmdb.org/t/p';
+
+// baseURL diambil dari runtime saat request dibuat, bukan saat modul di-load.
+// `configureCore()` biasanya dipanggil setelah modul ini di-import, jadi
+// membaca apiBase di sini akan mengunci nilai default '/api' selamanya.
+const api = axios.create({ timeout: 12000 });
+api.interceptors.request.use((cfg) => {
+  cfg.baseURL = getRuntime().apiBase;
+  return cfg;
+});
+
+// TMDB goes through our backend (/tmdb/*) which holds the API key server-side,
+// so the key never needs to be baked into the frontend bundle / Vercel env.
+const tmdb = axios.create({ timeout: 15000 });
+tmdb.interceptors.request.use((cfg) => {
+  cfg.baseURL = `${getRuntime().apiBase}/tmdb`;
+  return cfg;
+});
+
+// ========== ERROR REPORTING TO TELEGRAM ==========
+const reportError = (error) => {
+  const cfg = error.config || {};
+  // Build full URL with query params
+  let fullUrl = (cfg.baseURL || '') + (cfg.url || 'unknown');
+  if (cfg.params) {
+    const qs = new URLSearchParams(cfg.params).toString();
+    if (qs) fullUrl += '?' + qs;
+  }
+  const report = {
+    status: error.response?.status || 0,
+    method: (cfg.method || 'GET').toUpperCase(),
+    url: fullUrl,
+    page: getRuntime().getPage(),
+    trigger: cfg.url || 'unknown',
+    timestamp: new Date().toISOString(),
+    details: {
+      requestHeaders: cfg.headers ? { ...cfg.headers } : undefined,
+      requestBody: cfg.data,
+      responseBody: typeof error.response?.data === 'string'
+        ? error.response.data.substring(0, 2000)
+        : error.response?.data,
+      errorMessage: error.message || undefined,
+    },
+  };
+  // Use raw axios (not `api` instance) to avoid infinite loop
+  axios.post(`${getRuntime().apiBase}/report-error`, report).catch(() => {});
+};
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => { reportError(error); return Promise.reject(error); }
+);
+
+tmdb.interceptors.response.use(
+  (res) => res,
+  (error) => { reportError(error); return Promise.reject(error); }
+);
+
+// ========== CACHE ==========
+// Persistent cache backed by sessionStorage + in-memory for speed
+const memCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000;       // 10 min default
+const MANGA_CACHE_TTL = 30 * 60 * 1000; // 30 min for slow manga fetches
+const BUNDLE_CACHE_TTL = 15 * 60 * 1000; // 15 min for home bundles
+
+const _ssKey = (k) => `soora_cache:${k}`;
+
+// Lapisan persisten cache. Web → sessionStorage, native → MMKV.
+// Port sudah menelan error I/O sendiri; try/catch di sini hanya untuk JSON.parse.
+const _cacheRead = (key) => {
+  try {
+    const raw = getRuntime().cache.get(_ssKey(key));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null; // JSON rusak — perlakukan sebagai cache miss
+  }
+};
+
+const _cacheWrite = (key, entry) => {
+  try {
+    getRuntime().cache.set(_ssKey(key), JSON.stringify(entry));
+  } catch {
+    /* data tidak bisa di-serialize — lewati, memCache tetap terisi */
+  }
+};
+
+const _cacheDrop = (key) => getRuntime().cache.remove(_ssKey(key));
+
+/**
+ * Mengosongkan cache in-memory. Cache persisten tidak disentuh — pemanggil
+ * yang menghapusnya lewat port cache masing-masing platform.
+ * Dipakai test, dan nanti oleh tombol "Bersihkan cache" di Profile.
+ */
+export const clearApiMemCache = () => memCache.clear();
+
+// Refresh di background untuk stale-while-revalidate. Kegagalan sengaja
+// ditelan: pemanggil sudah menerima data stale dan tidak boleh terganggu.
+const _revalidate = (key, fetcher) => {
+  try {
+    // Promise.resolve() membungkus fetcher yang mengembalikan nilai biasa,
+    // dan try/catch menangkap fetcher yang melempar secara sinkron. Tanpa
+    // keduanya, kegagalan refresh background akan menjatuhkan pemanggil yang
+    // sudah menerima data stale — kebalikan dari tujuan fungsi ini.
+    Promise.resolve(fetcher())
+      .then((data) => {
+        if (data === undefined) return; // jangan cache hasil kosong
+        const entry = { data, ts: Date.now() };
+        memCache.set(key, entry);
+        _cacheWrite(key, entry);
+      })
+      .catch(() => {});
+  } catch {
+    /* fetcher melempar sinkron — data stale sudah dikembalikan, abaikan */
+  }
+};
+
+export const cachedGet = async (key, fetcher, ttl = CACHE_TTL) => {
+  const now = Date.now();
+
+  // 1) In-memory hit
+  const mem = memCache.get(key);
+  if (mem && now - mem.ts < ttl) return mem.data;
+
+  // 2) Persistent cache hit
+  const parsed = _cacheRead(key);
+  if (parsed) {
+    if (now - parsed.ts < ttl) {
+      memCache.set(key, parsed);
+      return parsed.data;
+    }
+    _cacheDrop(key);
+  }
+
+  // 3) Fetch fresh
+  const data = await fetcher();
+  const entry = { data, ts: now };
+  memCache.set(key, entry);
+  _cacheWrite(key, entry);
+  return data;
+};
+
+/**
+ * Stale-while-revalidate cache: returns stale data instantly if available,
+ * then refreshes in background. Perfect for homepage bundles.
+ */
+export const cachedGetSWR = async (key, fetcher, ttl = CACHE_TTL, staleTTL = ttl * 3) => {
+  const now = Date.now();
+
+  // Check in-memory first
+  const mem = memCache.get(key);
+  if (mem) {
+    if (now - mem.ts < ttl) return mem.data; // fresh
+    if (now - mem.ts < staleTTL) {
+      // Stale but usable — return immediately, revalidate in background
+      _revalidate(key, fetcher);
+      return mem.data;
+    }
+  }
+
+  // Check persistent cache
+  const parsed = _cacheRead(key);
+  if (parsed) {
+    if (now - parsed.ts < staleTTL) {
+      memCache.set(key, parsed);
+      // If stale, trigger background refresh
+      if (now - parsed.ts >= ttl) _revalidate(key, fetcher);
+      return parsed.data;
+    }
+    _cacheDrop(key);
+  }
+
+  // Nothing cached — fetch fresh
+  const data = await fetcher();
+  const entry = { data, ts: now };
+  memCache.set(key, entry);
+  _cacheWrite(key, entry);
+  return data;
+};
+
+// ========== TMDB HELPERS ==========
+export const tmdbImg = (path, size = 'w500') =>
+  path ? `${TMDB_IMG}/${size}${path}` : null;
+
+export const tmdbBackdrop = (path) =>
+  path ? `${TMDB_IMG}/original${path}` : null;
+
+export const hasTMDBKey = () => true; // TMDB key lives on the backend now
+
+const normalizeTMDB = (item) => ({
+  id: item.id,
+  tmdbId: item.id,
+  title: item.title || item.name || 'Unknown',
+  image: tmdbImg(item.poster_path),
+  cover: tmdbBackdrop(item.backdrop_path),
+  releaseDate: item.release_date || item.first_air_date || '',
+  rating: item.vote_average ? Math.round(item.vote_average * 10) : null,
+  type:
+    item.media_type === 'tv' || item.number_of_seasons || item.first_air_date
+      ? 'TV Series'
+      : 'Movie',
+  mediaType:
+    item.media_type ||
+    (item.number_of_seasons || item.first_air_date ? 'tv' : 'movie'),
+  overview: item.overview || '',
+});
+
+// ========== ANIME (AnimeKai — primary, HiAnime — fallback, AnimePahe — tertiary) ==========
+
+// Multi-provider search: tries AnimeKai first, enriches with HiAnime & AnimePahe results
+// Aggressive dedup to avoid showing the same anime 2-3 times
+const _normalizeForDedup = (title) => {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .trim()
+    // Remove common suffixes that cause duplicates
+    .replace(/\s*\((?:dub|sub|dubbed|subbed|tv|ova|ona|special|movie|hd|uncensored|censored|bd)\)/gi, '')
+    .replace(/\s*-\s*(dub|sub|dubbed|subbed)$/i, '')
+    // Remove season / part indicators for matching
+    .replace(/\s*(?:season|part|cour)\s*\d+/gi, '')
+    .replace(/\s*\d+(?:st|nd|rd|th)\s+season/gi, '')
+    // Normalize punctuation & whitespace
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+export const searchAnime = (query, page = 1) =>
+  cachedGet(`search:anime:${query}:${page}`, async () => {
+    // Backend handles multi-provider search (AnimeKai + HiAnime + AnimePahe) with server-side dedup
+    const res = await api.get('/anime/search', { params: { q: query, page } });
+    return res;
+  });
+
+export const getAnimeInfo = (id) =>
+  cachedGet(`anime:info:${id}`, () =>
+    api.get(`/anime/info/${encodeURIComponent(id)}`)
+  );
+
+// HiAnime info — used for malID/alID (embed fallback) and richer metadata
+export const getHiAnimeInfo = (id) =>
+  cachedGet(`hianime:info:${id}`, () =>
+    api.get('/anime/hianime/info', { params: { id } })
+  );
+
+/**
+ * Fetch MAL ID and AniList ID for an anime.
+ * Uses the orchestrated /anime/info/:id endpoint which already merges
+ * AnimeKai + HiAnime data and includes malId/alId.
+ */
+export const fetchAnimeIds = async (animeId, animeTitle) =>
+  cachedGet(`anime:ids:${animeId}`, async () => {
+    try {
+      const res = await api.get(`/anime/info/${encodeURIComponent(animeId)}`);
+      const data = res.data || {};
+      if (data.malId || data.alId) return { malId: data.malId, alId: data.alId };
+    } catch { /* continue */ }
+
+    // Fallback: Jikan v4 API
+    if (animeTitle) {
+      try {
+        const jikanRes = await axios.get('https://api.jikan.moe/v4/anime', {
+          params: { q: animeTitle, limit: 1, sfw: true },
+          timeout: 8000,
+        });
+        const jikanHit = jikanRes.data?.data?.[0];
+        if (jikanHit?.mal_id) return { malId: jikanHit.mal_id, alId: null };
+      } catch { /* give up */ }
+    }
+
+    return { malId: null, alId: null };
+  });
+
+// AnimePahe info
+export const getAnimePaheInfo = (id) =>
+  cachedGet(`animepahe:info:${id}`, () =>
+    api.get(`/anime/animepahe/info/${encodeURIComponent(id)}`)
+  );
+
+// Get available servers for an episode
+export const getAnimeServers = (episodeId) =>
+  api.get(`/anime/servers/${encodeURIComponent(episodeId)}`);
+
+// Watch with auto-fallback — backend handles AnimeKai → HiAnime → AnimePahe chain server-side
+export const watchAnimeEpisode = async (episodeId, server, category, epNumber) => {
+  // 1) Try orchestrated backend route (multi-provider fallback server-side)
+  try {
+    const res = await api.get(`/anime/watch/${encodeURIComponent(episodeId)}`, {
+      params: { server, category, epNumber },
+    });
+    if (res.data?.sources?.length > 0) return res;
+  } catch { /* continue to direct fallback */ }
+
+  // 2) Fallback: try direct AnimeKai route (passthrough to Consumet)
+  try {
+    const res = await api.get(`/anime/animekai/watch/${encodeURIComponent(episodeId)}`, {
+      params: { ...(server && { server }), ...(category && { category }) },
+    });
+    if (res.data?.sources?.length > 0) return res;
+  } catch { /* continue */ }
+
+  // 3) Fallback: try direct HiAnime route
+  try {
+    const res = await api.get(`/anime/hianime/watch/${encodeURIComponent(episodeId)}`, {
+      params: { ...(server && { server }), ...(category && { category }) },
+    });
+    if (res.data?.sources?.length > 0) return res;
+  } catch { /* final fallback failed */ }
+
+  throw new Error('Stream unavailable on all providers');
+};
+
+// Also support watching directly from a specific provider (for search results from that provider)
+export const watchAnimeEpisodeByProvider = async (episodeId, provider = 'animekai', server, category) => {
+  if (provider === 'hianime') {
+    return api.get(`/anime/hianime/watch/${encodeURIComponent(episodeId)}`, { params: { server, category } });
+  }
+  if (provider === 'animepahe') {
+    return api.get('/anime/animepahe/watch', { params: { episodeId } });
+  }
+  // Default: AnimeKai with full fallback chain
+  return watchAnimeEpisode(episodeId, server, category);
+};
+
+// ========== ANIME HOME BUNDLE ==========
+// Single request fetches ALL homepage data via orchestrated backend endpoint.
+// Backend merges spotlight + recentEps + mostPopular + topAiring + 12 genre sections in 1 call.
+export const getAnimeHomeBundle = () =>
+  cachedGetSWR('anime:home-bundle', async () => {
+    const res = await api.get('/anime/home');
+    // Don't cache empty bundles (all providers failed)
+    const d = res.data || {};
+    if (!d.spotlight?.length && !d.recentEpisodes?.length &&
+        !d.mostPopular?.length && !d.topAiring?.length) {
+      throw new Error('Empty bundle — all providers may be down');
+    }
+    return res;
+  }, BUNDLE_CACHE_TTL);
+
+export const getAnimeRecentEpisodes = (page = 1) =>
+  cachedGet(`anime:recent:${page}`, async () => {
+    // Try AnimeKai first, fallback to HiAnime
+    try {
+      const res = await api.get('/anime/animekai/recent-episodes', { params: { page } });
+      if (res.data?.results?.length > 0 || res.data?.length > 0) return res;
+    } catch { /* fallback */ }
+    return api.get('/anime/hianime/recently-updated', { params: { page } });
+  });
+
+export const getAnimeSpotlight = () =>
+  cachedGet('anime:spotlight', async () => {
+    try {
+      const res = await api.get('/anime/animekai/spotlight');
+      if (res.data?.results?.length > 0 || res.data?.length > 0) return res;
+    } catch { /* fallback */ }
+    return api.get('/anime/hianime/spotlight');
+  });
+
+export const getAnimeNewReleases = (page = 1) =>
+  cachedGet(`anime:new:${page}`, async () => {
+    try {
+      const res = await api.get('/anime/animekai/new-releases', { params: { page } });
+      if (res.data?.results?.length > 0 || res.data?.length > 0) return res;
+    } catch { /* fallback */ }
+    return api.get('/anime/hianime/recently-added', { params: { page } });
+  });
+
+export const getAnimeLatestCompleted = (page = 1) =>
+  cachedGet(`anime:completed:${page}`, async () => {
+    try {
+      const res = await api.get('/anime/animekai/latest-completed', { params: { page } });
+      if (res.data?.results?.length > 0 || res.data?.length > 0) return res;
+    } catch { /* fallback */ }
+    return api.get('/anime/hianime/latest-completed', { params: { page } });
+  });
+
+// Additional listing endpoints from HiAnime
+export const getAnimeMostPopular = (page = 1) =>
+  cachedGet(`anime:popular:${page}`, () =>
+    api.get('/anime/hianime/most-popular', { params: { page } })
+  );
+
+export const getAnimeTopAiring = (page = 1) =>
+  cachedGet(`anime:airing:${page}`, () =>
+    api.get('/anime/hianime/top-airing', { params: { page } })
+  );
+
+// ========== ANIME BROWSE: Genre, Type, Season, Advanced Search ==========
+
+// Browse anime by genre (backend handles provider fallback)
+export const getAnimeByGenre = (genre, page = 1) =>
+  cachedGet(`anime:genre:${genre}:${page}`, async () => {
+    return api.get(`/anime/genre/${encodeURIComponent(genre)}`, { params: { page } });
+  });
+
+// Browse anime by type (movie, tv, ova, ona, special)
+export const getAnimeByType = (type, page = 1) =>
+  cachedGet(`anime:type:${type}:${page}`, async () => {
+    return api.get(`/anime/hianime/${type}`, { params: { page } });
+  });
+
+// Advanced search with combined filters (HiAnime)
+// params: { type, status, season, genres, startDate, endDate, sort, page }
+export const getAnimeAdvancedSearch = (params = {}) => {
+  const { type, season, genres, year, sort, page = 1 } = params;
+  const queryParams = { page };
+  if (type) queryParams.type = type;
+  if (season) queryParams.season = season;
+  if (genres) queryParams.genres = genres; // comma-separated
+  if (sort) queryParams.sort = sort;
+  if (year) {
+    // Season ranges: Winter=Jan-Mar, Spring=Apr-Jun, Summer=Jul-Sep, Fall=Oct-Dec
+    const seasonStartMonth = { winter: '01', spring: '04', summer: '07', fall: '10' };
+    const seasonEndMonth = { winter: '03', spring: '06', summer: '09', fall: '12' };
+    if (season && seasonStartMonth[season]) {
+      queryParams.startDate = `${year}-${seasonStartMonth[season]}-01`;
+      queryParams.endDate = `${year}-${seasonEndMonth[season]}-28`;
+    } else {
+      queryParams.startDate = `${year}-01-01`;
+      queryParams.endDate = `${year}-12-31`;
+    }
+  }
+  const cacheKey = `anime:advsearch:${JSON.stringify(queryParams)}`;
+  return cachedGet(cacheKey, () =>
+    api.get('/anime/hianime/advanced-search', { params: queryParams })
+  );
+};
+
+// Get anime genre list
+export const getAnimeGenreList = () =>
+  cachedGet('anime:genres', async () => {
+    try {
+      const res = await api.get('/anime/hianime/genres');
+      if (res.data?.length > 0) return res;
+    } catch { /* fallback */ }
+    return api.get('/anime/animekai/genre/list');
+  });
+
+// ========== MOVIES / TV (TMDB) ==========
+export const searchMoviesTMDB = (query, page = 1) =>
+  cachedGet(`tmdb:search:${query}:${page}`, async () => {
+    const res = await tmdb.get('/search/multi', {
+      params: { query, page, include_adult: false },
+    });
+    return {
+      data: {
+        results: res.data.results
+          .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+          .map(normalizeTMDB),
+        totalPages: res.data.total_pages,
+      },
+    };
+  });
+
+export const getMovieDetailsTMDB = (id) =>
+  cachedGet(`tmdb:movie:${id}`, async () => {
+    const res = await tmdb.get(`/movie/${id}`, {
+      params: { append_to_response: 'credits,recommendations,similar,videos' },
+    });
+    return { data: res.data };
+  });
+
+export const getTVDetailsTMDB = (id) =>
+  cachedGet(`tmdb:tv:${id}`, async () => {
+    const res = await tmdb.get(`/tv/${id}`, {
+      params: { append_to_response: 'credits,recommendations,similar,videos' },
+    });
+    return { data: res.data };
+  });
+
+export const getTVSeasonTMDB = (id, season) =>
+  cachedGet(`tmdb:tv:${id}:s${season}`, async () => {
+    const res = await tmdb.get(`/tv/${id}/season/${season}`);
+    return { data: res.data };
+  });
+
+// Search TMDB by title and return full details (credits, recommendations, similar)
+// Used to enrich Goku data with TMDB metadata (cast images, recs, backdrop, etc.)
+export const findTMDBDetailsByTitle = (title, mediaType = 'movie', year = '') =>
+  cachedGet(`tmdb:find:${title}:${mediaType}:${year}`, async () => {
+    try {
+      const searchType = mediaType === 'tv' ? 'tv' : 'movie';
+      const searchRes = await tmdb.get(`/search/${searchType}`, {
+        params: { query: title, include_adult: false, ...(year ? { year } : {}) },
+      });
+      const results = searchRes.data?.results || [];
+      if (results.length === 0) return { data: null };
+      // Pick best match (first result, or exact title match)
+      const exact = results.find(
+        (r) => (r.title || r.name || '').toLowerCase() === title.toLowerCase()
+      );
+      const best = exact || results[0];
+      // Fetch full details with credits, recs, similar
+      const detailRes = await tmdb.get(`/${searchType}/${best.id}`, {
+        params: { append_to_response: 'credits,recommendations,similar,videos' },
+      });
+      return { data: detailRes.data };
+    } catch {
+      return { data: null };
+    }
+  });
+
+export const getTrendingTMDB = (type = 'all', time = 'week') =>
+  cachedGet(`tmdb:trending:${type}:${time}`, async () => {
+    const res = await tmdb.get(`/trending/${type}/${time}`);
+    return {
+      data: {
+        results: res.data.results
+          .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+          .map(normalizeTMDB),
+      },
+    };
+  });
+
+export const getPopularMovies = (page = 1) =>
+  cachedGet(`tmdb:popular:movie:${page}`, async () => {
+    const res = await tmdb.get('/movie/popular', { params: { page } });
+    return {
+      data: {
+        results: res.data.results.map((r) =>
+          normalizeTMDB({ ...r, media_type: 'movie' })
+        ),
+      },
+    };
+  });
+
+export const getPopularTV = (page = 1) =>
+  cachedGet(`tmdb:popular:tv:${page}`, async () => {
+    const res = await tmdb.get('/tv/popular', { params: { page } });
+    return {
+      data: {
+        results: res.data.results.map((r) =>
+          normalizeTMDB({ ...r, media_type: 'tv' })
+        ),
+      },
+    };
+  });
+
+// ========== TMDB GENRES & DISCOVER ==========
+export const getTMDBGenres = () =>
+  cachedGet('tmdb:genres', async () => {
+    const [movieRes, tvRes] = await Promise.all([
+      tmdb.get('/genre/movie/list'),
+      tmdb.get('/genre/tv/list'),
+    ]);
+    const map = new Map();
+    [...movieRes.data.genres, ...tvRes.data.genres].forEach((g) =>
+      map.set(g.id, g.name)
+    );
+    return { data: Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)) };
+  });
+
+export const discoverByGenre = (genreId, page = 1, mediaType = 'movie') =>
+  cachedGet(`tmdb:discover:${mediaType}:${genreId}:${page}`, async () => {
+    const res = await tmdb.get(`/discover/${mediaType}`, {
+      params: {
+        with_genres: genreId,
+        page,
+        sort_by: 'popularity.desc',
+      },
+    });
+    return {
+      data: {
+        results: res.data.results.map((r) =>
+          normalizeTMDB({ ...r, media_type: mediaType })
+        ),
+        totalPages: res.data.total_pages,
+      },
+    };
+  });
+
+/**
+ * Advanced TMDB discover — supports genre, year, sort, and media type filters.
+ * @param {{ mediaType?: 'movie'|'tv', genre?: number, year?: string|number, sort?: string, page?: number }} params
+ */
+export const discoverTMDB = ({ mediaType = 'movie', genre, year, sort = 'popularity.desc', page = 1 } = {}) => {
+  const key = `tmdb:adv:${mediaType}:${genre || ''}:${year || ''}:${sort}:${page}`;
+  return cachedGet(key, async () => {
+    const params = { page, sort_by: sort };
+    if (genre) params.with_genres = genre;
+    if (year) {
+      if (mediaType === 'movie') {
+        params.primary_release_year = year;
+      } else {
+        params.first_air_date_year = year;
+      }
+    }
+    const res = await tmdb.get(`/discover/${mediaType}`, { params });
+    return {
+      data: {
+        results: res.data.results.map((r) =>
+          normalizeTMDB({ ...r, media_type: mediaType })
+        ),
+        totalPages: res.data.total_pages,
+      },
+    };
+  });
+};
+
+// ========== MOVIE / TV STREAMING (Goku — primary, FlixHQ — fallback) ==========
+// Goku returns accessible HLS m3u8 sources with multiple quality levels.
+
+// Helper: search FlixHQ/HiMovies for a title and return the best match
+const _searchMovieProvider = async (provider, title, year, type) => {
+  const res = await api.get(`/movies/${provider}/${encodeURIComponent(title)}`);
+  const results = res.data?.results || [];
+  if (results.length === 0) return null;
+
+  // Try to match by title + year + type for best accuracy
+  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const titleNorm = normalize(title);
+  const typeFilter = type === 'tv' ? 'TV Series' : 'Movie';
+
+  // Prioritize: exact title + correct type + matching year
+  const scored = results.map((r) => {
+    let score = 0;
+    const rTitle = normalize(r.title);
+    if (rTitle === titleNorm) score += 10;
+    else if (rTitle.includes(titleNorm) || titleNorm.includes(rTitle)) score += 5;
+    if (r.type === typeFilter) score += 3;
+    if (year && r.releaseDate && r.releaseDate.startsWith(String(year))) score += 2;
+    return { ...r, _score: score };
+  });
+
+  scored.sort((a, b) => b._score - a._score);
+  return scored[0] || results[0];
+};
+
+// Get streaming sources for a movie — backend handles multi-provider fallback
+export const getMovieStreamingSources = async (title, tmdbId, year) =>
+  cachedGet(`stream:movie:${tmdbId}`, async () => {
+    const res = await api.get('/movies/stream', {
+      params: { title, tmdbId, year, type: 'movie' },
+    });
+    if (res.data?.error) throw new Error(res.data.error);
+    return { data: res.data };
+  });
+
+// Get streaming sources for a TV episode — backend handles multi-provider fallback
+export const getTVStreamingSources = async (title, tmdbId, season, episode, year) =>
+  cachedGet(`stream:tv:${tmdbId}:s${season}e${episode}`, async () => {
+    const res = await api.get('/movies/stream', {
+      params: { title, tmdbId, year, type: 'tv', season, episode },
+    });
+    if (res.data?.error) throw new Error(res.data.error);
+    return { data: res.data };
+  });
+
+// ========== GOKU INFO & DIRECT STREAMING ==========
+export const getGokuInfo = (gokuId) =>
+  cachedGet(`goku:info:${gokuId}`, async () => {
+    const res = await api.get('/movies/goku/info', { params: { id: gokuId } });
+    return { data: res.data };
+  });
+
+// Stream directly by Goku ID (skips search, much faster)
+export const getGokuMovieStream = (gokuId) =>
+  cachedGet(`goku:stream:movie:${gokuId}`, async () => {
+    const infoRes = await api.get('/movies/goku/info', { params: { id: gokuId } });
+    const info = infoRes.data;
+    const ep = info.episodes?.[0];
+    if (!ep?.id) throw new Error('No episode found');
+    const watchRes = await api.get('/movies/goku/watch', {
+      params: { episodeId: ep.id, mediaId: gokuId },
+    });
+    if (!watchRes.data?.sources?.length) throw new Error('No sources');
+    return { data: { ...watchRes.data, _provider: 'goku', _mediaTitle: info.title } };
+  });
+
+export const getGokuTVStream = (gokuId, season, episode) =>
+  cachedGet(`goku:stream:tv:${gokuId}:s${season}e${episode}`, async () => {
+    const infoRes = await api.get('/movies/goku/info', { params: { id: gokuId } });
+    const info = infoRes.data;
+    const episodes = info.episodes || [];
+    const targetEp = episodes.find((ep) => ep.season === season && ep.number === episode);
+    if (!targetEp) throw new Error('Episode not found');
+    const watchRes = await api.get('/movies/goku/watch', {
+      params: { episodeId: targetEp.id, mediaId: gokuId },
+    });
+    if (!watchRes.data?.sources?.length) throw new Error('No sources');
+    return { data: { ...watchRes.data, _provider: 'goku', _mediaTitle: info.title, _episodeTitle: targetEp.title } };
+  });
+
+// ========== GOKU MOVIE LISTINGS ==========
+// Normalize Goku items to match our Card component format
+const normalizeGoku = (item) => ({
+  id: item.id,
+  title: item.title || 'Unknown',
+  image: item.image || '',
+  type: item.type || 'Movie',
+  releaseDate: item.releaseDate || '',
+  duration: item.duration || '',
+  mediaType: item.type === 'TV Series' ? 'tv' : 'movie',
+  season: item.season || '',
+  latestEpisode: item.latestEpisode || '',
+});
+
+// ========== MOVIE HOME BUNDLE ==========
+// Backend orchestrates TMDB + Goku + LK21 in one call, with genre sections.
+export const getMovieHomeBundle = () =>
+  cachedGetSWR('movies:home-bundle', async () => {
+    const res = await api.get('/movies/home');
+    // Map backend response to the format MovieHome.jsx expects
+    const d = res.data || {};
+    return {
+      data: {
+        trendingMovies: d.gokuTrendingMovies || [],
+        trendingTV: d.gokuTrendingTV || [],
+        recentMovies: d.gokuRecentMovies || [],
+        recentTV: d.gokuRecentTV || [],
+        // Extra data from backend (available for future use)
+        tmdbTrending: d.trending || [],
+        tmdbPopularMovies: d.popularMovies || [],
+        tmdbPopularTV: d.popularTV || [],
+        lk21Popular: d.lk21Popular || [],
+        lk21Recent: d.lk21Recent || [],
+        lk21Series: d.lk21Series || [],
+        genres: d.genres || {},
+      },
+    };
+  }, BUNDLE_CACHE_TTL);
+
+export const getGokuTrendingMovies = () =>
+  cachedGet('goku:trending:movie', async () => {
+    const res = await api.get('/movies/goku/trending', { params: { type: 'movie' } });
+    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
+  });
+
+export const getGokuTrendingTV = () =>
+  cachedGet('goku:trending:tv', async () => {
+    const res = await api.get('/movies/goku/trending', { params: { type: 'tv' } });
+    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
+  });
+
+export const getGokuRecentMovies = () =>
+  cachedGet('goku:recent:movie', async () => {
+    const res = await api.get('/movies/goku/recent-movies');
+    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
+  });
+
+export const getGokuRecentTV = () =>
+  cachedGet('goku:recent:tv', async () => {
+    const res = await api.get('/movies/goku/recent-shows');
+    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
+  });
+
+// VixSrc direct HLS resolver — TMDB id → raw m3u8 (ad-free, our hls.js player).
+// Returns { m3u8, proxiedUrl } where proxiedUrl streams through our /proxy
+// (adds the required Referer). null m3u8 = fall back to embed.
+export const getVixsrcStream = (type, tmdbId, season, episode) =>
+  cachedGet(`vixsrc:${type}:${tmdbId}:${season || ''}:${episode || ''}`, async () => {
+    try {
+      const params = type === 'tv' ? { season, episode } : {};
+      const res = await api.get(`/movies/vixsrc/${type === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, { params });
+      const { m3u8, ref } = res.data || {};
+      if (!m3u8) return { m3u8: null, ref: null };
+      // Return RAW m3u8 + ref. VideoPlayer proxies it once itself (passing
+      // referer); pre-proxying here caused a nested /proxy?url=/proxy → 403.
+      return { m3u8, ref };
+    } catch {
+      return { m3u8: null, ref: null };
+    }
+  });
+
+// English movie/TV search via the backend multi-provider orchestrator
+// (TMDB + Goku + LK21). The old single-provider /movies/goku/:q passthrough
+// returned nothing whenever the Goku scraper was down — this endpoint falls
+// back to TMDB (always available server-side) so search keeps working.
+// Backend already card-normalizes tmdb results; goku/lk21 come as raw results.
+// English movie pool = TMDB ONLY. LK21 is a fully separate Sub-Indo pool
+// (searched via searchLK21 when soora_movie_lang === 'id'). Keeping LK21 out
+// here guarantees the English filter never surfaces LK21 films, and vice
+// versa. Backend /movies/search already strips id-language films from TMDB.
+export const searchGoku = async (query) => {
+  const res = await api.get('/movies/search', { params: { q: query, page: 1 } });
+  const tmdbItems = res.data?.tmdb?.results || [];       // already card-ready
+  return { data: { results: tmdbItems } };
+};
+
+// ========== LK21 (Indonesian movie/series provider) ==========
+const normalizeLK21 = (item) => ({
+  id: item._id,
+  lk21Id: item._id,
+  title: item.title || 'Unknown',
+  image: item.posterImg || '',
+  type: item.type === 'series' ? 'TV Series' : 'Movie',
+  mediaType: item.type === 'series' ? 'tv' : 'movie',
+  rating: item.rating || '',
+  qualityResolution: item.qualityResolution || '',
+  genres: item.genres || [],
+  episode: item.episode || null,
+  provider: 'lk21',
+});
+
+export const getLK21HomeBundle = () =>
+  cachedGetSWR('lk21:home-bundle', async () => {
+    const res = await api.get('/movies/lk21/home-bundle');
+    return res;
+  }, BUNDLE_CACHE_TTL);
+
+export const getLK21PopularMovies = (page = 1) =>
+  cachedGet(`lk21:popular:movies:${page}`, async () => {
+    const res = await api.get('/movies/lk21/popular', { params: { page } });
+    return { data: (Array.isArray(res.data) ? res.data : []).map(normalizeLK21) };
+  });
+
+export const getLK21RecentMovies = (page = 1) =>
+  cachedGet(`lk21:recent:movies:${page}`, async () => {
+    const res = await api.get('/movies/lk21/recent', { params: { page } });
+    return { data: (Array.isArray(res.data) ? res.data : []).map(normalizeLK21) };
+  });
+
+export const getLK21TopRatedMovies = (page = 1) =>
+  cachedGet(`lk21:top-rated:movies:${page}`, async () => {
+    const res = await api.get('/movies/lk21/top-rated', { params: { page } });
+    return { data: (Array.isArray(res.data) ? res.data : []).map(normalizeLK21) };
+  });
+
+export const getLK21LatestSeries = (page = 1) =>
+  cachedGet(`lk21:latest:series:${page}`, async () => {
+    const res = await api.get('/movies/lk21/series', { params: { page } });
+    return { data: (Array.isArray(res.data) ? res.data : []).map(normalizeLK21) };
+  });
+
+export const getLK21PopularSeries = (page = 1) =>
+  cachedGet(`lk21:popular:series:${page}`, async () => {
+    const res = await api.get('/movies/lk21/series/popular', { params: { page } });
+    return { data: (Array.isArray(res.data) ? res.data : []).map(normalizeLK21) };
+  });
+
+export const searchLK21 = async (query) => {
+  const res = await api.get(`/movies/lk21/search/${encodeURIComponent(query)}`);
+  // Backend now returns already-normalized items via dedicated route (with home-bundle fallback)
+  const raw = res.data?.results || [];
+  const items = raw.map((item) => {
+    // Items may already be normalized (from backend) or raw (from passthrough)
+    if (item.provider === 'lk21' && item.lk21Id) return item; // already normalized
+    return normalizeLK21(item);
+  });
+  return { data: { results: items } };
+};
+
+export const getLK21Info = async (id) => {
+  const res = await api.get(`/movies/lk21/info/${encodeURIComponent(id)}`);
+  return res;
+};
+
+export const getLK21SeriesInfo = async (id) => {
+  const res = await api.get(`/movies/lk21/series/info/${encodeURIComponent(id)}`);
+  return res;
+};
+
+export const getLK21MovieStreams = async (id) => {
+  const res = await api.get(`/movies/lk21/streams/${encodeURIComponent(id)}`);
+  return res;
+};
+
+export const getLK21SeriesStreams = async (id, season = 1, episode = 1) => {
+  const res = await api.get(`/movies/lk21/series/streams/${encodeURIComponent(id)}`, {
+    params: { season, episode },
+  });
+  return res;
+};
+
+// ========== MANGA (MangaPill — primary, MangaHere — fallback) ==========
+const normalizeMangaTitle = (title) => {
+  if (!title) return 'Unknown';
+  if (typeof title !== 'string') {
+    return title.english || title.romaji || title.userPreferred || title.native || 'Unknown';
+  }
+  // MangaPill concatenates two title variants without separator
+  // e.g., "Solo Leveling NovelSolo Leveling Official Light Novel"
+  const idx = title.search(/[a-z][A-Z]/);
+  if (idx !== -1 && idx >= 2 && title.length - idx - 1 >= 4) {
+    return title.slice(0, idx + 1);
+  }
+  return title;
+};
+
+// Proxy manga images through our server to add required Referer header
+export const mangaImgProxy = (url) => {
+  if (!url) return '';
+  // komiku's CDN (img/thumbnail.komiku.org) 403s hotlinks → must proxy w/ Referer.
+  if (url.includes('readdetectiveconan.com') || url.includes('mangapill') || url.includes('komiku.')) {
+    return `/manga-img?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
+// Detect if a MangaPill item is actually a novel (not a manga/manhwa)
+export const isMangaNovel = (item) => {
+  if (!item) return false;
+  const id = (item.id || '').toLowerCase();
+  const title = (typeof item.title === 'string' ? item.title : '').toLowerCase();
+  return id.includes('-novel') || /\bnovel\b/i.test(title) || /\blight novel\b/i.test(title);
+};
+
+// Get content type label for a manga item
+export const getMangaContentType = (item) => {
+  if (isMangaNovel(item)) return 'Novel';
+  // Check Komiku's type field first (returns 'Manhwa', 'Manga', 'Manhua' directly)
+  const komikuType = (item?.type || '').toLowerCase();
+  if (komikuType === 'manhwa' || komikuType === 'manhua') return 'Manhwa';
+  const title = (typeof item.title === 'string' ? item.title : '').toLowerCase();
+  if (title.includes('manhwa') || title.includes('manhua')) return 'Manhwa';
+  return 'Manga';
+};
+
+// Detect manhwa/manhua (works with Komiku type field + title/id heuristic)
+export const isManhwa = (item) => {
+  const komikuType = (item?.type || '').toLowerCase();
+  if (komikuType === 'manhwa' || komikuType === 'manhua') return true;
+  const id = (item?.id || '').toLowerCase();
+  const title = (typeof item?.title === 'string' ? item.title : '').toLowerCase();
+  return id.includes('manhwa') || id.includes('manhua') ||
+    /\b(manhwa|manhua)\b/.test(title);
+};
+
+// ========== MANGA HOME BUNDLE ==========
+export const getMangaHomeBundle = (lang = 'en') =>
+  cachedGetSWR(`manga:home-bundle:${lang}`, async () => {
+    const res = await api.get('/manga/home', { params: { lang } });
+    return res;
+  }, BUNDLE_CACHE_TTL);
+
+export const searchManga = (query, page = 1) =>
+  cachedGet(`manga:search:${query}:${page}`, async () => {
+    return api.get('/manga/search', { params: { q: query, provider: 'mangapill', page } });
+  }, MANGA_CACHE_TTL);
+
+export const getMangaInfo = (id, provider = 'mangapill') =>
+  cachedGet(`manga:info:${provider}:${id}`, () => {
+    return api.get(`/manga/info/${encodeURIComponent(id)}`, { params: { provider } });
+  }, MANGA_CACHE_TTL);
+
+export const getMangaChapterPages = (chapterId, provider = 'mangapill') =>
+  cachedGet(`manga:read:${provider}:${chapterId}`, () => {
+    return api.get(`/manga/read/${encodeURIComponent(chapterId)}`, { params: { provider } });
+  }, MANGA_CACHE_TTL);
+
+// MangaPill doesn't have latestmanga/bygenre, use search with popular terms
+export const getPopularManga = () =>
+  cachedGet('manga:popular', async () => {
+    const queries = ['one piece', 'naruto', 'demon slayer', 'jujutsu kaisen', 'solo leveling', 'attack on titan'];
+    const randomQueries = queries.sort(() => Math.random() - 0.5).slice(0, 3);
+    const results = await Promise.allSettled(
+      randomQueries.map((q) => api.get(`/manga/mangapill/${encodeURIComponent(q)}`))
+    );
+    const all = [];
+    const seen = new Set();
+    results.forEach((r) => {
+      if (r.status === 'fulfilled') {
+        (r.value.data?.results || []).forEach((item) => {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            all.push(item);
+          }
+        });
+      }
+    });
+    return { data: { results: all } };
+  }, MANGA_CACHE_TTL);
+
+// ========== MANGADEX (Multi-language support) ==========
+export const MANGA_LANGUAGES = [
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'id', label: 'Indonesian', flag: '🇮🇩' },
+  { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
+  { code: 'ko', label: 'Korean', flag: '🇰🇷' },
+  { code: 'zh', label: 'Chinese (Simplified)', flag: '🇨🇳' },
+  { code: 'zh-hk', label: 'Chinese (Traditional)', flag: '🇭🇰' },
+  { code: 'es', label: 'Spanish', flag: '🇪🇸' },
+  { code: 'es-la', label: 'Spanish (LATAM)', flag: '🇲🇽' },
+  { code: 'pt-br', label: 'Portuguese (Brazil)', flag: '🇧🇷' },
+  { code: 'fr', label: 'French', flag: '🇫🇷' },
+  { code: 'de', label: 'German', flag: '🇩🇪' },
+  { code: 'it', label: 'Italian', flag: '🇮🇹' },
+  { code: 'ru', label: 'Russian', flag: '🇷🇺' },
+  { code: 'ar', label: 'Arabic', flag: '🇸🇦' },
+  { code: 'th', label: 'Thai', flag: '🇹🇭' },
+  { code: 'vi', label: 'Vietnamese', flag: '🇻🇳' },
+  { code: 'tr', label: 'Turkish', flag: '🇹🇷' },
+  { code: 'pl', label: 'Polish', flag: '🇵🇱' },
+  { code: 'ms', label: 'Malay', flag: '🇲🇾' },
+  { code: 'hi', label: 'Hindi', flag: '🇮🇳' },
+];
+
+export const searchMangaDex = (query, page = 1) =>
+  cachedGet(`mangadex:search:${query}:${page}`, async () => {
+    return api.get(`/manga/mangadex/${encodeURIComponent(query)}`, { params: { page } });
+  }, MANGA_CACHE_TTL);
+
+export const getMangaDexInfo = (id, lang = 'en') =>
+  cachedGet(`mangadex:info:${id}:${lang}`, async () => {
+    return api.get(`/manga/mangadex/info/${encodeURIComponent(id)}`, { params: { lang } });
+  }, MANGA_CACHE_TTL);
+
+export const getMangaDexChapterPages = (chapterId) =>
+  cachedGet(`mangadex:read:${chapterId}`, async () => {
+    return api.get(`/manga/mangadex/read/${encodeURIComponent(chapterId)}`);
+  }, MANGA_CACHE_TTL);
+
+export const getMangaDexLanguages = (id) =>
+  cachedGet(`mangadex:langs:${id}`, async () => {
+    return api.get(`/manga/mangadex/info/${encodeURIComponent(id)}/languages`);
+  }, MANGA_CACHE_TTL);
+
+// ========== KOMIKU (Indonesian manga — komiku.org) ==========
+export const searchKomiku = (query) =>
+  cachedGet(`komiku:search:${query}`, async () => {
+    return api.get('/manga/search', { params: { q: query, provider: 'komiku' } });
+  }, MANGA_CACHE_TTL);
+
+export const getKomikuInfo = (id) =>
+  cachedGet(`komiku:info:${id}`, async () => {
+    return api.get(`/manga/komiku/info/${encodeURIComponent(id)}`);
+  }, MANGA_CACHE_TTL);
+
+export const getKomikuChapterPages = (chapterId) =>
+  cachedGet(`komiku:read:${chapterId}`, async () => {
+    return api.get(`/manga/komiku/read/${encodeURIComponent(chapterId)}`);
+  }, MANGA_CACHE_TTL);
+
+export const getKomikuTrending = () =>
+  cachedGet(`komiku:trending`, async () => {
+    return api.get('/manga/komiku/trending');
+  }, MANGA_CACHE_TTL);
+
+// Fuller Komiku catalog for Sub Indo home (multi-page, deduped)
+export const getKomikuList = (sort = 'latest', pages = 4) =>
+  cachedGet(`komiku:list:${sort}:${pages}`, async () => {
+    return api.get('/manga/komiku/list', { params: { sort, pages } });
+  }, MANGA_CACHE_TTL);
+
+// ========== SAMEHADAKU / Sub Indo (via Sankavollerei API) ==========
+// Sub Indo (Samehadaku) now goes through our backend proxy (/anime/subindo/*)
+// — faster (VPS path + server cache) and avoids sankavollerei's per-user anti-bot.
+const samehadaku = axios.create({ timeout: 20000 });
+samehadaku.interceptors.request.use((cfg) => {
+  cfg.baseURL = `${getRuntime().apiBase}/anime/subindo`;
+  return cfg;
+});
+
+// Normalize Samehadaku items to have `id` and `image` fields for Card component compatibility
+const _normalizeSamehadaku = (item) => ({
+  ...item,
+  id: item.animeId || item.id,
+  image: item.poster || item.image || '',
+  _source: 'samehadaku',
+});
+
+/**
+ * Get Sub Indo anime home bundle for the Sub Indo tab.
+ * Tries Samehadaku listing endpoints (ongoing/popular/recent).
+ * Fallback: searches popular anime titles to build a curated list.
+ */
+export const getSubIndoHomeBundle = () =>
+  cachedGetSWR('subindo:home-bundle', async () => {
+    // Backend proxy returns { ongoing, popular, recent, top10 } combined + cached.
+    try {
+      const res = await samehadaku.get('/home');
+      const d = res.data || {};
+      return {
+        ongoing: (d.ongoing || []).map(_normalizeSamehadaku),
+        popular: (d.popular || []).map(_normalizeSamehadaku),
+        recent: (d.recent || []).map(_normalizeSamehadaku),
+        top10: (d.top10 || []).map(_normalizeSamehadaku),
+      };
+    } catch {
+      return { ongoing: [], popular: [], recent: [], top10: [] };
+    }
+  }, BUNDLE_CACHE_TTL);
+
+/** Validated play sources for a Sub Indo episode. Backend verifies each URL is
+ *  a live video (drops dead "file tidak diakses" ones). Returns { sources, default }. */
+export const getSubIndoPlay = (episodeId) =>
+  cachedGet(`subindo:play:${episodeId}`, async () => {
+    try {
+      const res = await samehadaku.get(`/play/${encodeURIComponent(episodeId)}`);
+      return res.data || { sources: [], default: null };
+    } catch {
+      return { sources: [], default: null };
+    }
+  });
+
+/** Sub Indo anime by genre (samehadaku). Returns array of normalized items. */
+export const getSubIndoGenre = (genreId) =>
+  cachedGet(`subindo:genre:${genreId}`, async () => {
+    try {
+      const res = await samehadaku.get(`/genre/${genreId}`);
+      const d = res.data?.data ?? res.data ?? {};
+      return (d.animeList || []).map(_normalizeSamehadaku);
+    } catch {
+      return [];
+    }
+  }, MANGA_CACHE_TTL);
+
+/**
+ * Themed Sub Indo home sections (curated, non-generic).
+ * Returns { sections: [{key,title}], data: { key: [items] } }
+ */
+export const getSubIndoSections = () =>
+  cachedGetSWR('subindo:sections', async () => {
+    try {
+      const res = await samehadaku.get('/sections');
+      const d = res.data || {};
+      const data = {};
+      for (const k of Object.keys(d.data || {})) {
+        data[k] = (d.data[k] || []).map(_normalizeSamehadaku);
+      }
+      return { sections: d.sections || [], data };
+    } catch {
+      return { sections: [], data: {} };
+    }
+  }, BUNDLE_CACHE_TTL);
+
+/**
+ * Check if an anime title exists on Samehadaku (has Sub Indo).
+ * Returns boolean. Used to show Sub Indo badge on cards.
+ */
+export const checkSubIndoAvailable = async (title) => {
+  try {
+    const result = await searchSamehadaku(title);
+    return (result.animeList || []).length > 0;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Search Samehadaku for Sub Indo anime by title.
+ * Returns { animeList: [{ animeId, title, poster, type, score, ... }] }
+ */
+export const searchSamehadaku = (query) =>
+  cachedGet(`samehadaku:search:${query}`, async () => {
+    const res = await samehadaku.get('/search', { params: { q: query } });
+    return res.data?.data ?? res.data ?? { animeList: [] };
+  });
+
+/**
+ * Get anime detail from Samehadaku (episode list, synopsis, etc.)
+ * @param {string} animeId - e.g. "naruto-kecil"
+ */
+export const getSamehadakuAnimeInfo = (animeId) =>
+  cachedGet(`samehadaku:info:${animeId}`, async () => {
+    const res = await samehadaku.get(`/anime/${animeId}`);
+    return res.data?.data ?? res.data ?? null;
+  });
+
+/**
+ * Get episode streaming data (default stream URL + server list by quality).
+ * @param {string} episodeId - e.g. "naruto-kecil-episode-1"
+ * Returns { title, defaultStreamingUrl, server: { qualities: [...] }, ... }
+ */
+export const getSamehadakuEpisode = (episodeId) =>
+  cachedGet(`samehadaku:ep:${episodeId}`, async () => {
+    const res = await samehadaku.get(`/episode/${episodeId}`);
+    return res.data?.data ?? res.data ?? null;
+  });
+
+/**
+ * Resolve a server ID to an actual embed/streaming URL.
+ * @param {string} serverId - e.g. "9CB7E-7-xhmyrq"
+ * Returns { url: "https://..." }
+ */
+export const getSamehadakuServerUrl = (serverId) =>
+  cachedGet(`samehadaku:server:${serverId}`, async () => {
+    const res = await samehadaku.get(`/server/${serverId}`);
+    return res.data?.data ?? res.data ?? null;
+  });
+
+/**
+ * Find a Samehadaku anime matching the given title (fuzzy match).
+ * Tries multiple strategies: full title, Japanese title, shortened titles,
+ * and first significant words — with normalization to avoid API 500 errors.
+ * Returns { animeId, title, ... } or null.
+ */
+export const findSamehadakuAnime = async (title, japaneseTitle) =>
+  cachedGet(`samehadaku:find:${title}`, async () => {
+    // Words to strip from titles for cleaner searching
+    const NOISE_WORDS = /\b(the|a|an|of|in|on|at|to|for|and|or|no|wa|ga|wo|ni|de)\b/gi;
+    const SEASON_SUFFIX = /\s*(season\s*\d+|s\d+|part\s*\d+|cour\s*\d+|2nd|3rd|\d+th)\s*$/i;
+
+    // Normalize a title for Samehadaku search: remove special chars, collapse whitespace
+    const normalize = (t) =>
+      t.replace(/[^\w\s-]/g, ' ')  // remove special chars except hyphens
+        .replace(/\s+/g, ' ')       // collapse whitespace
+        .trim();
+
+    // Build search queries from most specific to least specific
+    const buildQueries = (t) => {
+      if (!t) return [];
+      const cleaned = normalize(t);
+      if (!cleaned) return [];
+
+      const queries = [cleaned];
+
+      // Without season suffix
+      const noSeason = cleaned.replace(SEASON_SUFFIX, '').trim();
+      if (noSeason && noSeason !== cleaned) queries.push(noSeason);
+
+      // First 3 significant words (good for long titles)
+      const words = cleaned.split(/\s+/).filter(w => w.length > 1);
+      if (words.length > 3) {
+        queries.push(words.slice(0, 3).join(' '));
+      }
+
+      // First 2 significant words
+      if (words.length > 2) {
+        queries.push(words.slice(0, 2).join(' '));
+      }
+
+      return queries;
+    };
+
+    // Fuzzy similarity score (simple Dice coefficient on bigrams)
+    const similarity = (a, b) => {
+      a = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+      b = b.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (a === b) return 1;
+      if (a.length < 2 || b.length < 2) return 0;
+      const bigrams = (s) => { const bg = new Set(); for (let i = 0; i < s.length - 1; i++) bg.add(s.slice(i, i + 2)); return bg; };
+      const aBg = bigrams(a);
+      const bBg = bigrams(b);
+      let matches = 0;
+      for (const bg of aBg) if (bBg.has(bg)) matches++;
+      return (2 * matches) / (aBg.size + bBg.size);
+    };
+
+    // Collect all queries to try: primary title variants, then japanese title variants
+    const allQueries = [];
+    const titleQueries = buildQueries(title);
+    allQueries.push(...titleQueries);
+    if (japaneseTitle && japaneseTitle !== title) {
+      allQueries.push(...buildQueries(japaneseTitle));
+    }
+
+    // Deduplicate
+    const seen = new Set();
+    const uniqueQueries = allQueries.filter(q => {
+      const key = q.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Try each query, collect all candidates
+    let bestMatch = null;
+    let bestScore = 0;
+    const refTitle = (title || '').toLowerCase();
+
+    for (const q of uniqueQueries) {
+      try {
+        const result = await searchSamehadaku(q);
+        const list = result.animeList || [];
+        for (const item of list) {
+          const itemTitle = (item.title || '').toLowerCase();
+          // Score based on similarity to original title
+          const score = Math.max(
+            similarity(refTitle, itemTitle),
+            japaneseTitle ? similarity(japaneseTitle.toLowerCase(), itemTitle) : 0,
+          );
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = item;
+          }
+          // Perfect or near-perfect match — return immediately
+          if (score > 0.8) return bestMatch;
+        }
+        // If we got results and have a reasonable match, stop searching
+        if (bestMatch && bestScore > 0.4) return bestMatch;
+      } catch {
+        // Samehadaku returns 500 for some queries — just try next
+        continue;
+      }
+    }
+
+    return bestMatch; // may be null if nothing matched
+  });
+
+export { normalizeMangaTitle };
+
+// ========== DOUJINDESU ==========
+const DOUJINDESU_CACHE_TTL = 15 * 60 * 1000; // 15 min
+
+/** Proxy doujindesu images through backend */
+export const doujindesuImgProxy = (url) => {
+  if (!url) return '';
+  // doujindesu CDN images need Referer header — proxy through backend
+  if (url.includes('doujindesu')) {
+    return `${getRuntime().apiBase}/doujindesu/img?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
+/** Get latest doujin */
+export const getDoujindesuLatest = (page = 1) =>
+  cachedGet(`doujindesu:latest:${page}`, async () => {
+    const res = await api.get('/doujindesu/latest', { params: { page } });
+    return res;
+  }, DOUJINDESU_CACHE_TTL);
+
+/** Search doujin */
+export const searchDoujindesu = (query, page = 1) =>
+  cachedGet(`doujindesu:search:${query}:${page}`, async () => {
+    const res = await api.get('/doujindesu/search', { params: { q: query, page } });
+    return res;
+  }, DOUJINDESU_CACHE_TTL);
+
+/** Get doujin detail (chapters, tags, synopsis) */
+export const getDoujindesuDetail = (id) =>
+  cachedGet(`doujindesu:detail:${id}`, async () => {
+    const res = await api.get(`/doujindesu/detail/${encodeURIComponent(id)}`);
+    return res;
+  }, DOUJINDESU_CACHE_TTL);
+
+/** Get chapter pages */
+export const getDoujindesuChapterPages = (chapterId) =>
+  cachedGet(`doujindesu:read:${chapterId}`, async () => {
+    const res = await api.get(`/doujindesu/read/${encodeURIComponent(chapterId)}`);
+    return res;
+  }, DOUJINDESU_CACHE_TTL);
+
+/** Get available genres */
+export const getDoujindesuGenres = () =>
+  cachedGet('doujindesu:genres', async () => {
+    const res = await api.get('/doujindesu/genres');
+    return res;
+  }, DOUJINDESU_CACHE_TTL * 4);
+
+/** Browse by genre */
+export const getDoujindesuByGenre = (slug, page = 1) =>
+  cachedGet(`doujindesu:genre:${slug}:${page}`, async () => {
+    const res = await api.get(`/doujindesu/genre/${encodeURIComponent(slug)}`, { params: { page } });
+    return res;
+  }, DOUJINDESU_CACHE_TTL);
+
+export default api;
