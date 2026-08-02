@@ -339,7 +339,7 @@ Detox / E2E tidak dipakai — biaya setup tidak sepadan untuk tim satu orang.
 |---|---|---|---|
 | 1 | Download offline butuh native module Kotlin | Tinggi | Ditempatkan di fase 6; rilis tidak bergantung padanya |
 | 2 | Provider embed berubah / mati | Tinggi, sering | EAS Update OTA |
-| 3 | Header/Referer di native berbeda dari web | Sedang | **Spike 1 hari di fase 1**. Kalau source tetap butuh `/proxy`, penghematan VPS batal tapi app tetap berfungsi |
+| 3 | ~~Header/Referer di native berbeda dari web~~ **TERJAWAB 2026-08-03 — proxy wajib** | — | Lihat §7.5 |
 | 4 | Regresi web saat pindah monorepo | Tinggi | Fase 0 berdiri sendiri, diverifikasi sebelum menyentuh RN |
 | 5 | Scope creep — 14 layar | Sedang | Kalau timeline meleset, potong fase 4 ke rilis kedua |
 | 6 | OAuth Google di native berbeda dari web | Sedang | Butuh `expo-auth-session`, client ID Android terpisah, SHA-1 keystore didaftarkan di Google Console. Dialokasikan di fase 1 |
@@ -371,6 +371,46 @@ Sudah dibangun dan terverifikasi tanpa perangkat:
    dengan SHA-1 dari `soora-keystore.jks` terdaftar di Google Cloud Console.
 3. Perilaku MMKV dan expo-sqlite di runtime (unit test memakai fake dan
    `node:sqlite`, bukan modul native sesungguhnya).
+
+### 7.5 Hasil spike Referer (2026-08-03) — proxy WAJIB
+
+Risiko 3 terjawab, dan jawabannya kebalikan dari asumsi awal.
+
+Diuji terhadap m3u8 VixSrc produksi (`/movies/vixsrc/movie/550`), URL yang sama
+persis diambil dari dua lokasi:
+
+| Dari | Header | Hasil |
+|---|---|---|
+| Mesin dev (IP residensial) | tanpa header | 403 |
+| Mesin dev | dengan `Referer` yang diminta backend | **403** |
+| VPS (82.25.62.151) | **tanpa header sama sekali** | **200**, `application/vnd.apple.mpegurl` |
+| VPS | dengan Referer | 200 |
+| VPS | Referer + Origin + User-Agent browser | 200 |
+
+**Referer tidak berpengaruh sama sekali.** Yang menentukan adalah IP: token di
+URL m3u8 terikat ke alamat yang memintanya, dan yang meminta adalah VPS saat
+backend melakukan ekstraksi. Perangkat mana pun dengan IP berbeda akan
+menerima 403.
+
+**Konsekuensi arsitektur:**
+
+1. `stream.soora.fun/proxy` **wajib** untuk semua playback, bukan opsional.
+   Rencana "kirim Referer sendiri dari ExoPlayer lalu lewati proxy" tidak bisa
+   dijalankan.
+2. Tidak ada penghematan bandwidth VPS untuk video. Seluruh trafik video tetap
+   transit lewat VPS, dan proxy menjadi jalur kritis — kapasitasnya harus
+   direncanakan untuk itu.
+3. Proxy sudah menulis ulang playlist (2287 byte langsung → 4567 byte lewat
+   proxy), jadi URL segmen ikut dialihkan. Ini yang memang dibutuhkan.
+
+**Catatan penting:** ini berlaku untuk **video**, bukan gambar. CDN gambar manga
+(`cdn.readdetectiveconan.com`) memang berbasis Referer — 403 tanpa header, 200
+dengan `Referer: https://mangapill.com/`, terverifikasi dari mesin dev. Jadi
+dua mekanisme berbeda: gambar boleh langsung dengan header, video harus lewat
+proxy.
+
+Yang masih perlu perangkat: apakah ExoPlayer bisa memutar playlist hasil proxy
+dengan mulus (seek, ganti kualitas, pemilihan audio/subtitle track).
 
 ## 8. Dekomposisi implementation plan
 
