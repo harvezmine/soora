@@ -150,12 +150,25 @@ router.get('/', async (req: Request, res: Response) => {
       const baseSuffix = req.query.base
         ? `&base=${encodeURIComponent(String(req.query.base))}`
         : '';
-      const childSuffix = `${refSuffix}${baseSuffix}`;
+
+      // `base` hanya berguna untuk entri yang nanti diambil sebagai playlist
+      // dan ditulis ulang lagi. Segmen adalah daun — menambahkan `base` ke
+      // 2087 baris segmen membengkakkan playlist 818 KB → 952 KB tanpa guna,
+      // dan bandwidth VPS adalah sumber daya yang paling terbatas di sini.
+      //
+      // Master playlist dikenali dari #EXT-X-STREAM-INF (anaknya = playlist
+      // varian); playlist media dikenali dari #EXTINF (anaknya = segmen).
+      const isMaster = text.includes('#EXT-X-STREAM-INF');
+      const childSuffix = isMaster ? `${refSuffix}${baseSuffix}` : refSuffix;
+
+      // URI= pada #EXT-X-MEDIA menunjuk playlist audio/subtitle, jadi selalu
+      // butuh `base` berapa pun jenis playlist induknya.
+      const uriSuffix = `${refSuffix}${baseSuffix}`;
 
       // Rewrite KEY/MAP URIs
       text = text.replace(/URI="([^"]+)"/g, (_match: string, uri: string) => {
         const abs = uri.startsWith('http') ? uri : new URL(uri, base).href;
-        return `URI="${proxyBase}?url=${encodeURIComponent(abs)}${childSuffix}"`;
+        return `URI="${proxyBase}?url=${encodeURIComponent(abs)}${uriSuffix}"`;
       });
 
       // Rewrite segment/playlist lines
