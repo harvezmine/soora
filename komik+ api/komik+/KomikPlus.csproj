@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <Version>1.8.0</Version>
+        <AssemblyVersion>1.8.0</AssemblyVersion>
+        <FileVersion>1.8.0</FileVersion>
+        <PackageVersion>1.8.0</PackageVersion>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Authors>Soora</Authors>
+        <Company>Soora</Company>
+        <Product>KomikPlus</Product>
+        <Description>A manga/komik API client for .NET — Komik+ by Soora</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageProjectUrl>https://github.com/soora/komikplus</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/soora/komikplus.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>komik;manga;manhwa;manhua;api;csharp;dotnet</PackageTags>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+        <PackageReleaseNotes>
+            [2.0.0]
+            - Rebranded to KomikPlus from NHentaiAPI.
+            - Generic manga/komik API client.
+            - Using System.Text.Json with proper converters.
+            - .NET 8.0 support.
+            - Full async handling.
+        </PackageReleaseNotes>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\LICENSE" Pack="true" PackagePath=""/>
+        <None Include="..\README.md" Pack="true" PackagePath=""/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.Text.Json" Version="9.0.0"/>
+    </ItemGroup>
+</Project>

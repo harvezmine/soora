@@ -1,0 +1,8 @@
+services:
+    lk21_api:
+        build: .
+        image: lk21_api:latest
+        ports:
+            - '${DOCKER_PORT:-8080}:8080'
+        restart: always
+        container_name: lk21_api
