@@ -85,14 +85,24 @@ export function StaleBanner() {
 }
 
 const s = StyleSheet.create({
+  // Diberi wadah seperti kartu, bukan teks melayang di tengah layar: pesan
+  // tanpa bentuk terbaca sebagai galat sistem yang nyasar, bukan bagian
+  // dari halaman.
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: space.xxxl,
-    paddingHorizontal: space.xl,
+    // Tepi 16dp seperti kartu, bukan 24: keduanya berdiri berdampingan di
+    // layar yang sama dan tepi yang berbeda langsung terlihat.
+    marginHorizontal: space.lg,
+    paddingVertical: space.xxl,
+    paddingHorizontal: space.lg,
     gap: space.sm,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  title: { color: colors.text, fontSize: font.size.lg, fontWeight: '600' },
+  title: { color: colors.text, fontSize: font.size.base, fontWeight: '700' },
   body: {
     color: colors.textMuted,
     fontSize: font.size.sm,

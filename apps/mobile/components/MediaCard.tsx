@@ -162,6 +162,11 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
     backgroundColor: colors.surfaceRaised,
+    // Batas tipis, bukan bayangan. `elevation` Android dan `shadow*` iOS
+    // berperilaku berbeda dan sulit dibuat konsisten; garis 1px murah
+    // dirender dan memberi batas yang jelas di tema gelap.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   posterBox: {
     width: CARD_WIDTH,
@@ -169,6 +174,8 @@ const s = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
     backgroundColor: colors.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   badge: {
     position: 'absolute',
