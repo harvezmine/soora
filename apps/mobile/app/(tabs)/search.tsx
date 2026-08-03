@@ -9,6 +9,7 @@ import { getMangaLang } from '../../lib/mangaLang';
 import { getSubIndoHomeBundle, getMovieHomeBundle, getMangaHomeBundle } from '@soora/core/api';
 import { buildSections } from '@soora/core/models';
 import { SectionRow } from '../../components/SectionRow';
+import { GenreBrowse } from '../../components/GenreBrowse';
 import { useCatalog, useDebounced } from '../../lib/useCatalog';
 import { MediaGrid } from '../../components/MediaGrid';
 import { SkeletonGrid } from '../../components/Skeleton';
@@ -239,6 +240,8 @@ export default function SearchScreen() {
           {barisJelajah.map((sec) => (
             <SectionRow key={sec.title} title={sec.title} items={sec.items} />
           ))}
+
+          <GenreBrowse />
         </ScrollView>
       ) : status === 'loading' ? (
         <SkeletonGrid />
