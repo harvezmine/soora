@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react';
-import { FlashList } from '@shopify/flash-list';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { getSamehadakuAnimeInfo } from '@soora/core/api';
 import { resolveImage, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
-import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
+import { DetailHeader, SectionTitle } from '../../components/Detail';
+import { EpisodeGrid } from '../../components/EpisodeGrid';
+import { GenreChips } from '../../components/GenreChips';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
@@ -29,6 +30,16 @@ export default function AnimeInfoScreen() {
   // Samehadaku memakai `episodeList` dengan field `episodeId`/`title`;
   // bentuk consumet lama memakai `episodes` dengan `id`/`number`. Keduanya
   // diterima supaya layar ini tidak pecah kalau penyedia English pulih.
+  const genres: string[] = useMemo(() => {
+    // Samehadaku memakai genreList berisi objek {title}; consumet memakai
+    // genres berisi string. Keduanya diterima.
+    const g = info?.genreList ?? info?.genres;
+    if (!Array.isArray(g)) return [];
+    return g.map((x: unknown) =>
+      typeof x === 'string' ? x : String((x as { title?: string })?.title ?? '')
+    );
+  }, [info]);
+
   const episodes: Episode[] = useMemo(() => {
     const list = info?.episodeList ?? info?.episodes;
     if (!Array.isArray(list)) return [];
@@ -71,52 +82,38 @@ export default function AnimeInfoScreen() {
   return (
     <View style={s.screen}>
       <Stack.Screen options={{ title }} />
-      <FlashList
-        data={episodes}
-        keyExtractor={(ep, i) => ep.id ?? `ep-${i}`}
-        contentContainerStyle={s.content}
-        ListHeaderComponent={
-          <>
-            <DetailHeader
-              title={title}
-              poster={resolveImage(info?.poster ?? info?.image)}
-              backdrop={info?.cover ? resolveImage(info.cover) : undefined}
-              meta={[info?.type, info?.status, info?.score, info?.aired].filter(Boolean)}
-              synopsis={String(
-                info?.synopsis?.paragraphs?.join('\n\n') ?? info?.description ?? ''
-              ).replace(/<[^>]*>/g, '')}
-            />
-            <SaveButton
-              item={{ id: String(id), listType: 'anime', title, poster: info?.poster ?? info?.image }}
-            />
-            <SectionTitle>Episode</SectionTitle>
-          </>
-        }
-        ListEmptyComponent={
+      <ScrollView contentContainerStyle={s.content}>
+        <DetailHeader
+          title={title}
+          poster={resolveImage(info?.image ?? info?.poster)}
+          backdrop={resolveImage(info?.cover ?? info?.image ?? info?.poster)}
+          meta={[info?.type, info?.status, info?.score, info?.aired].filter(Boolean)}
+          synopsis={String(info?.synopsis ?? info?.description ?? '').replace(/<[^>]*>/g, '')}
+        />
+        <SaveButton item={{ id: String(id), listType: 'anime', title, poster: info?.image }} />
+        <GenreChips genres={genres} />
+
+        <SectionTitle>Episode</SectionTitle>
+        {episodes.length === 0 ? (
           <EmptyState
             title="Belum ada episode"
             body="Penyedia tidak mengembalikan daftar episode untuk judul ini."
             onRetry={refresh}
           />
-        }
-        renderItem={({ item: ep, index }) => (
-          <ListRow
-            label={
-              ep.title
-                ? `${ep.number ?? index + 1}. ${ep.title}`
-                : `Episode ${ep.number ?? index + 1}`
-            }
-            onPress={() =>
+        ) : (
+          <EpisodeGrid
+            episodes={episodes}
+            onPilih={(ep) =>
               router.push(
                 `/watch/${encodeURIComponent(ep.id ?? '')}?kind=anime` +
-                  `&title=${encodeURIComponent(`${title} — Episode ${ep.number ?? index + 1}`)}` +
-                  `&ep=${ep.number ?? index + 1}` +
+                  `&title=${encodeURIComponent(`${title} — Episode ${ep.number ?? ''}`)}` +
+                  `&ep=${ep.number ?? ''}` +
                   `&animeId=${encodeURIComponent(String(id))}` as never
               )
             }
           />
         )}
-      />
+      </ScrollView>
     </View>
   );
 }

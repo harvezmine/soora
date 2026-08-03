@@ -93,3 +93,34 @@ export function nextChapterAfter(chapters, chId) {
   if (i < 0 || i >= list.length - 1) return null;
   return list[i + 1];
 }
+
+/**
+ * Bagi daftar episode jadi rentang untuk pemilih "1–50", "51–100", dan
+ * seterusnya.
+ *
+ * Ukuran potongan mengikuti web: 50 untuk judul di atas 100 episode, 25 untuk
+ * di atas 36, dan satu rentang saja untuk sisanya. Judul pendek tidak perlu
+ * pemilih — menampilkannya untuk 12 episode hanya menambah satu ketukan tanpa
+ * memberi apa pun.
+ *
+ * Label memakai `number` episode kalau ada, bukan indeks array: penyedia kerap
+ * mengembalikan episode 0 (spesial) atau melompati nomor, dan label berbasis
+ * indeks akan menyesatkan.
+ *
+ * @param {{ number?: number|string }[]} episodes
+ * @returns {{ label: string, start: number, end: number }[]}
+ */
+export function buildEpisodeRanges(episodes) {
+  const list = Array.isArray(episodes) ? episodes : [];
+  if (list.length === 0) return [];
+
+  const chunk = list.length > 100 ? 50 : list.length > 36 ? 25 : list.length;
+  const out = [];
+  for (let i = 0; i < list.length; i += chunk) {
+    const bagian = list.slice(i, i + chunk);
+    const awal = bagian[0]?.number ?? i + 1;
+    const akhir = bagian[bagian.length - 1]?.number ?? i + bagian.length;
+    out.push({ label: `${awal}–${akhir}`, start: i, end: i + bagian.length });
+  }
+  return out;
+}

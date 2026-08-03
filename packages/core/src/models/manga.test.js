@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { configureCore, resetCoreRuntime } from '../runtime.js';
-import { normalizeChapterPages, flattenChapterSegments, nextChapterAfter } from './manga.js';
+import {
+  normalizeChapterPages,
+  flattenChapterSegments,
+  nextChapterAfter,
+  buildEpisodeRanges,
+} from './manga.js';
 
 beforeEach(() => {
   resetCoreRuntime();
@@ -100,5 +105,50 @@ describe('nextChapterAfter', () => {
 
   it('mengabaikan entri tanpa id saat menghitung urutan', () => {
     expect(nextChapterAfter([{ id: 'a' }, {}, { id: 'b' }], 'a').id).toBe('b');
+  });
+});
+
+describe('buildEpisodeRanges', () => {
+  const buat = (n, mulai = 1) =>
+    Array.from({ length: n }, (_, i) => ({ number: mulai + i }));
+
+  it('daftar pendek jadi satu rentang — pemilih untuk 12 episode tidak berguna', () => {
+    const r = buildEpisodeRanges(buat(12));
+    expect(r).toHaveLength(1);
+    expect(r[0].label).toBe('1–12');
+  });
+
+  it('37 sampai 100 episode dipotong per 25', () => {
+    const r = buildEpisodeRanges(buat(60));
+    expect(r).toHaveLength(3);
+    expect(r[0].label).toBe('1–25');
+    expect(r[2].label).toBe('51–60');
+  });
+
+  it('di atas 100 episode dipotong per 50', () => {
+    const r = buildEpisodeRanges(buat(120));
+    expect(r).toHaveLength(3);
+    expect(r[0].label).toBe('1–50');
+    expect(r[2].label).toBe('101–120');
+  });
+
+  it('label memakai nomor episode, bukan indeks array', () => {
+    // Penyedia kerap mengembalikan episode 0 (spesial) atau melompati nomor.
+    const r = buildEpisodeRanges([{ number: 0 }, { number: 1 }, { number: 5 }]);
+    expect(r[0].label).toBe('0–5');
+  });
+
+  it('rentang menutupi seluruh daftar tanpa celah maupun tumpang tindih', () => {
+    const r = buildEpisodeRanges(buat(120));
+    expect(r[0].start).toBe(0);
+    r.forEach((x, i) => {
+      if (i > 0) expect(x.start).toBe(r[i - 1].end);
+    });
+    expect(r[r.length - 1].end).toBe(120);
+  });
+
+  it('daftar kosong atau bukan array tidak melempar', () => {
+    expect(buildEpisodeRanges([])).toEqual([]);
+    expect(buildEpisodeRanges(null)).toEqual([]);
   });
 });

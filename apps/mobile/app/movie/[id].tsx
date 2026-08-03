@@ -1,14 +1,16 @@
-import { useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { getMovieDetailsTMDB, getTVDetailsTMDB } from '@soora/core/api';
 import { resolveImage, tmdbSize, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
+import { EpisodeGrid } from '../../components/EpisodeGrid';
+import { GenreChips } from '../../components/GenreChips';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
-import { colors, space } from '../../theme/tokens';
+import { colors, font, onAccent, radius, space } from '../../theme/tokens';
 
 /**
  * Detail film atau serial dari TMDB.
@@ -44,6 +46,8 @@ export default function MovieInfoScreen() {
 
   const info = useMemo(() => data ?? {}, [data]);
   const title = info?.title || info?.name || (isTV ? 'Serial' : 'Film');
+
+  const [musimAktif, setMusimAktif] = useState(1);
 
   const seasons = useMemo(() => {
     const list = info?.seasons;
@@ -92,6 +96,21 @@ export default function MovieInfoScreen() {
     ? `https://image.tmdb.org/t/p/w780${info.backdrop_path}`
     : info?.cover;
 
+  /**
+   * Episode dibentuk dari `episode_count` musim, bukan dari panggilan API
+   * terpisah. Yang dibutuhkan untuk menavigasi ke pemutar hanya nomornya,
+   * jadi mengambil detail tiap musim berarti satu request tambahan yang
+   * hasilnya tidak dipakai.
+   */
+  const episodeMusim = useMemo(() => {
+    const se = seasons.find(
+      (x: { season_number?: number }) => (x.season_number ?? 1) === musimAktif
+    );
+    const n = Number(se?.episode_count ?? 0);
+    if (!Number.isFinite(n) || n <= 0) return [];
+    return Array.from({ length: n }, (_, i) => ({ id: String(i + 1), number: i + 1 }));
+  }, [seasons, musimAktif]);
+
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
       <Stack.Screen options={{ title }} />
@@ -104,7 +123,6 @@ export default function MovieInfoScreen() {
           isTV ? 'Serial' : 'Film',
           (info?.release_date || info?.first_air_date || '').slice(0, 4),
           info?.vote_average ? `${Math.round(info.vote_average * 10)}%` : '',
-          (info?.genres ?? []).map((g: { name?: string }) => g?.name).filter(Boolean).join(', '),
         ].filter(Boolean)}
         synopsis={info?.overview}
       />
@@ -113,25 +131,58 @@ export default function MovieInfoScreen() {
         item={{ id: String(id), listType: isTV ? 'tv' : 'movie', title, poster }}
       />
 
+      <GenreChips
+        genres={(info?.genres ?? [])
+          .map((g: { name?: string }) => String(g?.name ?? ''))
+          .filter(Boolean)}
+      />
+
       {isTV && seasons.length > 0 ? (
         <>
           <SectionTitle>Musim</SectionTitle>
-          {seasons.map((se: { id?: number; season_number?: number; name?: string; episode_count?: number }) => (
-            <ListRow
-              key={se.id ?? se.season_number}
-              label={se.name ?? `Musim ${se.season_number}`}
-              sub={se.episode_count ? `${se.episode_count} episode` : undefined}
-              onPress={() =>
-                router.push(
-                  `/watch/${encodeURIComponent(String(id))}?kind=tv` +
-                    `&season=${se.season_number ?? 1}&ep=1` +
-                    `&title=${encodeURIComponent(
-                      `${title} — ${se.name ?? `Musim ${se.season_number}`}`
-                    )}` as never
-                )
+          {/* Pemilih musim berupa pil, lalu grid episodenya muncul di bawah.
+              Sebelumnya tiap musim adalah baris yang langsung melompat ke
+              episode 1 — tidak ada cara memilih episode tertentu sama sekali. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.musimBaris}
+          >
+            {seasons.map(
+              (se: { id?: number; season_number?: number; name?: string; episode_count?: number }) => {
+                const nomor = se.season_number ?? 1;
+                const aktif = nomor === musimAktif;
+                return (
+                  <Pressable
+                    key={se.id ?? nomor}
+                    onPress={() => setMusimAktif(nomor)}
+                    style={[s.musimChip, aktif && s.musimAktif]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: aktif }}
+                    accessibilityLabel={se.name ?? `Musim ${nomor}`}
+                  >
+                    <Text style={[s.musimTeks, aktif && s.musimTeksAktif]}>
+                      {se.name ?? `Musim ${nomor}`}
+                    </Text>
+                  </Pressable>
+                );
               }
-            />
-          ))}
+            )}
+          </ScrollView>
+
+          <SectionTitle>Episode</SectionTitle>
+          <EpisodeGrid
+            episodes={episodeMusim}
+            onPilih={(ep) =>
+              router.push(
+                `/watch/${encodeURIComponent(String(id))}?kind=tv` +
+                  `&season=${musimAktif}&ep=${ep.number ?? 1}` +
+                  `&title=${encodeURIComponent(
+                    `${title} — S${musimAktif}E${ep.number ?? 1}`
+                  )}` as never
+              )
+            }
+          />
         </>
       ) : (
         <>
@@ -155,4 +206,17 @@ export default function MovieInfoScreen() {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: space.xxxl },
+  musimBaris: { gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm },
+  musimChip: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  musimAktif: { backgroundColor: colors.accent, borderColor: colors.accent },
+  musimTeks: { color: colors.textMuted, fontSize: font.size.sm, fontWeight: font.weight.medium },
+  musimTeksAktif: { color: onAccent },
 });

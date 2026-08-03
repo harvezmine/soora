@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Poster, type ImageSource } from './Poster';
@@ -39,18 +40,66 @@ export function DetailHeader({
         </View>
         <View style={s.headText}>
           <Text style={s.title}>{title}</Text>
-          {meta && meta.length > 0 ? (
-            <Text style={s.meta}>{meta.filter(Boolean).join(' · ')}</Text>
+          {/* Badge terpisah, bukan satu baris teks dipisah titik: status,
+              tipe, dan skor adalah fakta yang berbeda jenis, dan disatukan
+              jadi satu kalimat panjang keduanya sama-sama sulit dipindai. */}
+          {meta && meta.filter(Boolean).length > 0 ? (
+            <View style={s.badgeBaris}>
+              {meta.filter(Boolean).map((m) => (
+                <View key={m} style={s.badge}>
+                  <Text style={s.badgeTeks}>{m}</Text>
+                </View>
+              ))}
+            </View>
           ) : null}
         </View>
       </View>
 
-      {synopsis ? <Text style={s.synopsis}>{synopsis}</Text> : null}
+      {synopsis ? <Sinopsis teks={synopsis} /> : null}
     </View>
   );
 }
 
 /** Satu baris episode atau chapter. */
+/**
+ * Sinopsis dengan lipatan.
+ *
+ * Dipotong pada empat baris lalu diberi tombol. Memotong diam-diam dengan
+ * numberOfLines saja menyembunyikan fakta bahwa masih ada teks; menampilkan
+ * seluruhnya mendorong daftar episode jauh ke bawah pada judul bersinopsis
+ * panjang.
+ */
+function Sinopsis({ teks }: { teks: string }) {
+  const [terbuka, setTerbuka] = useState(false);
+  const [bisaBuka, setBisaBuka] = useState(false);
+
+  return (
+    <View>
+      <Text
+        style={s.synopsis}
+        numberOfLines={terbuka ? undefined : 4}
+        onTextLayout={(e) => {
+          // Tombol hanya muncul kalau teksnya memang terpotong. Menampilkan
+          // "Selengkapnya" untuk sinopsis dua baris terasa rusak.
+          if (!terbuka && e.nativeEvent.lines.length > 4) setBisaBuka(true);
+        }}
+      >
+        {teks}
+      </Text>
+      {bisaBuka ? (
+        <Pressable
+          onPress={() => setTerbuka((v) => !v)}
+          style={s.lipat}
+          accessibilityRole="button"
+          accessibilityLabel={terbuka ? 'Persingkat sinopsis' : 'Baca sinopsis selengkapnya'}
+        >
+          <Text style={s.lipatTeks}>{terbuka ? 'Persingkat' : 'Selengkapnya'}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export function ListRow({
   label,
   sub,
@@ -127,4 +176,21 @@ const s = StyleSheet.create({
   rowText: { gap: 2 },
   rowLabel: { color: colors.text, fontSize: font.size.md },
   rowSub: { color: colors.textDim, fontSize: font.size.xs },
+  badgeBaris: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.sm },
+  badge: {
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+  },
+  badgeTeks: { color: colors.textMuted, fontSize: font.size.xs, fontWeight: font.weight.medium },
+  lipat: {
+    alignSelf: 'flex-start',
+    minHeight: MIN_TOUCH,
+    justifyContent: 'center',
+    paddingHorizontal: space.lg,
+  },
+  lipatTeks: { color: colors.accent, fontSize: font.size.sm, fontWeight: font.weight.semibold },
 });
