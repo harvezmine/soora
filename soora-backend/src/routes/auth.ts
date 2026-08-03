@@ -83,7 +83,14 @@ router.post('/google', async (req: Request, res: Response) => {
   try {
     const idToken = String(req.body?.idToken || '');
     if (!idToken) return res.status(400).json({ error: 'Missing idToken' });
-    const ticket = await googleClient.verifyIdToken({ idToken, audience: config.googleClientId });
+    // Terima client web DAN client Android. Token dari peramban ber-`aud`
+    // client web; token dari APK ber-`aud` client Android. google-auth-library
+    // menerima array untuk kasus persis ini.
+    const audience = [config.googleClientId, config.googleAndroidClientId].filter(Boolean);
+    if (audience.length === 0) {
+      return res.status(500).json({ error: 'GOOGLE_CLIENT_ID belum dikonfigurasi di server' });
+    }
+    const ticket = await googleClient.verifyIdToken({ idToken, audience });
     const p = ticket.getPayload();
     if (!p?.email) return res.status(401).json({ error: 'Token Google tidak valid' });
 

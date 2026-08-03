@@ -96,7 +96,35 @@ pembaruan untuk user yang sudah memasang — selamanya.
 
 | Hal | Keterangan |
 |---|---|
-| Login Google | `GOOGLE_ANDROID_CLIENT_ID` di `lib/config.ts` masih kosong. Butuh OAuth client tipe **Android** dengan SHA-1 di atas terdaftar di Google Cloud Console. Sampai itu diisi, layar login menampilkan panduan setup, bukan tombol. |
+| Login Google | Butuh **dua** pengisian, lihat bagian di bawah. Sampai selesai, layar login menampilkan panduan setup, bukan tombol. |
 | Ikon dan splash | Belum ada direktori `assets/`. APK akan memakai ikon bawaan Expo. |
 | Error reporting | `BOT_TOKEN` dan `CHAT_ID` tidak ada di env produksi, jadi laporan ke Telegram diam-diam tidak terkirim. |
 | Halaman `soora.fun/download` | Belum dibuat. Untuk sekarang tautan EAS bisa dipakai langsung. |
+
+## Mengaktifkan login Google
+
+Login di soora.fun bekerja karena Google memvalidasi client **web** lewat
+"Authorized JavaScript origins" — browsernya memang berada di origin itu.
+Aplikasi Android tidak punya origin sama sekali; Google memvalidasinya lewat
+**nama paket + sidik jari SHA-1** penandatangan APK. Itu jenis OAuth client
+yang berbeda, dan client web tidak bisa dipakai untuk alur native.
+
+Langkahnya:
+
+1. Google Cloud Console → Credentials → Create OAuth client ID → **Android**
+   - Package name: `fun.soora.app`
+   - SHA-1: `F9:F7:EC:9E:69:C6:E9:E1:9B:43:63:9F:92:29:53:0C:94:D3:5A:52`
+
+   Kalau nanti membiarkan EAS memakai keystore lain, SHA-1-nya berbeda dan
+   harus didaftarkan juga — cek dengan `eas credentials`.
+
+2. Tempel client ID itu ke **dua** tempat:
+
+   - `apps/mobile/lib/config.ts` → `GOOGLE_ANDROID_CLIENT_ID`
+   - `soora-backend/ecosystem.config.js` → `GOOGLE_ANDROID_CLIENT_ID`,
+     lalu `pm2 restart soora-backend --update-env && pm2 save`
+
+Kenapa dua tempat: app memakainya untuk meminta token ke Google, dan backend
+memakainya untuk memverifikasi token itu. Backend sekarang menerima client web
+**dan** client Android — kalau hanya sisi app yang diisi, Google akan berhasil
+tapi backend menolak tokennya dengan "Verifikasi Google gagal".

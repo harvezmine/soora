@@ -46,6 +46,18 @@ export const config = {
   telegramChatId: process.env.CHAT_ID || '',
   jwtSecret: resolveJwtSecret(),
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  // Client ID Android terpisah.
+  //
+  // Google memvalidasi client web lewat "Authorized JavaScript origins" —
+  // itu sebabnya login di soora.fun bekerja: browsernya memang berada di
+  // origin tersebut. Aplikasi Android tidak punya origin sama sekali, jadi
+  // Google memvalidasinya lewat nama paket + sidik jari SHA-1 penandatangan,
+  // dan itu mengharuskan OAuth client bertipe "Android".
+  //
+  // Akibatnya ID token dari app membawa `aud` milik client Android, bukan
+  // client web. Verifikasi harus menerima keduanya; kalau hanya menerima
+  // client web, login di app selalu ditolak meski Google-nya sendiri sukses.
+  googleAndroidClientId: process.env.GOOGLE_ANDROID_CLIENT_ID || '',
   samehadakuBase: 'https://www.sankavollerei.com/anime/samehadaku',
   jikanBase: 'https://api.jikan.moe/v4',
 };
