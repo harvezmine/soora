@@ -9,6 +9,7 @@ import { NativePlayer } from '../../components/player/NativePlayer';
 import { EmbedPlayer } from '../../components/player/EmbedPlayer';
 import { ErrorState } from '../../components/States';
 import { getProgress, saveProgress } from '../../lib/progress';
+import { catatPercobaan } from '../../lib/playbackLog';
 import { colors, font, space } from '../../theme/tokens';
 
 type Source = ReturnType<typeof resolvePlayback>;
@@ -66,8 +67,23 @@ export default function WatchScreen() {
           // membuang yang mati, jadi `sources` di sini sudah tersaring.
           const play = await getSubIndoPlay(String(id));
           m3u8 = play?.default?.url ?? play?.sources?.find((x: { url?: string }) => x?.url)?.url;
-        } catch {
-          /* penyedia mati — lanjut ke embed */
+          catatPercobaan({
+            judul: String(title || 'Tanpa judul'),
+            kind: String(kind),
+            sumber: 'subindo-m3u8',
+            hasil: m3u8 ? 'ok' : 'kosong',
+          });
+        } catch (e) {
+          // Penyedia mati — lanjut ke embed, tapi catat dulu. Tanpa catatan
+          // ini kegagalannya hilang tanpa jejak dan hanya terlihat sebagai
+          // "tidak ada sumber" di ujung.
+          catatPercobaan({
+            judul: String(title || 'Tanpa judul'),
+            kind: String(kind),
+            sumber: 'subindo-m3u8',
+            hasil: 'galat',
+            pesan: e instanceof Error ? e.message : String(e),
+          });
         }
 
         let embeds: Array<{ url: string; label: string }> = [];
@@ -95,13 +111,23 @@ export default function WatchScreen() {
           season ? Number(season) : undefined,
           ep ? Number(ep) : kind === 'tv' ? 1 : undefined
         );
+        catatPercobaan({
+          judul: String(title || 'Tanpa judul'),
+          kind: String(kind),
+          sumber: 'vixsrc',
+          hasil: res?.m3u8 ? 'ok' : 'kosong',
+        });
         next = resolvePlayback({ m3u8: res?.m3u8, ref: res?.ref });
       }
 
       if (!next) {
+        // Sebutkan penyedia yang dicoba. "Tidak ada sumber" saja tidak
+        // membedakan judul yang memang tidak punya sumber dari penyedia yang
+        // sedang mati, padahal tindakannya berbeda: menunggu, atau menyerah.
+        const dicoba = kind === 'anime' ? 'Samehadaku dan embed' : 'VixSrc';
         setError(
-          'Tidak ada sumber yang bisa diputar untuk judul ini. ' +
-            'Penyedia mungkin sedang tidak tersedia.'
+          `Tidak ada sumber yang bisa diputar. Sudah dicoba: ${dicoba}. ` +
+            'Penyedia mungkin sedang tidak tersedia — coba lagi beberapa saat lagi.'
         );
         setStatus('error');
         return;
@@ -113,7 +139,15 @@ export default function WatchScreen() {
       // menampilkan layar error padahal percobaan berikutnya pasti berhasil.
       refetches.current = 0;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const pesan = e instanceof Error ? e.message : String(e);
+      catatPercobaan({
+        judul: String(title || 'Tanpa judul'),
+        kind: String(kind),
+        sumber: 'load',
+        hasil: 'galat',
+        pesan,
+      });
+      setError(pesan);
       setStatus('error');
     }
   }, [id, kind, season, ep, animeId, title]);

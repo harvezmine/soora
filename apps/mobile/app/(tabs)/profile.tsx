@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { ringkasLog } from '../../lib/playbackLog';
 import { Link, useFocusEffect } from 'expo-router';
 import Constants from 'expo-constants';
 import { LogOut, RefreshCw, Trash2 } from 'lucide-react-native';
@@ -128,6 +130,19 @@ export default function ProfileScreen() {
 
       <Row icon="cache" label="Bersihkan cache" onPress={clearCache} />
       <Row icon="cache" label="Hapus riwayat tontonan" onPress={confirmClearHistory} />
+
+      {/* Catatan percobaan pemutaran. Kegagalan pemutaran tidak bisa
+          diperbaiki dengan menebak; ini yang memberi judul, penyedia, dan
+          pesan aslinya saat melapor. */}
+      <Row
+        icon="cache"
+        label="Salin catatan pemutaran"
+        onPress={async () => {
+          const teks = ringkasLog();
+          await Clipboard.setStringAsync(teks);
+          Alert.alert('Tersalin', 'Catatan percobaan pemutaran sudah disalin.');
+        }}
+      />
 
       <Link href="/spike" asChild>
         <Pressable style={({ pressed }) => [s.row, pressed && s.pressed]}>

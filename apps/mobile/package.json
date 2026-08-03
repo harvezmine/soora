@@ -16,6 +16,7 @@
     "@soora/core-native": "workspace:*",
     "expo": "~57.0.9",
     "expo-auth-session": "~57.0.0",
+    "expo-clipboard": "~57.0.1",
     "expo-constants": "~57.0.0",
     "expo-image": "~57.0.1",
     "expo-keep-awake": "~57.0.1",
