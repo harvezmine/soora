@@ -10,6 +10,7 @@ import { GenreChips } from '../../components/GenreChips';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
+import { WatchLaterButton } from '../../components/WatchLaterButton';
 import { colors, font, onAccent, radius, space } from '../../theme/tokens';
 
 /**
@@ -128,6 +129,9 @@ export default function MovieInfoScreen() {
       />
 
       <SaveButton
+        item={{ id: String(id), listType: isTV ? 'tv' : 'movie', title, poster }}
+      />
+      <WatchLaterButton
         item={{ id: String(id), listType: isTV ? 'tv' : 'movie', title, poster }}
       />
 

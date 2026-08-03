@@ -10,6 +10,7 @@ import { GenreChips } from '../../components/GenreChips';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
+import { WatchLaterButton } from '../../components/WatchLaterButton';
 import { colors, space } from '../../theme/tokens';
 
 type Episode = { id?: string; number?: number; title?: string };
@@ -91,6 +92,9 @@ export default function AnimeInfoScreen() {
           synopsis={String(info?.synopsis ?? info?.description ?? '').replace(/<[^>]*>/g, '')}
         />
         <SaveButton item={{ id: String(id), listType: 'anime', title, poster: info?.image }} />
+        <WatchLaterButton
+          item={{ id: String(id), listType: 'anime', title, poster: info?.image }}
+        />
         <GenreChips genres={genres} />
 
         <SectionTitle>Episode</SectionTitle>

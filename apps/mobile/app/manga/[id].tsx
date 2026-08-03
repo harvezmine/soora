@@ -9,6 +9,7 @@ import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
+import { WatchLaterButton } from '../../components/WatchLaterButton';
 import { ChapterToolbar, type Urutan } from '../../components/ChapterToolbar';
 import { GenreChips } from '../../components/GenreChips';
 import { getReadingPos, type ReadingPos } from '../../lib/reading';
@@ -123,6 +124,9 @@ export default function MangaInfoScreen() {
             />
             <SaveButton
               item={{ id: String(id), listType: 'manga', title, poster: info?.image }}
+            />
+        <WatchLaterButton
+          item={{ id: String(id), listType: 'manga', title, poster: info?.image }}
             />
             {posBaca ? (
               <Pressable
