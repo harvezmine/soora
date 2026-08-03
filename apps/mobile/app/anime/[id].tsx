@@ -8,6 +8,7 @@ import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
+import { SaveButton } from '../../components/SaveButton';
 import { colors, space } from '../../theme/tokens';
 
 type Episode = { id?: string; number?: number; title?: string };
@@ -84,6 +85,9 @@ export default function AnimeInfoScreen() {
               synopsis={String(
                 info?.synopsis?.paragraphs?.join('\n\n') ?? info?.description ?? ''
               ).replace(/<[^>]*>/g, '')}
+            />
+            <SaveButton
+              item={{ id: String(id), listType: 'anime', title, poster: info?.poster ?? info?.image }}
             />
             <SectionTitle>Episode</SectionTitle>
           </>

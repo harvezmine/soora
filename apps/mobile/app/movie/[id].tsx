@@ -7,6 +7,7 @@ import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
+import { SaveButton } from '../../components/SaveButton';
 import { colors, space } from '../../theme/tokens';
 
 /**
@@ -106,6 +107,10 @@ export default function MovieInfoScreen() {
           (info?.genres ?? []).map((g: { name?: string }) => g?.name).filter(Boolean).join(', '),
         ].filter(Boolean)}
         synopsis={info?.overview}
+      />
+
+      <SaveButton
+        item={{ id: String(id), listType: isTV ? 'tv' : 'movie', title, poster }}
       />
 
       {isTV && seasons.length > 0 ? (

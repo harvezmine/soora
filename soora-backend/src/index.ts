@@ -14,6 +14,7 @@ import mangaRoutes from './routes/manga';
 import doujindesuRoutes from './routes/doujindesu';
 import komikplusRoutes from './routes/komikplus';
 import proxyRoutes from './routes/proxy';
+import appRoutes from './routes/app';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import adminRoutes from './routes/admin';
@@ -85,6 +86,9 @@ app.use('/komikplus', komikplusRoutes);
 
 // ========== PROXY ROUTES ==========
 app.use('/proxy', proxyRoutes);
+// Pemeriksaan versi untuk APK — distribusi di luar Play Store tidak punya
+// update otomatis, jadi app yang menanyakannya sendiri.
+app.use('/app', appRoutes);
 
 // Manga image proxy (separate mount point)
 import { default as proxyRouter } from './routes/proxy';

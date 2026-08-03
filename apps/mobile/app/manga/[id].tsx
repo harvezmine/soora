@@ -8,6 +8,7 @@ import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
+import { SaveButton } from '../../components/SaveButton';
 import { colors, space } from '../../theme/tokens';
 
 type Chapter = { id?: string; title?: string; chapterNumber?: string | number };
@@ -69,6 +70,9 @@ export default function MangaInfoScreen() {
                 chapters.length ? `${chapters.length} chapter` : '',
               ].filter(Boolean)}
               synopsis={info?.description?.replace(/<[^>]*>/g, '')}
+            />
+            <SaveButton
+              item={{ id: String(id), listType: 'manga', title, poster: info?.image }}
             />
             <SectionTitle>Chapter</SectionTitle>
           </>

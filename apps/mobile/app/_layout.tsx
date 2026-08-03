@@ -7,6 +7,7 @@ import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setCurrentPath } from '../lib/core';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { colors } from '../theme/tokens';
 
 export default function RootLayout() {
@@ -19,6 +20,9 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      {/* Distribusi di luar Play Store tidak punya pembaruan otomatis, jadi app
+          yang menanyakannya sendiri saat dibuka. */}
+      <UpdateBanner />
       {/* Tanpa backgroundColor: app edge-to-edge (app.json), jadi status bar
           transparan dan latar diambil dari konten di bawahnya. */}
       <StatusBar style="light" />
