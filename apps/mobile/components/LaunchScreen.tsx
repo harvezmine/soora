@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -11,10 +11,10 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { colors, font, space } from '../theme/tokens';
+import { colors } from '../theme/tokens';
 
 /** Berapa lama layar sambutan bertahan sebelum memudar. */
-const TAHAN_MS = 900;
+const TAHAN_MS = 1000;
 const PUDAR_MS = 420;
 
 type Props = {
@@ -30,31 +30,41 @@ type Props = {
  * putih. Masalahnya splash native hilang begitu bundel siap, sering terlalu
  * cepat untuk sempat terbaca.
  *
- * Komponen ini mengambil alih tepat setelahnya dengan gambar yang sama, lalu
- * memudar. Karena latar dan ikonnya identik dengan splash native, peralihannya
- * tidak terlihat sebagai dua layar berbeda.
+ * Logonya adalah berkas gambar yang sama persis, tidak digambar ulang. Yang
+ * dianimasikan hanyalah komposisinya: cahaya di belakang berdenyut, wordmark
+ * masuk dengan membesar halus. Menggambar ulang logo sebagai vektor akan
+ * menghasilkan bentuk yang mirip tapi tidak identik dengan logo aslinya.
  *
  * Sengaja TIDAK menunggu data apa pun. Menahan layar sambutan sampai request
  * pertama selesai berarti user dengan sinyal buruk menatap logo belasan detik;
  * layar beranda punya skeleton-nya sendiri untuk itu.
  */
 export function LaunchScreen({ onSelesai }: Props) {
+  const { width } = useWindowDimensions();
   const opacity = useSharedValue(1);
-  const skala = useSharedValue(0.92);
-  const denyut = useSharedValue(0.35);
+  const skala = useSharedValue(0.86);
+  const masuk = useSharedValue(0);
+  const cahaya = useSharedValue(0.35);
 
   useEffect(() => {
-    // Logo membesar sedikit saat masuk — memberi kesan app sedang bangun,
+    // Wordmark masuk dengan membesar halus — memberi kesan app sedang bangun,
     // bukan gambar diam yang membeku.
-    skala.value = withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) });
+    skala.value = withTiming(1, { duration: 620, easing: Easing.out(Easing.back(1.4)) });
+    masuk.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
 
-    denyut.value = withRepeat(
-      withSequence(
-        withTiming(0.8, { duration: 620, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0.35, { duration: 620, easing: Easing.inOut(Easing.quad) })
-      ),
-      -1,
-      false
+    // Cahaya di belakang logo berdenyut pelan. Ini menggantikan halo yang ada
+    // di berkas logo asli — halo itu sengaja dihapus saat latar dijadikan
+    // transparan, karena versi yang dibuat di sini lebih tajam dan ikut skala.
+    cahaya.value = withDelay(
+      260,
+      withRepeat(
+        withSequence(
+          withTiming(0.85, { duration: 760, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0.4, { duration: 760, easing: Easing.inOut(Easing.quad) })
+        ),
+        -1,
+        false
+      )
     );
 
     opacity.value = withDelay(
@@ -66,32 +76,41 @@ export function LaunchScreen({ onSelesai }: Props) {
         if (selesai) runOnJS(onSelesai)();
       })
     );
-    // Sengaja sekali jalan: nilai animasi disimpan di shared value, jadi
-    // menjalankan ulang effect akan mengulang animasi dari awal tiap render.
+    // Sengaja sekali jalan: nilainya disimpan di shared value, jadi menjalankan
+    // ulang effect akan mengulang animasi dari awal tiap render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const gayaLuar = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  const gayaLogo = useAnimatedStyle(() => ({ transform: [{ scale: skala.value }] }));
-  const gayaDenyut = useAnimatedStyle(() => ({ opacity: denyut.value }));
+  const gayaLogo = useAnimatedStyle(() => ({
+    opacity: masuk.value,
+    transform: [{ scale: skala.value }],
+  }));
+  const gayaCahaya = useAnimatedStyle(() => ({
+    opacity: cahaya.value,
+    transform: [{ scale: 0.9 + cahaya.value * 0.25 }],
+  }));
+
+  const lebarLogo = Math.min(width * 0.72, 340);
 
   return (
     <Animated.View style={[s.lapisan, gayaLuar]} pointerEvents="none">
+      <Animated.View style={[s.cahaya, { width: lebarLogo, height: lebarLogo }, gayaCahaya]} />
       <Animated.View style={gayaLogo}>
         <Image
-          source={require('../assets/icon.png')}
-          style={s.logo}
+          source={require('../assets/logo-wordmark.png')}
+          style={{ width: lebarLogo, height: lebarLogo * RASIO }}
           contentFit="contain"
           // Aset lokal; transisi hanya menambah kedip yang tidak perlu.
           transition={0}
         />
       </Animated.View>
-
-      <Text style={s.nama}>Soora</Text>
-      <Animated.Text style={[s.tagline, gayaDenyut]}>Anime · Film · Manga</Animated.Text>
     </Animated.View>
   );
 }
+
+/** Tinggi dibagi lebar berkas logo-wordmark.png (1024x458). */
+const RASIO = 458 / 1024;
 
 const s = StyleSheet.create({
   lapisan: {
@@ -107,18 +126,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.bg,
     zIndex: 100,
   },
-  logo: { width: 108, height: 108 },
-  nama: {
-    color: colors.text,
-    fontSize: font.size.xxl,
-    fontWeight: font.weight.bold,
-    letterSpacing: 1,
-    marginTop: space.lg,
-  },
-  tagline: {
-    color: colors.textMuted,
-    fontSize: font.size.sm,
-    letterSpacing: 2,
-    marginTop: space.sm,
+  cahaya: {
+    position: 'absolute',
+    borderRadius: 999,
+    // Jingga merek dari huruf S. Radius besar dengan opasitas rendah membaca
+    // sebagai cahaya, bukan sebagai lingkaran.
+    backgroundColor: '#ff6b4a',
+    opacity: 0.4,
   },
 });

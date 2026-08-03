@@ -60,15 +60,16 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.merek}>
-          <Image
-            source={require('../../assets/icon.png')}
-            style={[s.logo, sempit && s.logoSempit]}
-            contentFit="contain"
-            transition={0}
-          />
-          <Text style={s.namaMerek}>Soora</Text>
-        </View>
+        {/* Wordmark, bukan ikon + teks terpisah: logonya sudah memuat namanya,
+            jadi menaruh keduanya berarti menulis "Soora" dua kali. */}
+        <Image
+          source={require('../../assets/logo-wordmark.png')}
+          style={[s.logo, sempit && s.logoSempit]}
+          contentFit="contain"
+          contentPosition="left"
+          transition={0}
+          accessibilityLabel="Soora"
+        />
 
         <Text style={[s.judul, sempit && s.judulSempit]}>Selamat datang{'\n'}kembali.</Text>
         <Text style={s.sub}>
@@ -177,15 +178,9 @@ const s = StyleSheet.create({
   },
   isiSempit: { paddingTop: space.xl },
 
-  merek: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  logo: { width: 44, height: 44 },
-  logoSempit: { width: 34, height: 34 },
-  namaMerek: {
-    color: colors.text,
-    fontSize: font.size.lg,
-    fontWeight: font.weight.bold,
-    letterSpacing: 0.5,
-  },
+  // 1024x458 pada berkasnya; tinggi mengikuti agar tidak gepeng.
+  logo: { width: 168, height: 75 },
+  logoSempit: { width: 132, height: 59 },
 
   judul: {
     color: colors.text,

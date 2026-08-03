@@ -36,7 +36,7 @@ const config: ExpoConfig = {
     // dipakai: EAS harus menulis balik nilainya ke berkas konfigurasi, dan itu
     // mustahil untuk app.config.ts yang dinamis — build-nya gagal sebelum
     // menyentuh apa pun.
-    versionCode: 6,
+    versionCode: 7,
     adaptiveIcon: {
       // Versi maskable: motifnya berada di dalam safe zone, jadi tidak terpotong
       // saat launcher memangkasnya jadi lingkaran, kotak bulat, atau squircle.
@@ -56,7 +56,11 @@ const config: ExpoConfig = {
       'expo-splash-screen',
       {
         image: './assets/splash-icon.png',
-        imageWidth: 180,
+        // Wordmark memanjang, jadi lebarnya jauh lebih besar dari ikon persegi.
+        // Harus sedekat mungkin dengan lebar logo di LaunchScreen (72% layar,
+        // maksimal 340) — kalau berbeda, logo akan terlihat melompat ukuran
+        // saat splash native digantikan layar sambutan JS.
+        imageWidth: 300,
         resizeMode: 'contain',
         backgroundColor: BRAND_BG,
       },

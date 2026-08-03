@@ -13369,3 +13369,14 @@ a:hover {
   .landing-download-pill { transition: none; }
   .landing-download-pill:hover { transform: none; }
 }
+
+/* Wordmark di landing. Lebarnya mengikuti viewport lewat clamp supaya tidak
+   perlu breakpoint terpisah, dan max-width menjaga agar tidak melar di layar
+   lebar. Rasio aslinya 1024x458. */
+.landing-logo-img {
+  width: clamp(220px, 52vw, 420px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 12px 42px rgba(255, 107, 74, 0.35));
+}
+.landing-logo { display: flex; justify-content: center; }

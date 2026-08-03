@@ -219,21 +219,18 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
 
       <div className="landing-content">
         {/* Logo */}
+        {/* Wordmark asli sebagai gambar, bukan SVG tiruan: bentuk huruf,
+            gradien, dan wajah di dua huruf "o" tidak bisa direproduksi dengan
+            path sederhana tanpa berubah jadi logo yang berbeda. */}
         <div className="landing-logo">
-          <div className="landing-logo-mark">
-            <svg viewBox="0 0 40 40" width="36" height="36" fill="none">
-              <circle cx="20" cy="20" r="17" stroke="url(#logoGrad)" strokeWidth="2"/>
-              <path d="M13 26C13.8 27 15.5 28 18 28c3.5 0 5.5-2 5.5-4.2 0-2.3-1.8-3.2-4.5-3.8l-1-.2C15.5 19.3 14 18.5 14 16.8c0-1.8 1.8-3.3 4.2-3.3 1.8 0 3.2.7 4 1.5" stroke="url(#logoGrad)" strokeWidth="2.2" strokeLinecap="round"/>
-              <defs>
-                <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
-                  <stop offset="0%" stopColor="#7c5cfc"/>
-                  <stop offset="50%" stopColor="#ff6b9d"/>
-                  <stop offset="100%" stopColor="#00d4aa"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <h1 className="landing-logo-text">soora</h1>
+          <img
+            src="/logo-wordmark.png"
+            alt="Soora"
+            className="landing-logo-img"
+            width="1024"
+            height="458"
+            fetchPriority="high"
+          />
         </div>
 
         <p className="landing-tagline">Your Universe of Entertainment</p>
