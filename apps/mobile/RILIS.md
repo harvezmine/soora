@@ -76,7 +76,13 @@ pembaruan untuk user yang sudah memasang — selamanya.
 3. EAS memberi tautan unduhan. Buka di HP, pasang (Android akan meminta izin
    "pasang dari sumber tidak dikenal").
 
-4. Supaya user lain tahu ada versi baru, set env berikut di
+4. Taruh APK-nya di tempat yang bisa diunduh publik. Dua pilihan:
+   - **Paling cepat:** pakai tautan EAS apa adanya sebagai `APP_APK_URL`.
+   - **Lebih rapi:** unduh APK-nya, letakkan di VPS, sajikan lewat nginx, lalu
+     pakai URL itu. Tautan EAS bisa kedaluwarsa; berkas sendiri tidak.
+
+5. Supaya halaman `soora.fun/download` dan banner di dalam app menampilkannya,
+   set env berikut di
    `soora-backend/ecosystem.config.js` lalu
    `pm2 restart soora-backend --update-env`:
 
@@ -92,6 +98,19 @@ pembaruan untuk user yang sudah memasang — selamanya.
    `https://`. Keduanya divalidasi backend dan diabaikan (dengan peringatan di
    log) kalau salah bentuk.
 
+   **Penting:** menambahkan key BARU ke `ecosystem.config.js` tidak cukup dengan
+   `pm2 restart soora-backend --update-env` — PM2 hanya menyegarkan variabel
+   yang sudah dikenalnya. Untuk key baru, restart lewat berkasnya:
+
+   ```bash
+   cd ~/soora/soora-code/soora-backend
+   pm2 restart ecosystem.config.js --update-env && pm2 save
+   ```
+
+   Selama `APP_APK_URL` kosong, `soora.fun/download` menampilkan "Belum
+   tersedia untuk diunduh" dan banner pembaruan tidak pernah muncul — keduanya
+   memang begitu, bukan kerusakan.
+
 ## Yang belum siap
 
 | Hal | Keterangan |
@@ -99,7 +118,7 @@ pembaruan untuk user yang sudah memasang — selamanya.
 | Login Google | Butuh **dua** pengisian, lihat bagian di bawah. Sampai selesai, layar login menampilkan panduan setup, bukan tombol. |
 | Ikon dan splash | Belum ada direktori `assets/`. APK akan memakai ikon bawaan Expo. |
 | Error reporting | `BOT_TOKEN` dan `CHAT_ID` tidak ada di env produksi, jadi laporan ke Telegram diam-diam tidak terkirim. |
-| Halaman `soora.fun/download` | Belum dibuat. Untuk sekarang tautan EAS bisa dipakai langsung. |
+| ~~Halaman `soora.fun/download`~~ | **Sudah live.** Mengambil versi dari `/app/version`, jadi cukup set env di server — tidak perlu deploy ulang web. |
 
 ## Mengaktifkan login Google
 
