@@ -65,8 +65,8 @@ export default function FilmScreen() {
       }
     >
       {movie.stale && <StaleBanner />}
-      <SearchEntry bagian="movie" />
       <HeroSpotlight items={(sections[0]?.items ?? []).slice(0, 5)} />
+      <SearchEntry bagian="movie" />
 
       {sections.length === 0 ? (
         <EmptyState

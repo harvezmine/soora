@@ -89,8 +89,8 @@ export default function HomeScreen() {
       }
     >
       {anime.stale && <StaleBanner />}
-      <SearchEntry bagian="anime" />
       <HeroSpotlight items={(sections[0]?.items ?? []).slice(0, 5)} />
+      <SearchEntry bagian="anime" />
 
       <ContinueRow items={continueItems} />
 

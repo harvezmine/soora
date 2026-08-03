@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "prebuild": "expo prebuild --platform android",
     "export": "expo export --platform android --output-dir .expo-export",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@shopify/flash-list": "2.0.2",
@@ -47,6 +48,9 @@
     "@types/react": "~19.2.0",
     "eas-cli": "^21.4.0",
     "expo-doctor": "^1.0.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "@typescript-eslint/parser": "^8.20.0"
   }
 }

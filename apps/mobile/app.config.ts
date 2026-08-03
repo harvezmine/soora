@@ -36,7 +36,7 @@ const config: ExpoConfig = {
     // dipakai: EAS harus menulis balik nilainya ke berkas konfigurasi, dan itu
     // mustahil untuk app.config.ts yang dinamis — build-nya gagal sebelum
     // menyentuh apa pun.
-    versionCode: 9,
+    versionCode: 10,
     adaptiveIcon: {
       // Versi maskable: motifnya berada di dalam safe zone, jadi tidak terpotong
       // saat launcher memangkasnya jadi lingkaran, kotak bulat, atau squircle.
@@ -55,13 +55,16 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        image: './assets/splash-icon.png',
-        // Wordmark memanjang, jadi lebarnya jauh lebih besar dari ikon persegi.
-        // Harus sedekat mungkin dengan lebar logo di LaunchScreen (72% layar,
-        // maksimal 340) — kalau berbeda, logo akan terlihat melompat ukuran
-        // saat splash native digantikan layar sambutan JS.
-        imageWidth: 300,
-        resizeMode: 'contain',
+        // TANPA gambar, sengaja. Splash native dan LaunchScreen sama-sama
+        // menampilkan wordmark, dan hasilnya terlihat sebagai dua tahap:
+        // logo statis yang terpotong di kiri-kanan, lalu logo utuh yang
+        // membesar. Terpotongnya karena imageWidth diterapkan pada gambar
+        // berbanding 1024x430 dan sebagian perangkat memangkas alih-alih
+        // mengecilkan.
+        //
+        // Sekarang splash native hanya warna latar. Warnanya identik dengan
+        // LaunchScreen, jadi yang terlihat user hanya satu tahap: logo yang
+        // membesar, sama seperti di web.
         backgroundColor: BRAND_BG,
       },
     ],

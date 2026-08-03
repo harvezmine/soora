@@ -58,6 +58,21 @@ export default function MovieInfoScreen() {
     return list.filter((se: { season_number?: number }) => (se?.season_number ?? 0) > 0);
   }, [info]);
 
+  /**
+   * Episode dibentuk dari `episode_count` musim, bukan dari panggilan API
+   * terpisah. Yang dibutuhkan untuk menavigasi ke pemutar hanya nomornya,
+   * jadi mengambil detail tiap musim berarti satu request tambahan yang
+   * hasilnya tidak dipakai.
+   */
+  const episodeMusim = useMemo(() => {
+    const se = seasons.find(
+      (x: { season_number?: number }) => (x.season_number ?? 1) === musimAktif
+    );
+    const n = Number(se?.episode_count ?? 0);
+    if (!Number.isFinite(n) || n <= 0) return [];
+    return Array.from({ length: n }, (_, i) => ({ id: String(i + 1), number: i + 1 }));
+  }, [seasons, musimAktif]);
+
   // Semua hook di atas dipanggil tanpa syarat — return lebih awal baru boleh
   // setelah titik ini.
   if (!supported) {
@@ -97,20 +112,6 @@ export default function MovieInfoScreen() {
     ? `https://image.tmdb.org/t/p/w780${info.backdrop_path}`
     : info?.cover;
 
-  /**
-   * Episode dibentuk dari `episode_count` musim, bukan dari panggilan API
-   * terpisah. Yang dibutuhkan untuk menavigasi ke pemutar hanya nomornya,
-   * jadi mengambil detail tiap musim berarti satu request tambahan yang
-   * hasilnya tidak dipakai.
-   */
-  const episodeMusim = useMemo(() => {
-    const se = seasons.find(
-      (x: { season_number?: number }) => (x.season_number ?? 1) === musimAktif
-    );
-    const n = Number(se?.episode_count ?? 0);
-    if (!Number.isFinite(n) || n <= 0) return [];
-    return Array.from({ length: n }, (_, i) => ({ id: String(i + 1), number: i + 1 }));
-  }, [seasons, musimAktif]);
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>

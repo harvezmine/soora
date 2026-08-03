@@ -92,8 +92,8 @@ export default function MangaScreen() {
       }
     >
       {stale && <StaleBanner />}
-      <SearchEntry bagian="manga" />
       {hero ? <HeroSpotlight item={hero} /> : null}
+      <SearchEntry bagian="manga" />
 
       <LangPicker
         label="Bahasa manga"

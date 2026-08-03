@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getMangaInfo, detectMangaProvider } from '@soora/core/api';
-import { resolveImage, unwrap } from '@soora/core/models';
+import { resolveImage, splitLabel, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
@@ -177,11 +177,14 @@ export default function MangaInfoScreen() {
           )
         }
         renderItem={({ item: ch, index }) => {
-          const label = ch.title || `Chapter ${ch.chapterNumber ?? index + 1}`;
+          // Nomor dan judul dipisah: menempelkan string mentah penyedia
+          // membuat baris tidak sejajar dan judul panjang menutupi nomornya.
+          const { nomor, judul } = splitLabel(ch, index);
           const terakhir = posBaca?.chId === ch.id;
           return (
             <ListRow
-              label={terakhir ? `${label}  ·  terakhir dibaca` : label}
+              label={`Chapter ${nomor}`}
+              sub={terakhir ? [judul, 'terakhir dibaca'].filter(Boolean).join(' · ') : judul}
               // Provider dan judul dibawa serta: reader tidak bisa menyimpulkan
               // provider dari id chapter dengan andal, dan tanpa judul header
               // reader hanya menampilkan "Baca".

@@ -150,11 +150,14 @@ const s = StyleSheet.create({
   isi: { flex: 1 },
   gulir: {
     flexGrow: 1,
+    // Dipusatkan secara vertikal saat ruang berlebih, bukan menempel ke tepi
+    // atas. flexGrow menjaga agar tetap bisa digulir begitu papan ketik naik
+    // dan isinya melebihi tinggi layar.
+    justifyContent: 'center',
     paddingHorizontal: space.xl,
-    paddingTop: space.xxxl,
-    paddingBottom: space.xl,
+    paddingVertical: space.xxl,
   },
-  gulirSempit: { paddingTop: space.xl },
+  gulirSempit: { paddingVertical: space.lg },
 
   // 1024x430 pada berkasnya; tinggi mengikuti agar tidak gepeng.
   logo: { width: 156, height: 65 },

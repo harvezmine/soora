@@ -12,6 +12,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -196,12 +197,18 @@ export default function ReadScreen() {
       }
     });
 
-  // Geser mendatar hanya berguna saat diperbesar; saat 1x, sumbu itu milik
-  // daftar sepenuhnya.
+  /**
+   * Geser mendatar saat diperbesar.
+   *
+   * WAJIB dua jari. Versi sebelumnya memakai satu jari dan hanya mengabaikan
+   * hasilnya saat skala 1 — tapi pengenalan gesturnya tetap berjalan, dan
+   * itu menahan tiap sentuhan beberapa milidetik sebelum menyerah ke daftar.
+   * Gejalanya persis yang dilaporkan: gulir kadang jalan, kadang tersangkut
+   * seperti mau mencubit.
+   */
   const geser = Gesture.Pan()
-    .minPointers(1)
-    .maxPointers(1)
-    .activeOffsetX([-12, 12])
+    .minPointers(2)
+    .averageTouches(true)
     .onStart(() => {
       'worklet';
       geserXAwal.value = geserX.value;
@@ -216,6 +223,8 @@ export default function ReadScreen() {
 
   const ketuk = Gesture.Tap()
     .numberOfTaps(2)
+    // Jarak toleransi kecil: tanpa ini gulir pendek terbaca sebagai ketukan.
+    .maxDistance(12)
     .onEnd(() => {
       'worklet';
       // Ketuk ganda: bolak-balik antara 1x dan 2x, jalan pintas dari cubit.
@@ -224,7 +233,31 @@ export default function ReadScreen() {
       if (target === 1) geserX.value = withTiming(0, { duration: 180 });
     });
 
-  const gestur = Gesture.Simultaneous(cubit, geser, ketuk);
+  /**
+   * Ketuk tunggal membuka/menutup kontrol.
+   *
+   * Sebagai gestur, bukan Pressable yang membungkus daftar: dua lapisan
+   * penangkap sentuhan di atas daftar yang bisa digulir saling menahan, dan
+   * itu bagian dari sebabnya gulir terasa tersangkut.
+   *
+   * Menunggu ketuk-ganda gagal lebih dulu, kalau tidak tiap ketukan ganda
+   * juga memunculkan kontrol di tengah lompatan zoom.
+   */
+  const ketukTunggal = Gesture.Tap()
+    .numberOfTaps(1)
+    .maxDistance(12)
+    .requireExternalGestureToFail(ketuk)
+    .onEnd(() => {
+      'worklet';
+      runOnJS(setTampilKontrol)(!tampilKontrol);
+    });
+
+  // Race: hanya satu yang boleh menang. Cubit dan geser sama-sama menuntut
+  // dua jari, jadi gulir satu jari tidak pernah ikut diperebutkan.
+  const gestur = Gesture.Race(
+    Gesture.Simultaneous(cubit, geser),
+    Gesture.Exclusive(ketuk, ketukTunggal)
+  );
 
   const gayaZoom = useAnimatedStyle(() => ({
     transform: [{ scale: skala.value }, { translateX: geserX.value }],
@@ -275,7 +308,6 @@ export default function ReadScreen() {
 
       <GestureDetector gesture={gestur}>
         <Animated.View style={[s.isi, gayaZoom]}>
-        <Pressable style={s.isi} onPress={() => setTampilKontrol((v) => !v)}>
         <FlashList
           data={feed.baris}
           keyExtractor={(b) => b.kunci}
@@ -317,7 +349,6 @@ export default function ReadScreen() {
             ) : null
           }
         />
-        </Pressable>
         </Animated.View>
       </GestureDetector>
 

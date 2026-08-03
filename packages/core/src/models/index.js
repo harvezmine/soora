@@ -13,4 +13,5 @@ export {
   flattenChapterSegments,
   nextChapterAfter,
   buildEpisodeRanges,
+  splitLabel,
 } from './manga.js';

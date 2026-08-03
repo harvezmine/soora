@@ -81,6 +81,8 @@ export function HeroSpotlight({
   const listRef = useRef<FlatList<MediaItem> | null>(null);
 
   useEffect(() => {
+    // 8 detik, bukan 5: pada 5 detik banner berpindah sebelum judulnya sempat
+    // dibaca, dan itu terasa mengganggu alih-alih hidup.
     if (!otomatis || daftar.length < 2) return;
     const t = setInterval(() => {
       setAktif((i) => {
@@ -88,7 +90,7 @@ export function HeroSpotlight({
         listRef.current?.scrollToOffset({ offset: berikut * width, animated: true });
         return berikut;
       });
-    }, 5000);
+    }, 8000);
     return () => clearInterval(t);
   }, [otomatis, daftar.length, width]);
 
@@ -110,7 +112,10 @@ export function HeroSpotlight({
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScrollEnd}
-        onScrollBeginDrag={() => setOtomatis(false)}
+        // Berhenti PERMANEN setelah sentuhan pertama, bukan hanya selama
+        // digeser: user yang sudah memilih sendiri tidak ingin dipindahkan
+        // lagi beberapa detik kemudian.
+        onTouchStart={() => setOtomatis(false)}
         // Lebar tetap per halaman; tanpa ini FlatList mengukur tiap kartu dan
         // scrollToOffset bisa meleset setengah halaman.
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}

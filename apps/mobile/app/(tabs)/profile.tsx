@@ -291,8 +291,14 @@ const s = StyleSheet.create({
   btnGarisTeks: { color: colors.text, fontSize: font.size.md, fontWeight: '600' },
   btn: {
     minHeight: MIN_TOUCH,
+    // flexDirection dan gap WAJIB: tanpa keduanya ikon dan teks menumpuk
+    // vertikal lalu meluber keluar tombol, karena tinggi tombol dikunci
+    // minHeight sementara isinya jadi dua baris.
+    flexDirection: 'row',
+    gap: space.sm,
+    paddingHorizontal: space.md,
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },

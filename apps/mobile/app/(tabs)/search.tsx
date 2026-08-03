@@ -1,10 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Search as SearchIcon, X } from 'lucide-react-native';
-import { searchSamehadaku, searchMoviesTMDB, searchManga } from '@soora/core/api';
+import { searchSamehadaku, searchMoviesTMDB, searchManga, searchKomiku } from '@soora/core/api';
 import { normalizeList, unwrap } from '@soora/core/models';
 import { getRuntime } from '@soora/core';
 import { useLocalSearchParams } from 'expo-router';
+import { getMangaLang } from '../../lib/mangaLang';
+import { getSubIndoHomeBundle, getMovieHomeBundle, getMangaHomeBundle } from '@soora/core/api';
+import { buildSections } from '@soora/core/models';
+import { SectionRow } from '../../components/SectionRow';
 import { useCatalog, useDebounced } from '../../lib/useCatalog';
 import { MediaGrid } from '../../components/MediaGrid';
 import { SkeletonGrid } from '../../components/Skeleton';
@@ -69,7 +73,9 @@ export default function SearchScreen() {
     const tugas = {
       anime: () => searchSamehadaku(query),
       movie: () => searchMoviesTMDB(query),
-      manga: () => searchManga(query),
+      // Kolam manga mengikuti bahasa yang dipilih di beranda manga. Mencari
+      // judul Indonesia di mangapill hampir selalu nihil, dan sebaliknya.
+      manga: () => (getMangaLang() === 'id' ? searchKomiku(query) : searchManga(query)),
     };
     const aktif = bagian === 'all' ? (['anime', 'movie'] as const) : ([bagian] as const);
 
@@ -89,7 +95,8 @@ export default function SearchScreen() {
       } else if (k === 'movie') {
         items.push(...normalizeList(d?.results, 'movie', 'tmdb'));
       } else {
-        items.push(...normalizeList(d?.results ?? d, 'manga', 'mangapill'));
+        const sumber = getMangaLang() === 'id' ? 'komiku' : 'mangapill';
+        items.push(...normalizeList(d?.results ?? d, 'manga', sumber));
       }
     });
 
@@ -112,6 +119,60 @@ export default function SearchScreen() {
   );
 
   const items = useMemo(() => data?.items ?? [], [data]);
+
+  /**
+   * Tiga bagian statis saat kolom pencarian masih kosong.
+   *
+   * Layar Cari sebelumnya kosong sampai user mengetik, dan layar kosong
+   * tidak memberi petunjuk apa pun tentang apa yang bisa dicari.
+   *
+   * Dijalankan HANYA saat kolom kosong (`!enabled`), dan bundelnya sudah
+   * dipakai beranda masing-masing bagian sehingga hampir selalu tersedia
+   * dari cache — membuka layar Cari tidak menambah request baru.
+   */
+  const jelajah = useCatalog(
+    'home',
+    'cari:jelajah',
+    useCallback(async () => {
+      const [a, f, m] = await Promise.allSettled([
+        getSubIndoHomeBundle(),
+        getMovieHomeBundle(),
+        getMangaHomeBundle(getMangaLang()),
+      ]);
+      const isi = (r: PromiseSettledResult<unknown>) =>
+        r.status === 'fulfilled' ? (unwrap(r.value) as Record<string, unknown>) : {};
+      return { anime: isi(a), film: isi(f), manga: isi(m) };
+    }, []),
+    !enabled
+  );
+
+  const barisJelajah = useMemo(() => {
+    const d = jelajah.data;
+    if (!d) return [];
+    const mangaSections = (d.manga as { sections?: Record<string, unknown> })?.sections ?? {};
+    const mangaPertama = Object.values(mangaSections)[0];
+    return buildSections([
+      {
+        title: 'Anime populer',
+        items: (d.anime as { popular?: unknown; ongoing?: unknown })?.popular ??
+          (d.anime as { ongoing?: unknown })?.ongoing,
+        kind: 'anime' as const,
+        source: 'samehadaku',
+      },
+      {
+        title: 'Film trending',
+        items: (d.film as { tmdbTrending?: unknown })?.tmdbTrending,
+        kind: 'movie' as const,
+        source: 'tmdb',
+      },
+      {
+        title: 'Manga pilihan',
+        items: mangaPertama,
+        kind: 'manga' as const,
+        source: getMangaLang() === 'id' ? 'komiku' : 'mangapill',
+      },
+    ]);
+  }, [jelajah.data]);
 
   const submit = () => {
     if (!enabled) return;
@@ -147,7 +208,11 @@ export default function SearchScreen() {
       </View>
 
       {!enabled ? (
-        <View style={s.recentWrap}>
+        <ScrollView
+          contentContainerStyle={s.recentWrap}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {recent.length > 0 ? (
             <>
               <View style={s.recentHead}>
@@ -170,7 +235,11 @@ export default function SearchScreen() {
           ) : (
             <Text style={s.hint}>Ketik minimal 2 huruf untuk mulai mencari.</Text>
           )}
-        </View>
+
+          {barisJelajah.map((sec) => (
+            <SectionRow key={sec.title} title={sec.title} items={sec.items} />
+          ))}
+        </ScrollView>
       ) : status === 'loading' ? (
         <SkeletonGrid />
       ) : status === 'error' ? (

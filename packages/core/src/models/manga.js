@@ -124,3 +124,43 @@ export function buildEpisodeRanges(episodes) {
   }
   return out;
 }
+
+/**
+ * Pisahkan nomor dari judul chapter atau episode.
+ *
+ * Penyedia mengembalikan bentuk yang tidak seragam: kadang `chapterNumber`
+ * terisi, kadang hanya judul seperti "Chapter 52", kadang judul asli seperti
+ * "Chapter 52 - Pertarungan Terakhir". Menempelkan string mentahnya ke layar
+ * menghasilkan label yang panjang dan tidak sejajar antar baris.
+ *
+ * Yang dikembalikan: `nomor` untuk kolom kiri, dan `judul` hanya kalau ia
+ * benar-benar menambah informasi. Judul yang isinya cuma mengulang nomor
+ * ("Chapter 52") dibuang, bukan ditampilkan dua kali.
+ *
+ * @param {{ chapterNumber?: number|string, number?: number|string, title?: string }} item
+ * @param {number} indeks Cadangan terakhir kalau nomor tidak bisa ditemukan.
+ */
+export function splitLabel(item, indeks = 0) {
+  const raw = item?.chapterNumber ?? item?.number;
+  const judulAsli = String(item?.title ?? '').trim();
+
+  let nomor = '';
+  if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+    nomor = String(raw).trim();
+  } else {
+    // Angka pertama di judul, termasuk desimal seperti "10.5".
+    const m = judulAsli.match(/(\d+(?:\.\d+)?)/);
+    nomor = m ? m[1] : String(indeks + 1);
+  }
+
+  // Buang awalan penomoran dari judul: "Chapter 52", "Ch. 52", "Episode 3",
+  // "Eps 3", beserta pemisah setelahnya.
+  let judul = judulAsli
+    .replace(/^\s*(chapter|chap|ch\.?|episode|eps?\.?)\s*\d+(?:\.\d+)?\s*[-–—:.]?\s*/i, '')
+    .trim();
+
+  // Judul yang tersisa hanya berupa angka tidak menambah apa pun.
+  if (/^\d+(?:\.\d+)?$/.test(judul)) judul = '';
+
+  return { nomor, judul };
+}

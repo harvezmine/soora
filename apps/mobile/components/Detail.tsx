@@ -20,9 +20,31 @@ export function DetailHeader({
   title: string;
   poster?: ImageSource;
   backdrop?: ImageSource;
-  meta?: string[];
+  /** Bentuknya sengaja longgar: penyedia tidak konsisten. */
+  meta?: unknown[];
   synopsis?: string;
 }) {
+  /**
+   * Metadata dipaksa jadi teks di sini, bukan dipercaya sudah berupa string.
+   *
+   * Penyedia mengembalikan bentuk yang tidak seragam: skor Samehadaku adalah
+   * objek `{ value, users }`, bukan angka. Dulu meta digabung dengan join()
+   * sehingga objek hanya tampil sebagai "[object Object]" — jelek tapi tidak
+   * menjatuhkan layar. Begitu meta dirender sebagai anak React satu per satu,
+   * objek yang sama melempar dan seluruh layar detail anime jatuh.
+   */
+  const metaBersih = (meta ?? [])
+    .map((m) => {
+      if (typeof m === 'string') return m.trim();
+      if (typeof m === 'number') return String(m);
+      if (m && typeof m === 'object') {
+        const o = m as { value?: unknown; name?: string; title?: string };
+        return String(o.value ?? o.name ?? o.title ?? '').trim();
+      }
+      return '';
+    })
+    .filter(Boolean);
+
   return (
     <View>
       <View style={s.backdropBox}>
@@ -43,9 +65,9 @@ export function DetailHeader({
           {/* Badge terpisah, bukan satu baris teks dipisah titik: status,
               tipe, dan skor adalah fakta yang berbeda jenis, dan disatukan
               jadi satu kalimat panjang keduanya sama-sama sulit dipindai. */}
-          {meta && meta.filter(Boolean).length > 0 ? (
+          {metaBersih.length > 0 ? (
             <View style={s.badgeBaris}>
-              {meta.filter(Boolean).map((m) => (
+              {metaBersih.map((m) => (
                 <View key={m} style={s.badge}>
                   <Text style={s.badgeTeks}>{m}</Text>
                 </View>

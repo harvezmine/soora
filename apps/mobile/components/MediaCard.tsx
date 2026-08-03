@@ -23,6 +23,18 @@ export const CARD_WIDTH = 118;
 export const CARD_HEIGHT = CARD_WIDTH * 1.5;
 
 /**
+ * Rasio tinggi/lebar poster per jenis.
+ *
+ * Poster film dan anime mendekati 2:3 (1.5). Sampul manga lebih ramping,
+ * sekitar 1:1.42 pada mangapill dan komiku. Memaksa semuanya ke 1.5 dengan
+ * contentFit 'cover' memangkas sampul manga dari atas dan bawah — itulah
+ * sebabnya poster manga di beranda terlihat ter-zoom padahal di layar info
+ * gambarnya normal.
+ */
+const RASIO: Record<string, number> = { manga: 1.42 };
+const rasioUntuk = (kind?: string) => RASIO[kind ?? ''] ?? 1.5;
+
+/**
  * Varian di dalam grid.
  *
  * FlashList v2 memaksa lebar sel = lebar konten dibagi jumlah kolom. Kartu
@@ -71,7 +83,14 @@ export const MediaCard = memo(function MediaCard({
       accessibilityRole="button"
       accessibilityLabel={item.title}
     >
-      <View style={fill ? s.posterBoxFill : s.posterBox}>
+      <View
+        style={[
+          fill ? s.posterBoxFill : s.posterBox,
+          fill
+            ? { aspectRatio: 1 / rasioUntuk(item.kind) }
+            : { height: CARD_WIDTH * rasioUntuk(item.kind) },
+        ]}
+      >
         {/* recyclingKey harus sama dengan keyExtractor. Id numerik TMDB untuk
             film dan serial berada di ruang terpisah, jadi id 5920 bisa muncul
             dua kali dalam satu hasil pencarian gabungan — dan expo-image akan

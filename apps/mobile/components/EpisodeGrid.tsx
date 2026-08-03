@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, Search } from 'lucide-react-native';
-import { buildEpisodeRanges } from '@soora/core/models';
+import { buildEpisodeRanges, splitLabel } from '@soora/core/models';
 import {
   colors,
   font,
@@ -126,14 +126,18 @@ export function EpisodeGrid({ episodes, aktifId, onPilih }: Props) {
       <View style={s.grid}>
         {tampil.map((ep, i) => {
           const aktif = Boolean(aktifId) && ep.id === aktifId;
-          const label = String(ep.number ?? i + 1);
+          // Sel hanya memuat NOMOR. Judul episode dijejalkan ke dalam sel
+          // 56px akan terpotong jadi satu-dua huruf yang tidak berarti;
+          // judulnya dibawa ke label aksesibilitas.
+          const { nomor, judul } = splitLabel(ep, i);
+          const label = nomor;
           return (
             <Pressable
               key={ep.id ?? `ep-${label}-${i}`}
               onPress={() => onPilih(ep)}
               style={({ pressed }) => [s.sel, aktif && s.selAktif, pressed && s.ditekan]}
               accessibilityRole="button"
-              accessibilityLabel={ep.title ? `Episode ${label}: ${ep.title}` : `Episode ${label}`}
+              accessibilityLabel={judul ? `Episode ${nomor}: ${judul}` : `Episode ${nomor}`}
             >
               <Text style={[s.selTeks, aktif && s.selTeksAktif]} numberOfLines={1}>
                 {label}

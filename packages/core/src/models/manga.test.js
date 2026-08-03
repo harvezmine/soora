@@ -5,6 +5,7 @@ import {
   flattenChapterSegments,
   nextChapterAfter,
   buildEpisodeRanges,
+  splitLabel,
 } from './manga.js';
 
 beforeEach(() => {
@@ -150,5 +151,45 @@ describe('buildEpisodeRanges', () => {
   it('daftar kosong atau bukan array tidak melempar', () => {
     expect(buildEpisodeRanges([])).toEqual([]);
     expect(buildEpisodeRanges(null)).toEqual([]);
+  });
+});
+
+describe('splitLabel', () => {
+  it('memakai chapterNumber saat ada', () => {
+    expect(splitLabel({ chapterNumber: 52, title: 'Chapter 52' }).nomor).toBe('52');
+  });
+
+  it('membuang judul yang hanya mengulang nomor', () => {
+    // "Chapter 52" sebagai judul tidak menambah apa pun di samping nomor 52.
+    expect(splitLabel({ chapterNumber: 52, title: 'Chapter 52' }).judul).toBe('');
+    expect(splitLabel({ number: 3, title: 'Episode 3' }).judul).toBe('');
+  });
+
+  it('mempertahankan judul yang benar-benar berisi', () => {
+    const r = splitLabel({ chapterNumber: 52, title: 'Chapter 52 - Pertarungan Terakhir' });
+    expect(r.nomor).toBe('52');
+    expect(r.judul).toBe('Pertarungan Terakhir');
+  });
+
+  it('mengambil nomor dari judul saat field nomor kosong', () => {
+    expect(splitLabel({ title: 'Chapter 108' }).nomor).toBe('108');
+  });
+
+  it('menerima nomor desimal', () => {
+    // Chapter sisipan seperti 10.5 lazim di manga.
+    expect(splitLabel({ title: 'Chapter 10.5 - Omake' })).toEqual({
+      nomor: '10.5',
+      judul: 'Omake',
+    });
+  });
+
+  it('jatuh ke indeks kalau tidak ada nomor sama sekali', () => {
+    expect(splitLabel({ title: 'Prolog' }, 0).nomor).toBe('1');
+    expect(splitLabel({ title: 'Prolog' }, 0).judul).toBe('Prolog');
+  });
+
+  it('item kosong tidak melempar', () => {
+    expect(splitLabel(null, 4).nomor).toBe('5');
+    expect(splitLabel(undefined, 0).judul).toBe('');
   });
 });
