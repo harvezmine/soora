@@ -37,8 +37,9 @@ const ANSWERS = {
   'Signing key information:': '',
   'Key store location:': KS_PATH,
   'Key name:': 'soora',
-  'Key store password:': 'soora-pwa-2025',
-  'Key password:': 'soora-pwa-2025',
+  // Dari environment — lihat catatan di build-apk.js.
+  'Key store password:': process.env.SOORA_KS_PASS || '',
+  'Key password:': process.env.SOORA_KS_PASS || '',
   'Package ID:': 'fun.soora.app',
   'App version name:': '1.0.0',
   'App version code:': '1',

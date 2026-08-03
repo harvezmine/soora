@@ -25,7 +25,14 @@ const config: ExpoConfig = {
   backgroundColor: BRAND_BG,
   android: {
     package: 'fun.soora.app',
-    versionCode: 1,
+    // Harus > versionCode APK Capacitor lama (yang bernilai 1), kalau tidak
+    // Android menolak memasangnya sebagai pembaruan.
+    //
+    // Dinaikkan MANUAL tiap rilis. `autoIncrement` di eas.json sengaja tidak
+    // dipakai: EAS harus menulis balik nilainya ke berkas konfigurasi, dan itu
+    // mustahil untuk app.config.ts yang dinamis — build-nya gagal sebelum
+    // menyentuh apa pun.
+    versionCode: 2,
     adaptiveIcon: {
       backgroundColor: BRAND_BG,
     },
@@ -48,6 +55,17 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
+  },
+  extra: {
+    eas: {
+      // WAJIB DIISI sebelum `eas build` pertama.
+      //
+      // Jalankan `npx eas-cli init` — perintah itu membuat project di akun
+      // Expo dan biasanya menulis id-nya sendiri ke konfigurasi. Karena
+      // konfigurasi ini TypeScript (dinamis), EAS tidak bisa menulis ke sini,
+      // jadi id-nya harus ditempel manual. Tanpa ini build gagal seketika.
+      projectId: '',
+    },
   },
 };
 

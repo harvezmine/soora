@@ -31,7 +31,15 @@ const PROJECT = resolve(__dirname, '..');
 const TWA_DIR = join(PROJECT, 'twa-build');
 const KS_PATH = join(PROJECT, 'soora-keystore.jks');
 const KS_ALIAS = 'soora';
-const KS_PASS = 'soora-pwa-2025';
+// Password keystore dibaca dari environment, bukan ditulis di sini.
+// Repo ini publik; password yang ter-commit sama saja dengan tidak ada
+// password begitu keystore-nya bocor lewat jalur lain.
+// Set SOORA_KS_PASS sebelum menjalankan skrip ini.
+const KS_PASS = process.env.SOORA_KS_PASS;
+if (!KS_PASS) {
+  console.error('SOORA_KS_PASS belum di-set. Jalankan: set SOORA_KS_PASS=<password>');
+  process.exit(1);
+}
 const OUT_DIR = join(PROJECT, 'public', 'download');
 const WEB_MANIFEST = 'https://soora.fun/manifest.json';
 

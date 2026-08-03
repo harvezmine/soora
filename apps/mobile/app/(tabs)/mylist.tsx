@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { isLoggedIn } from '@soora/core/user';
 import { listMyList, removeFromMyList, syncMyList, type ListItem } from '../../lib/mylist';
+import { resolveImage } from '@soora/core/models';
 import { Poster } from '../../components/Poster';
 import { EmptyState } from '../../components/States';
 import { colors, font, iconSize, iconStroke, radius, space, MIN_TOUCH } from '../../theme/tokens';
@@ -69,10 +70,10 @@ export default function MyListScreen() {
               accessibilityLabel={item.title}
             >
               <View style={s.thumb}>
-                <Poster
-                  source={{ uri: item.poster ?? '' }}
-                  recyclingKey={keyOf(item)}
-                />
+                {/* resolveImage, bukan URL mentah: poster manga berasal dari
+                    CDN yang membalas 403 tanpa header Referer, dan tanpa ini
+                    seluruh thumbnail manga di daftar jadi kotak kosong. */}
+                <Poster source={resolveImage(item.poster ?? '')} recyclingKey={keyOf(item)} />
               </View>
               <View style={s.meta}>
                 <Text style={s.title} numberOfLines={2}>

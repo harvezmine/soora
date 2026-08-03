@@ -14,13 +14,13 @@ export function SaveButton({ item }: { item: Omit<ListItem, 'addedAt'> }) {
   const [saved, setSaved] = useState(() => isInMyList(item.listType, item.id));
 
   const toggle = () => {
-    if (saved) {
-      removeFromMyList(item.listType, item.id);
-      setSaved(false);
-    } else {
-      addToMyList(item);
-      setSaved(true);
-    }
+    // Status hanya berubah kalau penyimpanan benar-benar berhasil. Sebelumnya
+    // tombol selalu berubah jadi "Tersimpan"; saat penyimpanan penuh, user
+    // melihat konfirmasi palsu lalu judulnya hilang begitu layar dibuka ulang.
+    const ok = saved
+      ? removeFromMyList(item.listType, item.id)
+      : addToMyList(item);
+    if (ok) setSaved(!saved);
   };
 
   const Icon = saved ? BookmarkCheck : Bookmark;

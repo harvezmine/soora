@@ -18,6 +18,7 @@ import { colors, font, iconSize, iconStroke, onAccent, radius, space, MIN_TOUCH 
 export function UpdateBanner() {
   const [info, setInfo] = useState<VersionInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [failed, setFailed] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -35,6 +36,9 @@ export function UpdateBanner() {
     <Modal
       visible
       transparent
+      // Tanpa ini scrim tidak menutup area status bar di app edge-to-edge,
+      // menyisakan pita terang di atas dialog.
+      statusBarTranslucent
       animationType="fade"
       // Tombol back Android tidak boleh menutup pembaruan wajib.
       onRequestClose={() => {
@@ -63,12 +67,21 @@ export function UpdateBanner() {
 
           <Pressable
             style={({ pressed }) => [s.btn, pressed && s.pressed]}
-            onPress={() => void Linking.openURL(info.apkUrl)}
+            onPress={() => {
+              // openURL menolak kalau skemanya tidak dikenali perangkat.
+              // Tanpa catch, tombolnya diam saja tanpa penjelasan apa pun —
+              // dan pada pembaruan wajib, app jadi terkunci di dialog ini.
+              Linking.openURL(info.apkUrl).catch(() =>
+                setFailed('Tidak bisa membuka tautan unduhan. Buka soora.fun/download di peramban.')
+              );
+            }}
             accessibilityRole="button"
           >
             <Download size={iconSize.sm} color={onAccent} strokeWidth={iconStroke} />
             <Text style={s.btnText}>Unduh pembaruan</Text>
           </Pressable>
+
+          {failed ? <Text style={s.failed}>{failed}</Text> : null}
 
           {!info.mandatory && (
             <Pressable
@@ -111,6 +124,7 @@ const s = StyleSheet.create({
     lineHeight: font.size.sm * font.lineHeight.normal,
   },
   mandatory: { color: colors.warning, fontSize: font.size.sm, marginTop: space.xs },
+  failed: { color: colors.danger, fontSize: font.size.sm, marginTop: space.xs },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
