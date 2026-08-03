@@ -102,7 +102,7 @@ yang gagal memberi pesan yang menjelaskan sebabnya.
 
 Dua cacat yang sudah terlihat di v8.
 
-### 8.1 Splash: hilangkan cakram oranye
+### 8.1 Splash: hilangkan cakram oranye — SELESAI (commit 4c7ef58)
 Penyebabnya: React Native tidak punya `filter: blur()`. Lingkaran ber-`borderRadius`
 dengan warna solid tampil sebagai cakram keras, bukan cahaya seperti di web.
 
@@ -110,9 +110,18 @@ Perbaikan: gambar cahayanya dengan `RadialGradient` dari `react-native-svg`
 (sudah terpasang) — gradien betulan dari pusat ke transparan. Sekalian samakan
 kurva dan durasinya dengan splash web supaya dua platform terasa satu produk.
 
-### 8.2 OAuth
-Client Android sudah benar (package `fun.soora.app`, SHA-1 cocok). Yang belum
-diperiksa dan paling mungkin jadi penyebab:
+### 8.2 OAuth — TERTAHAN
+
+Yang sudah diperiksa dan TERBUKTI benar, jadi tidak perlu diperiksa lagi:
+- Client Android: package `fun.soora.app`, SHA-1 cocok dengan keystore.
+- Redirect: expo memakai `fun.soora.app:/oauthredirect`, dan skema itu
+  memang dideklarasikan di `app.config.ts`.
+- Backend: `audience` memuat client web DAN client Android, keduanya ada di
+  env proses produksi.
+- Alur token: expo-auth-session menukar `code` jadi `id_token` sendiri di
+  Android. Sempat diduga inilah penyebabnya — ternyata bukan.
+
+Yang BELUM diperiksa, dan sekarang menjadi satu-satunya tersangka tersisa:
 - **Branding / OAuth consent screen** — nama app masih `docloq`.
 - **Audience** — kalau masih "Testing", hanya akun yang terdaftar sebagai test
   user yang bisa masuk; sisanya ditolak tanpa penjelasan berarti.

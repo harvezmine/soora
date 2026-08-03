@@ -92,7 +92,20 @@ export function useGoogleSignIn() {
     if (!response) return;
 
     if (response.type === 'error') {
-      setError(response.error?.message ?? 'Login Google gagal.');
+      // Pesan MENTAH dari Google, bukan kalimat umum.
+      //
+      // `error.message` sering kosong; yang benar-benar menjelaskan adalah
+      // `error.code` (mis. redirect_uri_mismatch, access_denied) dan
+      // `params.error_description`. Tanpa keduanya, kegagalan OAuth hanya
+      // terbaca sebagai "Login Google gagal" dan penyebabnya mustahil
+      // dipersempit dari laporan user.
+      const bagian = [
+        response.error?.code,
+        response.error?.message,
+        response.params?.error,
+        response.params?.error_description,
+      ].filter(Boolean);
+      setError(bagian.length ? bagian.join(' · ') : 'Login Google gagal tanpa pesan.');
       setBusy(false);
       return;
     }
@@ -114,7 +127,13 @@ export function useGoogleSignIn() {
 
     exchangeGoogleIdToken(idToken)
       .then(setUser)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => {
+        // Google berhasil tapi backend menolak. Sebutkan bedanya — dua
+        // kegagalan ini butuh perbaikan di tempat yang sama sekali berbeda:
+        // satu di Google Cloud Console, satu di ecosystem.config.js server.
+        const pesan = e instanceof Error ? e.message : String(e);
+        setError(`Google berhasil, server Soora menolak token: ${pesan}`);
+      })
       .finally(() => setBusy(false));
   }, [response]);
 
