@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { getMangaInfo, detectMangaProvider } from '@soora/core/api';
 import { resolveImage, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
@@ -9,7 +9,8 @@ import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
-import { colors, space } from '../../theme/tokens';
+import { getReadingPos, type ReadingPos } from '../../lib/reading';
+import { colors, font, onAccent, radius, space, MIN_TOUCH } from '../../theme/tokens';
 
 type Chapter = { id?: string; title?: string; chapterNumber?: string | number };
 
@@ -27,6 +28,15 @@ export default function MangaInfoScreen() {
     `manga:${provider}:${id}`,
     useCallback(async () => unwrap(await getMangaInfo(id, provider)), [id, provider]),
     Boolean(id)
+  );
+
+  const [posBaca, setPosBaca] = useState<ReadingPos | null>(null);
+  // Dibaca ulang tiap layar mendapat fokus: user kembali ke sini tepat
+  // setelah membaca, dan tombol lanjut harus menunjuk chapter terbaru.
+  useFocusEffect(
+    useCallback(() => {
+      setPosBaca(getReadingPos(String(id)));
+    }, [id])
   );
 
   const info = useMemo(() => data ?? {}, [data]);
@@ -79,6 +89,28 @@ export default function MangaInfoScreen() {
             <SaveButton
               item={{ id: String(id), listType: 'manga', title, poster: info?.image }}
             />
+            {posBaca ? (
+              <Pressable
+                style={({ pressed }) => [s.lanjut, pressed && s.lanjutDitekan]}
+                accessibilityRole="button"
+                accessibilityLabel={`Lanjut baca ${posBaca.chLabel}`}
+                onPress={() =>
+                  router.push({
+                    pathname: '/read/[chapter]',
+                    params: {
+                      chapter: posBaca.chId,
+                      provider,
+                      title,
+                      mangaId: String(id),
+                    },
+                  } as never)
+                }
+              >
+                <Text style={s.lanjutTeks} numberOfLines={1}>
+                  Lanjut baca · {posBaca.chLabel}
+                </Text>
+              </Pressable>
+            ) : null}
             <SectionTitle>Chapter</SectionTitle>
           </>
         }
@@ -91,16 +123,17 @@ export default function MangaInfoScreen() {
         }
         renderItem={({ item: ch, index }) => {
           const label = ch.title || `Chapter ${ch.chapterNumber ?? index + 1}`;
+          const terakhir = posBaca?.chId === ch.id;
           return (
             <ListRow
-              label={label}
+              label={terakhir ? `${label}  ·  terakhir dibaca` : label}
               // Provider dan judul dibawa serta: reader tidak bisa menyimpulkan
               // provider dari id chapter dengan andal, dan tanpa judul header
               // reader hanya menampilkan "Baca".
               onPress={() =>
                 router.push({
                   pathname: '/read/[chapter]',
-                  params: { chapter: ch.id ?? '', provider, title: `${title} — ${label}` },
+                  params: { chapter: ch.id ?? '', provider, title, mangaId: String(id) },
                 } as never)
               }
             />
@@ -114,4 +147,20 @@ export default function MangaInfoScreen() {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: space.xxxl },
+  lanjut: {
+    minHeight: MIN_TOUCH,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: space.lg,
+    marginTop: space.sm,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+  },
+  lanjutDitekan: { opacity: 0.8 },
+  lanjutTeks: {
+    color: onAccent,
+    fontSize: font.size.md,
+    fontWeight: font.weight.semibold,
+  },
 });
