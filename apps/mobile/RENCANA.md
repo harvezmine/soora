@@ -55,11 +55,54 @@ ke halaman terakhir.
 
 ---
 
-## Fase 7 — Splash dan OAuth (perbaikan, bukan fitur)
+## Fase 7 — Player film dan anime  ⭐ prioritas kedua
+
+Sesudah manga. Beberapa sumber masih gagal diputar dan tampilannya kalah dari
+web. Fase ini memperbaiki dulu yang rusak, baru mempercantik — memperindah
+pemutar yang tidak bisa memutar tidak ada gunanya.
+
+### 7.1 Petakan dulu apa yang rusak
+Tidak ada gunanya menebak. Yang dikerjakan lebih dulu:
+- Rekam tiap kegagalan pemutaran ke penyimpanan lokal: judul, sumber, mode
+  (native / embed), pesan galat, dan status HTTP dari proxy.
+- Layar diagnostik di Profil untuk menyalin rekaman itu.
+- Uji langsung dari VPS untuk 10 judul film dan 10 anime, catat mana yang
+  mengembalikan m3u8, mana yang hanya embed, mana yang 403.
+
+Baru setelah ada daftarnya, perbaikannya bisa ditargetkan.
+
+### 7.2 Rantai sumber yang bisa gagal dengan anggun
+- Web memakai failover server otomatis; mobile belum. Kalau sumber pertama
+  gagal, coba berikutnya tanpa melempar user ke layar galat.
+- Bedakan galat yang bisa diulang (token kedaluwarsa, jaringan) dari yang tidak
+  (judul memang tidak punya sumber) — sekarang keduanya tampil sama.
+- Layar galat menyebutkan sumber mana yang dicoba dan menawarkan pilihan lain,
+  bukan hanya "Pemutaran gagal".
+
+### 7.3 Pemutar embed
+Anime Sub Indo diputar lewat WebView. Sekarang praktis tanpa kendali.
+- Bar atas sendiri dengan judul dan tombol kembali.
+- Tombol layar penuh yang memutar orientasi.
+- Blokir popup dan pengalihan yang dilakukan situs sumber.
+- Deteksi halaman embed yang gagal dimuat, lalu tawarkan sumber lain.
+
+### 7.4 Rapikan pemutar native
+- Pengaturan kecepatan dan trek bertahan antar episode.
+- Tombol episode berikutnya di dalam pemutar; putar otomatis setelah selesai.
+- Lewati opening: lompat 85 detik, tampil hanya di menit-menit awal.
+- Indikator buffering yang terpisah dari indikator memuat awal — sekarang
+  keduanya sama sehingga tersendat di tengah terlihat seperti hang.
+
+**Selesai kalau:** 10 judul film dan 10 anime dari daftar uji bisa diputar, dan
+yang gagal memberi pesan yang menjelaskan sebabnya.
+
+---
+
+## Fase 8 — Splash dan OAuth (perbaikan, bukan fitur)
 
 Dua cacat yang sudah terlihat di v8.
 
-### 7.1 Splash: hilangkan cakram oranye
+### 8.1 Splash: hilangkan cakram oranye
 Penyebabnya: React Native tidak punya `filter: blur()`. Lingkaran ber-`borderRadius`
 dengan warna solid tampil sebagai cakram keras, bukan cahaya seperti di web.
 
@@ -67,7 +110,7 @@ Perbaikan: gambar cahayanya dengan `RadialGradient` dari `react-native-svg`
 (sudah terpasang) — gradien betulan dari pusat ke transparan. Sekalian samakan
 kurva dan durasinya dengan splash web supaya dua platform terasa satu produk.
 
-### 7.2 OAuth
+### 8.2 OAuth
 Client Android sudah benar (package `fun.soora.app`, SHA-1 cocok). Yang belum
 diperiksa dan paling mungkin jadi penyebab:
 - **Branding / OAuth consent screen** — nama app masih `docloq`.
@@ -81,7 +124,7 @@ app, plus isi halaman Branding dan Audience di Google Cloud Console.
 
 ---
 
-## Fase 8 — Kartu dan baris (fondasi tampilan)
+## Fase 9 — Kartu dan baris (fondasi tampilan)
 
 Sumber kesan "polos" ada di sini: kartu hanya poster dan judul, tanpa satu pun
 penanda. Diperbaiki sekali, ketiga bagian ikut membaik.
@@ -98,7 +141,7 @@ penanda. Diperbaiki sekali, ketiga bagian ikut membaik.
 
 ---
 
-## Fase 9 — Halaman detail
+## Fase 10 — Halaman detail
 
 Sekarang: poster, judul, sinopsis, daftar episode. Web jauh lebih kaya.
 
@@ -111,7 +154,7 @@ Sekarang: poster, judul, sinopsis, daftar episode. Web jauh lebih kaya.
 
 ---
 
-## Fase 10 — Pencarian dan penemuan
+## Fase 11 — Pencarian dan penemuan
 
 - Riwayat pencarian dan saran, tersimpan lokal.
 - Filter: genre, tahun, tipe, status.
@@ -133,5 +176,7 @@ Sekarang: poster, judul, sinopsis, daftar episode. Web jauh lebih kaya.
 ## Urutan yang disarankan
 
 Fase 6 dulu — manga praktis tidak bisa dipakai dengan nyaman sekarang.
-Lalu 7, karena dua-duanya cacat yang sudah kelihatan. Baru 8, yang memberi
-lompatan tampilan paling besar per satuan usaha. 9 dan 10 menyusul.
+Lalu 7 (player film dan anime), karena pemutaran yang gagal lebih merugikan
+daripada tampilan yang polos. 8 menyusul: dua cacat kecil yang sudah
+kelihatan dan murah diperbaiki. Baru 9, yang memberi lompatan tampilan
+paling besar per satuan usaha. 10 dan 11 terakhir.
