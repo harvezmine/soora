@@ -956,6 +956,22 @@ export const getMangaChapterPages = (chapterId, provider = 'mangapill') =>
     return api.get(`/manga/read/${encodeURIComponent(chapterId)}`, { params: { provider } });
   }, MANGA_CACHE_TTL);
 
+/**
+ * Menebak penyedia manga dari bentuk id-nya.
+ *
+ * mangapill memakai id berawalan angka (`3004-10052000/...`), komiku memakai
+ * slug murni. Memanggil endpoint dengan provider yang salah mengembalikan 200
+ * berisi daftar halaman kosong, bukan error — jadi kegagalannya tampak seperti
+ * "chapter tidak punya gambar" dan menyesatkan.
+ *
+ * @param {string} [id]
+ * @returns {'mangapill' | 'komiku'}
+ */
+export const detectMangaProvider = (id) => {
+  if (!id) return 'mangapill';
+  return /^\d/.test(String(id)) ? 'mangapill' : 'komiku';
+};
+
 // MangaPill doesn't have latestmanga/bygenre, use search with popular terms
 export const getPopularManga = () =>
   cachedGet('manga:popular', async () => {

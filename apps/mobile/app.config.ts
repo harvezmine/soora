@@ -36,7 +36,7 @@ const config: ExpoConfig = {
     // dipakai: EAS harus menulis balik nilainya ke berkas konfigurasi, dan itu
     // mustahil untuk app.config.ts yang dinamis — build-nya gagal sebelum
     // menyentuh apa pun.
-    versionCode: 3,
+    versionCode: 4,
     adaptiveIcon: {
       // Versi maskable: motifnya berada di dalam safe zone, jadi tidak terpotong
       // saat launcher memangkasnya jadi lingkaran, kotak bulat, atau squircle.

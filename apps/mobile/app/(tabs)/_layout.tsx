@@ -1,10 +1,16 @@
 import { Tabs } from 'expo-router';
-import { BookOpen, Bookmark, Home, Search, User } from 'lucide-react-native';
+import { BookOpen, Clapperboard, Home, Search, User } from 'lucide-react-native';
 import { colors, iconSize, iconStroke, font, MIN_TOUCH } from '../../theme/tokens';
 
 /**
  * Lima tab — batas maksimum bottom navigation menurut Material.
  * Semua punya ikon DAN label: navigasi ikon-saja menurunkan penemuan fitur.
+ *
+ * Tiga bagian katalog dipisah seperti di web (Sooranime / Sooraflix /
+ * Sooramics). "Daftar Saya" dikeluarkan dari tab bar dan pindah ke Profil:
+ * enam tab melewati batas Material, dan dari tiga kandidat yang bisa dilepas,
+ * daftar milik user adalah satu-satunya yang tidak dipakai untuk menjelajah.
+ * Rutenya tetap hidup lewat `href: null`, jadi tautan lama tidak putus.
  */
 export default function TabsLayout() {
   return (
@@ -26,9 +32,18 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Beranda',
+          title: 'Anime',
           tabBarIcon: ({ color }) => (
             <Home size={iconSize.md} color={color} strokeWidth={iconStroke} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="film"
+        options={{
+          title: 'Film',
+          tabBarIcon: ({ color }) => (
+            <Clapperboard size={iconSize.md} color={color} strokeWidth={iconStroke} />
           ),
         }}
       />
@@ -54,9 +69,8 @@ export default function TabsLayout() {
         name="mylist"
         options={{
           title: 'Daftar Saya',
-          tabBarIcon: ({ color }) => (
-            <Bookmark size={iconSize.md} color={color} strokeWidth={iconStroke} />
-          ),
+          // Rute tetap ada, hanya tidak muncul di tab bar. Dibuka dari Profil.
+          href: null,
         }}
       />
       <Tabs.Screen

@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { FlashList } from '@shopify/flash-list';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { getMangaInfo } from '@soora/core/api';
+import { getMangaInfo, detectMangaProvider } from '@soora/core/api';
 import { resolveImage, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
@@ -17,10 +17,15 @@ export default function MangaInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
+  // Sebelumnya selalu memakai default 'mangapill'. Judul dengan id berbentuk
+  // slug ada di komiku, dan memanggil mangapill untuk id itu membalas 200 tanpa
+  // chapter — layar tampak "belum ada chapter" padahal judulnya baik-baik saja.
+  const provider = detectMangaProvider(id);
+
   const { data, status, error, refresh } = useCatalog(
     'title',
-    `manga:${id}`,
-    useCallback(async () => unwrap(await getMangaInfo(id)), [id]),
+    `manga:${provider}:${id}`,
+    useCallback(async () => unwrap(await getMangaInfo(id, provider)), [id, provider]),
     Boolean(id)
   );
 
@@ -84,12 +89,23 @@ export default function MangaInfoScreen() {
             onRetry={refresh}
           />
         }
-        renderItem={({ item: ch, index }) => (
-          <ListRow
-            label={ch.title || `Chapter ${ch.chapterNumber ?? index + 1}`}
-            onPress={() => router.push(`/read/${encodeURIComponent(ch.id ?? '')}` as never)}
-          />
-        )}
+        renderItem={({ item: ch, index }) => {
+          const label = ch.title || `Chapter ${ch.chapterNumber ?? index + 1}`;
+          return (
+            <ListRow
+              label={label}
+              // Provider dan judul dibawa serta: reader tidak bisa menyimpulkan
+              // provider dari id chapter dengan andal, dan tanpa judul header
+              // reader hanya menampilkan "Baca".
+              onPress={() =>
+                router.push({
+                  pathname: '/read/[chapter]',
+                  params: { chapter: ch.id ?? '', provider, title: `${title} — ${label}` },
+                } as never)
+              }
+            />
+          );
+        }}
       />
     </View>
   );

@@ -100,6 +100,15 @@ export default function ProfileScreen() {
         <Stat label="Sedang ditonton" value={counts.watching} />
       </View>
 
+      {/* Daftar Saya keluar dari tab bar saat tab Film ditambahkan (enam tab
+          melewati batas Material). Tautannya ditaruh paling atas di sini,
+          sebelum semua aksi pengaturan, supaya tetap mudah ditemukan. */}
+      <Link href="/(tabs)/mylist" asChild>
+        <Pressable style={({ pressed }) => [s.btn, pressed && s.pressed]}>
+          <Text style={s.btnText}>Buka Daftar Saya</Text>
+        </Pressable>
+      </Link>
+
       {!loggedIn && (
         <Link href="/(auth)/login" asChild>
           <Pressable style={({ pressed }) => [s.btn, pressed && s.pressed]}>
