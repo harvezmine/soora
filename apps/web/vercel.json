@@ -2,6 +2,13 @@
   "functions": {
     "api/manga-img.js": { "maxDuration": 15 }
   },
+  "redirects": [
+    {
+      "source": "/download/soora.apk",
+      "destination": "https://api.soora.fun/download/soora.apk",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/sitemap.xml",
