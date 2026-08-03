@@ -5,6 +5,7 @@ import '../lib/core';
 import { useEffect } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setCurrentPath } from '../lib/core';
 import { UpdateBanner } from '../components/UpdateBanner';
@@ -19,6 +20,10 @@ export default function RootLayout() {
   }, [pathname]);
 
   return (
+    // WAJIB membungkus seluruh app: tanpa ini setiap Gesture dari
+    // react-native-gesture-handler diam saja tanpa error — ketuk-ganda untuk
+    // melompat dan seretan bilah waktu di pemutar tidak akan pernah terpicu.
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       {/* Distribusi di luar Play Store tidak punya pembaruan otomatis, jadi app
           yang menanyakannya sendiri saat dibuka. */}
@@ -46,5 +51,6 @@ export default function RootLayout() {
         <Stack.Screen name="spike" options={{ title: 'Spike Referer' }} />
       </Stack>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

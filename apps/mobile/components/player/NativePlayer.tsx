@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-worklets';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEventListener } from 'expo';
-import { Captions, Gauge, Layers } from 'lucide-react-native';
-import { colors, font, iconSize, iconStroke, onAccent, radius, space, MIN_TOUCH } from '../../theme/tokens';
+import { colors, font, space } from '../../theme/tokens';
 import { TrackSheet, type SheetOption } from './TrackSheet';
+import { PlayerControls, formatWaktu } from './PlayerControls';
 
 /**
  * Pemutar native berbasis expo-video (ExoPlayer di Android).
  *
- * Memakai expo-video, bukan react-native-video: seluruh kemampuan yang
- * dibutuhkan fase 3 sudah ada — `staysActiveInBackground`,
+ * Memakai expo-video, bukan react-native-video: `staysActiveInBackground`,
  * `showNowPlayingNotification`, pemilihan trek audio dan subtitle, serta
- * `keepScreenOnWhilePlaying` — sementara paketnya sudah terpasang dan terbukti
- * mem-bundle sejak harness spike fase 1. Satu dependensi native lebih sedikit.
+ * `keepScreenOnWhilePlaying` semuanya sudah ada.
+ *
+ * Kontrolnya dibuat sendiri, `nativeControls` dimatikan. Kontrol bawaan
+ * ExoPlayer tidak bisa diberi tombol kembali, tidak mengenal tema app, tidak
+ * punya gestur ketuk-ganda untuk melompat, dan memaksa tombol audio/subtitle
+ * diletakkan di bar terpisah di luar video — memakan tinggi layar yang justru
+ * paling langka di ponsel.
  *
  * Satu hal yang TIDAK didukung: pemilihan kualitas manual. `videoTrack` di
  * expo-video read-only, jadi kualitas sepenuhnya ditentukan ABR ExoPlayer.
@@ -27,16 +35,30 @@ export function NativePlayer({
   startAt = 0,
   onProgress,
   onError,
+  onBack,
 }: {
   uri: string;
   title?: string;
   startAt?: number;
   onProgress?: (position: number, duration: number) => void;
   onError?: (message: string) => void;
+  onBack?: () => void;
 }) {
   const [ready, setReady] = useState(false);
   const [sheet, setSheet] = useState<null | 'audio' | 'subtitle' | 'speed'>(null);
+  const [tampilKontrol, setTampilKontrol] = useState(true);
+  const [bermain, setBermain] = useState(true);
+  const [posisi, setPosisi] = useState(0);
+  const [durasi, setDurasi] = useState(0);
+  const [buffered, setBuffered] = useState(0);
+  /** Waktu pratinjau saat bilah diseret; null berarti tidak sedang diseret. */
+  const [scrub, setScrub] = useState<number | null>(null);
+  const [lompatan, setLompatan] = useState<null | { arah: -1 | 1; nonce: number }>(null);
   const seeded = useRef(false);
+
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const lanskap = width > height;
 
   const player = useVideoPlayer({ uri }, (p: VideoPlayer) => {
     p.loop = false;
@@ -53,16 +75,17 @@ export function NativePlayer({
       p.currentTime = startAt;
       seeded.current = true;
     }
-    // 5 detik, bukan 1. Tiap event memicu penulisan progress; sekali per detik
-    // berarti JSON.parse + JSON.stringify seluruh daftar tiap detik di JS
-    // thread yang sedang merender video.
-    p.timeUpdateEventInterval = 5;
+    // 1 detik, bukan 5. Bilah waktu yang hanya bergerak tiap 5 detik terlihat
+    // patah-patah; penulisan progress ke penyimpanan tetap diredam terpisah
+    // di bawah supaya frekuensinya tidak ikut naik.
+    p.timeUpdateEventInterval = 1;
     p.play();
   });
 
   useEventListener(player, 'statusChange', ({ status, error }) => {
     if (status === 'readyToPlay') {
       setReady(true);
+      setDurasi(player.duration || 0);
       // Cadangan kalau seek di setup belum sempat diterapkan sebelum sumber
       // siap. Sekali saja — kalau tidak, tiap perubahan status akan melempar
       // user kembali ke titik itu.
@@ -78,26 +101,120 @@ export function NativePlayer({
     }
   });
 
+  useEventListener(player, 'playingChange', ({ isPlaying }) => setBermain(isPlaying));
+
   // Posisi terakhir yang diketahui, disimpan di ref supaya tetap terbaca saat
   // unmount. Membaca `player.currentTime` di cleanup TIDAK bisa diandalkan:
   // effect internal expo-video yang melepas player terdaftar lebih dulu, jadi
   // saat cleanup kita berjalan objeknya sudah dilepas.
   const lastSeen = useRef({ position: 0, duration: 0 });
+  const tulisTerakhir = useRef(0);
 
-  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+  useEventListener(player, 'timeUpdate', ({ currentTime, bufferedPosition }) => {
     const duration = player.duration || 0;
     lastSeen.current = { position: currentTime, duration };
-    onProgress?.(currentTime, duration);
+    setPosisi(currentTime);
+    setDurasi(duration);
+    // -1 berarti buffer tidak bisa ditentukan; jangan gambarkan sebagai 0,
+    // itu membuat lapisan buffer berkedip hilang.
+    if (bufferedPosition >= 0) setBuffered(bufferedPosition);
+
+    // Penyimpanan progress tetap ~5 detik sekali meski event tiap detik: tiap
+    // penulisan mem-parse dan menulis ulang seluruh daftar di JS thread yang
+    // sedang merender video.
+    if (currentTime - tulisTerakhir.current >= 5 || currentTime < tulisTerakhir.current) {
+      tulisTerakhir.current = currentTime;
+      onProgress?.(currentTime, duration);
+    }
   });
 
+  /** Sembunyikan kontrol otomatis, tapi jangan saat sedang dijeda atau menyeret. */
+  useEffect(() => {
+    if (!tampilKontrol || !bermain || sheet !== null || scrub !== null) return;
+    const t = setTimeout(() => setTampilKontrol(false), 3500);
+    return () => clearTimeout(t);
+  }, [tampilKontrol, bermain, sheet, scrub, posisi]);
+
+  const lompat = useCallback(
+    (delta: number) => {
+      const d = player.duration || 0;
+      const target = Math.min(d > 0 ? d : Infinity, Math.max(0, player.currentTime + delta));
+      player.currentTime = target;
+      setPosisi(target);
+    },
+    [player]
+  );
+
+  const lompatGestur = useCallback(
+    (arah: -1 | 1) => {
+      lompat(arah * 10);
+      // nonce memaksa indikator muncul lagi walau arahnya sama dengan ketukan
+      // sebelumnya; tanpa itu, ketuk-ganda beruntun tidak memberi umpan balik.
+      setLompatan({ arah, nonce: Date.now() });
+    },
+    [lompat]
+  );
+
+  useEffect(() => {
+    if (!lompatan) return;
+    const t = setTimeout(() => setLompatan(null), 550);
+    return () => clearTimeout(t);
+  }, [lompatan]);
+
+  const togglePlay = useCallback(() => {
+    if (player.playing) player.pause();
+    else player.play();
+  }, [player]);
+
   /**
-   * Trek audio — VixSrc menyediakan Italia dan Inggris.
+   * Tombol layar penuh memutar orientasi, bukan membesarkan view.
    *
-   * Pemilihan KUALITAS video sengaja tidak ada: `videoTrack` di expo-video
-   * bersifat read-only, jadi kualitas hanya bisa diatur otomatis oleh ABR
-   * ExoPlayer. Kalau pemilihan manual jadi kebutuhan keras nanti, jalannya
-   * adalah pindah ke react-native-video — bukan menambal di sini.
+   * Pemutar sudah mengisi layar; yang sebenarnya dicari user saat menekan
+   * "layar penuh" di ponsel adalah gambar melebar ke sisi panjang layar. Video
+   * 16:9 pada layar potret hanya memakai sekitar sepertiga tinggi.
+   *
+   * Keluar dari lanskap memakai `unlockAsync`, bukan mengunci potret: mengunci
+   * berlaku untuk seluruh proses, sehingga layar lain ikut terkunci sampai app
+   * ditutup paksa.
    */
+  const togglePenuh = useCallback(() => {
+    if (lanskap) void ScreenOrientation.unlockAsync();
+    else void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+  }, [lanskap]);
+
+  // Kembalikan orientasi saat pemutar ditutup, kalau tidak user terdampar di
+  // lanskap saat kembali ke daftar.
+  useEffect(() => {
+    return () => {
+      void ScreenOrientation.unlockAsync();
+    };
+  }, []);
+
+  /**
+   * Ketuk tunggal membuka/menutup kontrol; ketuk ganda melompat 10 detik.
+   *
+   * `requireExternalGestureToFail` membuat ketuk tunggal menunggu ketuk ganda
+   * gagal lebih dulu. Tanpa itu, tiap ketukan ganda juga memicu ketuk tunggal
+   * dan kontrol berkedip muncul-hilang di tengah lompatan.
+   */
+  const ketukGanda = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDuration(280)
+    .onEnd((e) => {
+      'worklet';
+      runOnJS(lompatGestur)(e.x < width / 2 ? -1 : 1);
+    });
+
+  const ketukTunggal = Gesture.Tap()
+    .numberOfTaps(1)
+    .requireExternalGestureToFail(ketukGanda)
+    .onEnd(() => {
+      'worklet';
+      runOnJS(setTampilKontrol)(!tampilKontrol);
+    });
+
+  const gestur = Gesture.Exclusive(ketukGanda, ketukTunggal);
+
   const audioOptions = useCallback((): SheetOption[] => {
     const tracks = player.availableAudioTracks ?? [];
     return tracks.map((t, i) => ({
@@ -154,15 +271,20 @@ export function NativePlayer({
 
   return (
     <View style={s.wrap}>
-      <VideoView
-        player={player}
-        style={s.video}
-        contentFit="contain"
-        nativeControls
-        allowsPictureInPicture
-        startsPictureInPictureAutomatically
-        fullscreenOptions={{ enable: true }}
-      />
+      <GestureDetector gesture={gestur}>
+        <View style={s.isi}>
+          <VideoView
+            player={player}
+            style={s.video}
+            contentFit="contain"
+            // Kontrol bawaan dimatikan; lihat catatan di atas komponen.
+            nativeControls={false}
+            allowsPictureInPicture
+            startsPictureInPictureAutomatically
+            fullscreenOptions={{ enable: true }}
+          />
+        </View>
+      </GestureDetector>
 
       {!ready && (
         <View style={s.loading} pointerEvents="none">
@@ -175,14 +297,47 @@ export function NativePlayer({
         </View>
       )}
 
-      {/* Kontrol tambahan di luar kontrol bawaan: pemilih audio, subtitle,
-          dan kecepatan. Kontrol transport (play/seek) sengaja dibiarkan bawaan
-          supaya perilaku PiP dan notifikasi lockscreen tetap konsisten. */}
-      <View style={s.extras}>
-        <ExtraButton icon="audio" label="Audio" onPress={() => setSheet('audio')} />
-        <ExtraButton icon="subtitle" label="Subtitle" onPress={() => setSheet('subtitle')} />
-        <ExtraButton icon="speed" label="Kecepatan" onPress={() => setSheet('speed')} />
-      </View>
+      {/* Umpan balik ketuk-ganda. Tanpa ini gestur terasa seperti tidak
+          terjadi apa-apa sampai gambar berpindah. */}
+      {lompatan && (
+        <View
+          style={[s.lompatIndikator, lompatan.arah === -1 ? s.lompatKiri : s.lompatKanan]}
+          pointerEvents="none"
+        >
+          <Text style={s.lompatTeks}>{lompatan.arah === -1 ? '−10 dtk' : '+10 dtk'}</Text>
+        </View>
+      )}
+
+      {/* Waktu tujuan saat menyeret, ditaruh di tengah gambar: jari user
+          menutupi bilah di bawah, jadi angka di sana tidak terbaca. */}
+      {scrub !== null && (
+        <View style={s.scrubKotak} pointerEvents="none">
+          <Text style={s.scrubTeks}>{formatWaktu(scrub)}</Text>
+        </View>
+      )}
+
+      {tampilKontrol && ready && (
+        <PlayerControls
+          judul={title}
+          bermain={bermain}
+          posisi={scrub ?? posisi}
+          durasi={durasi}
+          buffered={buffered}
+          penuh={lanskap}
+          onPlayPause={togglePlay}
+          onLompat={lompat}
+          onScrub={setScrub}
+          onSeek={(d) => {
+            player.currentTime = d;
+            setPosisi(d);
+            setScrub(null);
+          }}
+          onKembali={() => onBack?.()}
+          onPenuh={togglePenuh}
+          onSheet={setSheet}
+          inset={insets}
+        />
+      )}
 
       <TrackSheet
         visible={sheet !== null}
@@ -203,61 +358,49 @@ export function NativePlayer({
   );
 }
 
-function ExtraButton({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: 'audio' | 'subtitle' | 'speed';
-  label: string;
-  onPress: () => void;
-}) {
-  const Icon = icon === 'audio' ? Layers : icon === 'subtitle' ? Captions : Gauge;
-  return (
-    <Pressable
-      style={({ pressed }) => [s.extraBtn, pressed && { opacity: 0.7 }]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <Icon size={iconSize.sm} color={colors.text} strokeWidth={iconStroke} />
-      <Text style={s.extraText}>{label}</Text>
-    </Pressable>
-  );
-}
+const ABSOLUT_ISI_PENUH = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.videoBg },
+  isi: { flex: 1 },
   video: { flex: 1, width: '100%' },
   loading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...ABSOLUT_ISI_PENUH,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.md,
   },
   loadingText: { color: colors.textMuted, fontSize: font.size.sm, paddingHorizontal: space.xl },
-  extras: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: space.sm,
-    paddingVertical: space.sm,
-    backgroundColor: colors.videoBg,
-  },
-  extraBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-    minHeight: MIN_TOUCH,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  extraText: { color: colors.text, fontSize: font.size.xs },
-});
 
-export { onAccent };
+  lompatIndikator: {
+    position: 'absolute',
+    top: '45%',
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  lompatKiri: { left: '12%' },
+  lompatKanan: { right: '12%' },
+  lompatTeks: {
+    color: colors.text,
+    fontSize: font.size.md,
+    fontWeight: font.weight.semibold,
+  },
+
+  scrubKotak: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '42%',
+    paddingHorizontal: space.xl,
+    paddingVertical: space.md,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  },
+  scrubTeks: {
+    color: colors.text,
+    fontSize: font.size.xl,
+    fontWeight: font.weight.bold,
+    fontVariant: ['tabular-nums'],
+  },
+});

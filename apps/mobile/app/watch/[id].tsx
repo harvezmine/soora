@@ -200,6 +200,7 @@ export default function WatchScreen() {
           startAt={resumeAt.current}
           onProgress={onProgress}
           onError={onPlayerError}
+          onBack={() => router.back()}
         />
       )}
 

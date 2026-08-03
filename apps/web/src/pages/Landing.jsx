@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 
 /* ── PWA install prompt cache ── */
@@ -281,6 +281,20 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
           ))}
         </div>
 
+        {/* Bar mengambang di atas hanya muncul di ponsel dan hilang begitu app
+            terpasang. Tautan ini permanen, supaya pengguna desktop yang ingin
+            memasang di ponselnya tetap punya jalan menemukannya. */}
+        <div className="landing-download-link">
+          <Link to="/download" className="landing-download-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Unduh aplikasi Android
+          </Link>
+        </div>
+
         <footer className="landing-footer">
           <p>&copy; 2026 soora. Open-source entertainment platform.</p>
         </footer>
@@ -306,15 +320,29 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
               </div>
               <div>
                 <div className="landing-mobile-install-title">Soora App</div>
-                <div className="landing-mobile-install-sub">Install gratis · Tanpa Play Store</div>
+                <div className="landing-mobile-install-sub">
+                  {isAndroid
+                    ? 'APK native · Gratis, tanpa Play Store'
+                    : 'Install gratis · Tanpa Play Store'}
+                </div>
               </div>
             </div>
-            <button className="landing-mobile-install-btn" onClick={handleInstall}>
-              Install
-            </button>
+            {/* Di Android, arahkan ke APK native — bukan PWA. APK punya pemutar
+                native, audio jalan di latar belakang, dan katalog offline;
+                PWA tidak satu pun. Di iOS dan desktop tidak ada APK, jadi
+                pemasangan PWA tetap jalur yang benar. */}
+            {isAndroid ? (
+              <Link className="landing-mobile-install-btn" to="/download">
+                Unduh APK
+              </Link>
+            ) : (
+              <button className="landing-mobile-install-btn" onClick={handleInstall}>
+                Install
+              </button>
+            )}
           </div>
 
-          {showGuide && (
+          {showGuide && !isAndroid && (
             <div className="landing-mobile-install-guide">
               {isIOS ? (
                 <p>

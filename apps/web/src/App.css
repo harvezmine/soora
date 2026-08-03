@@ -13161,56 +13161,211 @@ a:hover {
 /* ===== Halaman unduh APK ===== */
 .download-page {
   min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px 64px;
-  background: #06060e;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(124, 92, 252, 0.18), transparent 70%),
+    #06060e;
+  color: #f3f4f8;
+  padding-bottom: 64px;
 }
-.download-card {
-  width: 100%;
-  max-width: 620px;
+
+/* ── Hero ── */
+.download-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(40px, 9vw, 96px) 20px clamp(28px, 6vw, 56px);
+}
+.download-hero-glow {
+  position: absolute;
+  inset: -40% 20% auto 20%;
+  height: 420px;
+  background: radial-gradient(closest-side, rgba(255, 107, 157, 0.22), transparent);
+  filter: blur(40px);
+  pointer-events: none;
+}
+.download-hero-inner {
+  position: relative;
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+.download-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 24px;
   background: #0e0e1a;
   border: 1px solid #23233a;
-  border-radius: 16px;
-  padding: 32px 24px;
-  color: #f3f4f8;
+  margin-bottom: 20px;
 }
-.download-card h1 { font-size: 26px; font-weight: 700; margin: 0 0 12px; }
-.download-card h2 { font-size: 17px; font-weight: 600; margin: 24px 0 8px; }
-.download-lead { color: #9a9ab0; line-height: 1.6; margin: 0 0 24px; }
-.download-muted { color: #7d7d99; font-size: 14px; line-height: 1.6; }
-.download-note { margin-top: 28px; }
+.download-title {
+  /* clamp, bukan breakpoint: judulnya harus mengecil mulus dari ponsel sempit
+     sampai desktop, tanpa lompatan ukuran di titik tertentu. */
+  font-size: clamp(28px, 7vw, 44px);
+  line-height: 1.15;
+  font-weight: 700;
+  margin: 0 0 14px;
+  letter-spacing: -0.02em;
+}
+.download-title-accent {
+  background: linear-gradient(120deg, #7c5cfc, #ff6b9d 55%, #00d4aa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.download-lead {
+  color: #9a9ab0;
+  font-size: clamp(15px, 2.4vw, 17px);
+  line-height: 1.65;
+  margin: 0 auto;
+  /* Batas panjang baris supaya tetap nyaman dibaca di layar lebar. */
+  max-width: 46ch;
+}
+
+.download-action { margin-top: 28px; }
 
 .download-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  /* 52px: di atas ambang sentuh 48dp Material, dengan sisa untuk bayangan. */
   min-height: 52px;
-  border-radius: 10px;
-  background: #e11d48;
+  padding: 0 28px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #7c5cfc, #e11d48);
   color: #fff;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 650;
   text-decoration: none;
-  transition: background 180ms ease;
+  box-shadow: 0 10px 30px -12px rgba(225, 29, 72, 0.7);
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
 }
-.download-btn:hover { background: #be123c; }
-.download-btn span { font-weight: 400; opacity: 0.85; }
+.download-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -14px rgba(225, 29, 72, 0.85); }
+.download-btn:active { transform: translateY(0); filter: brightness(0.95); }
+.download-btn:focus-visible { outline: 3px solid #7c5cfc; outline-offset: 3px; }
 
-.download-soon {
+.download-meta {
+  color: #7d7d99;
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+.download-meta-ios {
+  max-width: 44ch;
+  margin-inline: auto;
+  line-height: 1.6;
+}
+
+.download-skeleton {
+  height: 52px;
+  display: grid;
+  place-items: center;
+}
+.download-skeleton-bar {
+  width: min(220px, 70%);
+  height: 52px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16162a 25%, #23233a 50%, #16162a 75%);
+  background-size: 200% 100%;
+  animation: download-shimmer 1.4s linear infinite;
+}
+@keyframes download-shimmer {
+  to { background-position: -200% 0; }
+}
+
+.download-note {
+  max-width: 46ch;
+  margin: 0 auto;
   border: 1px solid #23233a;
-  border-radius: 10px;
-  padding: 16px;
-  background: #16162a;
+  border-radius: 14px;
+  padding: 18px 20px;
+  background: #0e0e1a;
+  text-align: left;
 }
-.download-soon strong { display: block; margin-bottom: 6px; }
-.download-soon p { color: #9a9ab0; margin: 0; line-height: 1.6; }
+.download-note strong { display: block; margin-bottom: 6px; }
+.download-note p { color: #9a9ab0; margin: 0; line-height: 1.6; font-size: 14px; }
+.download-note-warn { border-color: #4a2b12; background: #1a1108; }
 
-.download-changelog p { color: #9a9ab0; line-height: 1.6; margin: 0; white-space: pre-wrap; }
-.download-help ol { color: #9a9ab0; line-height: 1.7; padding-left: 20px; margin: 0 0 12px; }
+/* ── Isi ── */
+.download-body {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.download-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 40px;
+  display: grid;
+  /* auto-fit + minmax: satu kolom di ponsel, dua begitu ruang cukup, tanpa
+     satu pun media query. */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.download-feature {
+  border: 1px solid #23233a;
+  border-radius: 14px;
+  padding: 18px;
+  background: #0e0e1a;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.download-feature:hover { border-color: #35355a; transform: translateY(-2px); }
+.download-feature h3 { font-size: 15px; font-weight: 650; margin: 0 0 6px; }
+.download-feature p { color: #9a9ab0; font-size: 14px; line-height: 1.6; margin: 0; }
+
+.download-section { margin-bottom: 36px; }
+.download-section h2 { font-size: 18px; font-weight: 650; margin: 0 0 10px; }
+.download-section p { color: #9a9ab0; line-height: 1.65; margin: 0; white-space: pre-wrap; }
+.download-steps {
+  color: #9a9ab0;
+  line-height: 1.75;
+  padding-left: 20px;
+  margin: 0 0 12px;
+}
+.download-steps li { margin-bottom: 6px; }
+
+.download-muted { color: #7d7d99; font-size: 14px; line-height: 1.65; }
+.download-footnote { text-align: center; margin-top: 8px; }
+.download-footnote a { color: #9a8cff; }
 
 @media (prefers-reduced-motion: reduce) {
-  .download-btn { transition: none; }
+  .download-btn,
+  .download-feature { transition: none; }
+  .download-btn:hover,
+  .download-feature:hover { transform: none; }
+  .download-skeleton-bar { animation: none; }
+}
+
+/* ── Pil unduh permanen di landing ── */
+.landing-download-link {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 20px;
+}
+.landing-download-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e8f5;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.landing-download-pill:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+.landing-download-pill:focus-visible { outline: 3px solid #7c5cfc; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-download-pill { transition: none; }
+  .landing-download-pill:hover { transform: none; }
 }
