@@ -55,16 +55,22 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        // TANPA gambar, sengaja. Splash native dan LaunchScreen sama-sama
-        // menampilkan wordmark, dan hasilnya terlihat sebagai dua tahap:
-        // logo statis yang terpotong di kiri-kanan, lalu logo utuh yang
-        // membesar. Terpotongnya karena imageWidth diterapkan pada gambar
-        // berbanding 1024x430 dan sebagian perangkat memangkas alih-alih
-        // mengecilkan.
+        // Gambar TRANSPARAN, bukan dihilangkan.
         //
-        // Sekarang splash native hanya warna latar. Warnanya identik dengan
-        // LaunchScreen, jadi yang terlihat user hanya satu tahap: logo yang
-        // membesar, sama seperti di web.
+        // Tujuannya tetap sama: splash native hanya menampilkan warna latar,
+        // sehingga yang terlihat user cuma satu tahap — logo yang membesar di
+        // LaunchScreen. Sebelumnya wordmark tampil dua kali, dan versi
+        // nativenya terpotong kiri-kanan karena imageWidth diterapkan pada
+        // gambar berbanding 1024x430.
+        //
+        // Menghapus `image` sama sekali TIDAK bisa: plugin tetap menulis
+        // windowSplashScreenAnimatedIcon = @drawable/splashscreen_logo ke
+        // styles.xml, sementara drawable itu hanya dibuat kalau image ada.
+        // AAPT lalu gagal me-resolve rujukan yang menggantung, dan Gradle
+        // berhenti dengan galat tanpa keterangan. Dua build hilang karenanya.
+        image: './assets/splash-kosong.png',
+        imageWidth: 1,
+        resizeMode: 'contain',
         backgroundColor: BRAND_BG,
       },
     ],
