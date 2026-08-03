@@ -5,6 +5,7 @@ import { buildSections, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { HeroSpotlight } from '../../components/HeroSpotlight';
 import { SearchEntry } from '../../components/SearchEntry';
+import { MasukBertahap } from '../../components/MasukBertahap';
 import { SectionRow } from '../../components/SectionRow';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState, StaleBanner } from '../../components/States';
@@ -75,7 +76,11 @@ export default function FilmScreen() {
           onRetry={movie.refresh}
         />
       ) : (
-        sections.map((sec) => <SectionRow key={sec.title} title={sec.title} items={sec.items} />)
+        sections.map((sec, i) => (
+          <MasukBertahap key={sec.title} indeks={i}>
+            <SectionRow title={sec.title} items={sec.items} />
+          </MasukBertahap>
+        ))
       )}
     </ScrollView>
   );

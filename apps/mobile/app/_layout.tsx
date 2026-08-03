@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setCurrentPath } from '../lib/core';
 import { LaunchScreen } from '../components/LaunchScreen';
+import { useReduceMotion } from '../lib/useReduceMotion';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { colors } from '../theme/tokens';
 
@@ -21,6 +22,7 @@ void SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const pathname = usePathname();
   const [sambutanSelesai, setSambutanSelesai] = useState(false);
+  const kurangiGerak = useReduceMotion();
 
   // Lepas splash native begitu React siap menggambar. LaunchScreen memakai
   // latar dan ikon yang sama, jadi user tidak melihat pergantian.
@@ -50,6 +52,14 @@ export default function RootLayout() {
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           contentStyle: { backgroundColor: colors.bg },
+          // Geser dari kanan untuk maju, dan sistem membalikkannya sendiri
+          // saat mundur — arah gerak itu yang memberi tahu user ia masuk
+          // lebih dalam atau keluar.
+          //
+          // 220ms: di bawah 150ms peralihannya tidak terbaca sebagai gerak,
+          // di atas 300ms navigasi mulai terasa lambat.
+          animation: kurangiGerak ? 'none' : 'slide_from_right',
+          animationDuration: 220,
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -59,10 +69,28 @@ export default function RootLayout() {
         <Stack.Screen name="movie/[id]" options={{ title: '' }} />
         <Stack.Screen name="manga/[id]" options={{ title: '' }} />
         {/* Watch dan Read immersive: tanpa header, tanpa tab bar. */}
-        <Stack.Screen name="watch/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="read/[chapter]" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="watch/[id]"
+          options={{ headerShown: false, animation: kurangiGerak ? 'none' : 'fade' }}
+        />
+        <Stack.Screen
+          name="read/[chapter]"
+          options={{ headerShown: false, animation: kurangiGerak ? 'none' : 'fade' }}
+        />
+        <Stack.Screen
+          name="(auth)/login"
+          options={{
+            headerShown: false,
+            animation: kurangiGerak ? 'none' : 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="(auth)/register"
+          options={{
+            headerShown: false,
+            animation: kurangiGerak ? 'none' : 'slide_from_bottom',
+          }}
+        />
         <Stack.Screen name="spike" options={{ title: 'Spike Referer' }} />
       </Stack>
       {/* Di atas Stack, bukan menggantikannya: navigator tetap dipasang dan

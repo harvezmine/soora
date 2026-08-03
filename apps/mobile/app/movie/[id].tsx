@@ -7,6 +7,7 @@ import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { EpisodeGrid } from '../../components/EpisodeGrid';
 import { GenreChips } from '../../components/GenreChips';
+import { SerupaRow } from '../../components/SerupaRow';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
@@ -202,6 +203,12 @@ export default function MovieInfoScreen() {
           />
         </>
       )}
+
+      <SerupaRow
+        idSekarang={String(id)}
+        kind={isTV ? 'tv' : 'movie'}
+        genres={info?.genres ?? []}
+      />
     </ScrollView>
   );
 }

@@ -154,8 +154,10 @@ const s = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   wrapFill: { width: '100%' },
-  // Hanya opacity: transform akan menggeser tetangganya saat menggulir.
-  pressed: { opacity: 0.7 },
+  // Hanya opacity, TIDAK transform: skala pada kartu di dalam baris yang
+  // sedang digulir menggeser tetangganya dan membuat barisnya bergetar.
+  // Material memakai state layer untuk alasan yang sama.
+  pressed: { opacity: 0.62 },
   posterBoxFill: {
     width: '100%',
     aspectRatio: 1 / GRID_ASPECT,

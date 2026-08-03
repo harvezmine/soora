@@ -7,6 +7,7 @@ import { useCatalog } from '../../lib/useCatalog';
 import { DetailHeader, SectionTitle } from '../../components/Detail';
 import { EpisodeGrid } from '../../components/EpisodeGrid';
 import { GenreChips } from '../../components/GenreChips';
+import { SerupaRow } from '../../components/SerupaRow';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
@@ -117,6 +118,8 @@ export default function AnimeInfoScreen() {
             }
           />
         )}
+
+        <SerupaRow idSekarang={String(id)} kind="anime" genres={genres} />
       </ScrollView>
     </View>
   );
