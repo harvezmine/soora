@@ -58,13 +58,14 @@ const config: ExpoConfig = {
   },
   extra: {
     eas: {
-      // WAJIB DIISI sebelum `eas build` pertama.
+      // Project Expo: @harvezmine/soora. Ditempel manual karena konfigurasi ini
+      // TypeScript (dinamis) — `eas init` melaporkan "Cannot automatically
+      // write to dynamic config" dan mencetak id-nya untuk disalin.
+      // Bukan rahasia: id ini hanya penunjuk project, bukan kredensial.
       //
-      // Jalankan `npx eas-cli init` — perintah itu membuat project di akun
-      // Expo dan biasanya menulis id-nya sendiri ke konfigurasi. Karena
-      // konfigurasi ini TypeScript (dinamis), EAS tidak bisa menulis ke sini,
-      // jadi id-nya harus ditempel manual. Tanpa ini build gagal seketika.
-      projectId: '',
+      // `slug` di atas harus sama dengan slug project di Expo, kalau tidak EAS
+      // menolak dengan "does not match the slug field".
+      projectId: '24e3039b-0a0d-45fc-b2ba-62debd68506e',
     },
   },
 };

@@ -42,6 +42,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~19.2.0",
+    "eas-cli": "^21.4.0",
     "expo-doctor": "^1.0.0",
     "typescript": "~6.0.3"
   }
