@@ -96,24 +96,28 @@ router.get('/info/:id', async (req: Request, res: Response) => {
 
     const cacheKey = `manga:info:${provider}:${id}:${lang2}`;
     const data = await cached(cacheKey, async () => {
-      // mangapill: pakai scraper sendiri lebih dulu.
-      //
-      // Parser consumet untuk provider ini menggantung sampai timeout sejak
-      // 2026-08-03 (diuji 60 detik, tidak pernah membalas), sehingga daftar
-      // chapter tidak bisa diambil sama sekali — padahal halaman sumbernya
-      // sendiri terambil dalam 0,7 detik. Consumet tetap dipakai sebagai
-      // cadangan kalau markup mangapill berubah dan scraper kita gagal.
-      if (provider === 'mangapill') {
-        try {
-          return await mangapillInfo(id);
-        } catch (e: any) {
-          console.warn('[manga/info] scraper mangapill gagal, coba consumet:', e?.message);
-        }
-      }
-
       const params: Record<string, any> = {};
       if (provider === 'mangadex') params.lang = lang2;
-      return consumet.mangaInfo(id, provider, params);
+
+      try {
+        return await consumet.mangaInfo(id, provider, params);
+      } catch (e: any) {
+        // Cadangan khusus mangapill: scrape halaman judulnya langsung.
+        //
+        // Pada 2026-08-03 jalur consumet untuk provider ini menggantung sampai
+        // timeout selama beberapa jam — HTTP 000 setelah 60 detik — sehingga
+        // daftar chapter tidak bisa diambil sama sekali dan seluruh alur baca
+        // buntu. Sementara halaman sumbernya sendiri tetap terambil dalam 0,7
+        // detik. Gangguan itu pulih sendiri setelah backend restart, jadi akar
+        // masalahnya sementara, bukan parser yang rusak.
+        //
+        // Consumet tetap jalur utama karena terbukti bekerja dan lebih murah
+        // (respons ter-cache 0,07 detik). Scraper ini hanya jaring pengaman
+        // supaya kejadian yang sama tidak lagi mematikan fitur baca.
+        if (provider !== 'mangapill') throw e;
+        console.warn('[manga/info] consumet gagal, pakai scraper mangapill:', e?.message);
+        return await mangapillInfo(id);
+      }
     }, CACHE_TTL.INFO, 'long');
 
     res.json(data);
