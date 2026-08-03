@@ -13189,14 +13189,17 @@ a:hover {
   text-align: center;
 }
 .download-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 84px;
-  height: 84px;
-  border-radius: 24px;
-  background: #0e0e1a;
-  border: 1px solid #23233a;
-  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+/* Wordmark memanjang (1024x430); lebarnya ikut viewport lewat clamp supaya
+   tidak perlu breakpoint, dan tingginya otomatis agar tidak gepeng. */
+.download-mark-img {
+  width: clamp(180px, 44vw, 300px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 10px 30px rgba(255, 107, 74, 0.28));
 }
 .download-title {
   /* clamp, bukan breakpoint: judulnya harus mengecil mulus dari ponsel sempit

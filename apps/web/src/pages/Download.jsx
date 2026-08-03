@@ -50,22 +50,7 @@ export default function Download() {
 
         <div className="download-hero-inner">
           <div className="download-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none" width="52" height="52">
-              <circle cx="16" cy="16" r="14" stroke="url(#dlG)" strokeWidth="2" opacity="0.85" />
-              <path
-                d="M11 21C11.8 22 13.5 23 16 23c3.5 0 5.5-2 5.5-4.2 0-2.3-1.8-3.2-4.5-3.8l-1-.2C13.5 14.3 12 13.5 12 11.8 12 10 13.8 8.5 16.2 8.5c1.8 0 3.2.7 4 1.5"
-                stroke="url(#dlG)"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              />
-              <defs>
-                <linearGradient id="dlG" x1="0" y1="0" x2="32" y2="32">
-                  <stop offset="0%" stopColor="#7c5cfc" />
-                  <stop offset="50%" stopColor="#ff6b9d" />
-                  <stop offset="100%" stopColor="#00d4aa" />
-                </linearGradient>
-              </defs>
-            </svg>
+            <img src="/logo-wordmark.png" alt="Soora" className="download-mark-img" width="1024" height="430" />
           </div>
 
           <h1 className="download-title">

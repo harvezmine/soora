@@ -102,11 +102,7 @@ export default function Login() {
         <div className="auth-panel-overlay" />
         <div className="auth-panel-content">
           <div className="auth-panel-logo" onClick={() => navigate('/')}>
-            <svg viewBox="0 0 36 36" width="30" height="30" fill="none">
-              <circle cx="18" cy="18" r="15" stroke="url(#authPG)" strokeWidth="2"/>
-              <path d="M12 24c.7.9 2.2 1.8 4.5 1.8 3.2 0 5-1.8 5-3.8 0-2.1-1.6-2.9-4-3.5l-.9-.2c-2.2-.5-3.5-1.2-3.5-2.7 0-1.6 1.6-3 3.8-3 1.6 0 2.9.6 3.6 1.4" stroke="url(#authPG)" strokeWidth="2" strokeLinecap="round"/>
-              <defs><linearGradient id="authPG" x1="0" y1="0" x2="36" y2="36"><stop offset="0%" stopColor="#7c5cfc"/><stop offset="100%" stopColor="#00d4aa"/></linearGradient></defs>
-            </svg>
+            <img src="/icons/icon-192x192.png" alt="Soora" width="30" height="30" />
             <span>soora</span>
           </div>
           <div className="auth-panel-hero">
@@ -137,11 +133,7 @@ export default function Login() {
           <div className={`auth-form-card ${shake ? 'auth-shake' : ''}`}>
             {/* Mobile logo */}
             <div className="auth-mobile-logo" onClick={() => navigate('/')}>
-              <svg viewBox="0 0 36 36" width="26" height="26" fill="none">
-                <circle cx="18" cy="18" r="15" stroke="url(#authMG)" strokeWidth="2"/>
-                <path d="M12 24c.7.9 2.2 1.8 4.5 1.8 3.2 0 5-1.8 5-3.8 0-2.1-1.6-2.9-4-3.5l-.9-.2c-2.2-.5-3.5-1.2-3.5-2.7 0-1.6 1.6-3 3.8-3 1.6 0 2.9.6 3.6 1.4" stroke="url(#authMG)" strokeWidth="2" strokeLinecap="round"/>
-                <defs><linearGradient id="authMG" x1="0" y1="0" x2="36" y2="36"><stop offset="0%" stopColor="#7c5cfc"/><stop offset="100%" stopColor="#00d4aa"/></linearGradient></defs>
-              </svg>
+              <img src="/icons/icon-192x192.png" alt="Soora" width="26" height="26" />
               <span>soora</span>
             </div>
 

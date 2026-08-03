@@ -69,7 +69,7 @@ export default function MobileAppBanner() {
     <div className="install-card">
       <div className="install-card-inner">
         <div className="install-card-icon">
-          <img src="/soranime.svg" alt="Soora" width="44" height="44" />
+          <img src="/icons/icon-192x192.png" alt="Soora" width="44" height="44" />
         </div>
         <div className="install-card-body">
           <h3 className="install-card-title">Install Soora App</h3>
