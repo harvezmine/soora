@@ -228,7 +228,7 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
             alt="Soora"
             className="landing-logo-img"
             width="1024"
-            height="458"
+            height="430"
             fetchPriority="high"
           />
         </div>

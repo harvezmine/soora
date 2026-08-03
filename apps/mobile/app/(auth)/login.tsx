@@ -178,9 +178,9 @@ const s = StyleSheet.create({
   },
   isiSempit: { paddingTop: space.xl },
 
-  // 1024x458 pada berkasnya; tinggi mengikuti agar tidak gepeng.
-  logo: { width: 168, height: 75 },
-  logoSempit: { width: 132, height: 59 },
+  // 1024x430 pada berkasnya; tinggi mengikuti agar tidak gepeng.
+  logo: { width: 168, height: 71 },
+  logoSempit: { width: 132, height: 55 },
 
   judul: {
     color: colors.text,

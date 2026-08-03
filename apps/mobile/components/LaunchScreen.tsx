@@ -52,9 +52,8 @@ export function LaunchScreen({ onSelesai }: Props) {
     skala.value = withTiming(1, { duration: 620, easing: Easing.out(Easing.back(1.4)) });
     masuk.value = withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) });
 
-    // Cahaya di belakang logo berdenyut pelan. Ini menggantikan halo yang ada
-    // di berkas logo asli — halo itu sengaja dihapus saat latar dijadikan
-    // transparan, karena versi yang dibuat di sini lebih tajam dan ikut skala.
+    // Cahaya di belakang logo berdenyut pelan. Berkas logonya sendiri statis,
+    // jadi inilah yang membuat layar terasa hidup tanpa mengubah logonya.
     cahaya.value = withDelay(
       260,
       withRepeat(
@@ -109,8 +108,8 @@ export function LaunchScreen({ onSelesai }: Props) {
   );
 }
 
-/** Tinggi dibagi lebar berkas logo-wordmark.png (1024x458). */
-const RASIO = 458 / 1024;
+/** Tinggi dibagi lebar berkas logo-wordmark.png (1024x430). */
+const RASIO = 430 / 1024;
 
 const s = StyleSheet.create({
   lapisan: {
