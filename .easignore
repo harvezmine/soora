@@ -1,0 +1,38 @@
+# Arsip yang diunggah ke EAS Build.
+#
+# Tanpa berkas ini arsipnya 634 MB (unggah ~3 menit) karena EAS ikut menyertakan
+# apps/web/twa-build — 850 MB berisi Android SDK dan keluaran Gradle TWA lama,
+# meski sudah gitignored.
+#
+# PENTING: begitu .easignore ada, EAS memakai berkas ini SEBAGAI GANTI .gitignore.
+# Jadi semua yang perlu dikecualikan harus disebut di sini, termasuk node_modules.
+#
+# JANGAN kecualikan package.json milik anggota workspace mana pun (apps/web,
+# soora-backend, packages/*). pnpm install di server build membaca seluruh
+# workspace; satu manifest hilang membuat install gagal.
+
+node_modules
+.git
+
+# Toolchain dan keluaran build TWA/Capacitor lama - tidak dipakai app native
+apps/web/twa-build
+apps/web/dist
+apps/web/dist-test
+apps/web/ios
+apps/web/android
+apps/web/public/download
+
+# Keluaran build lain
+dist
+build
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Cache
+.expo
+**/.expo
+.turbo
+coverage
+*.log
