@@ -24,6 +24,16 @@ extra: {
 
 Tanpa itu, `eas build` gagal seketika.
 
+## Kenapa `soora.fun/download` bilang "belum tersedia"
+
+Karena APK-nya memang belum pernah dibangun. Halaman itu membaca `apkUrl` dari
+`/app/version`, dan nilainya masih kosong — tidak ada berkas untuk ditautkan.
+Halamannya berfungsi normal; yang belum ada adalah APK-nya.
+
+Urutannya: build dulu (di bawah) → dapat berkas APK → taruh di tempat yang bisa
+diunduh → set `APP_APK_URL` di server. Setelah itu halaman download dan banner
+pembaruan di dalam app langsung menampilkannya.
+
 ## Sekali saja: keystore
 
 Ini bagian yang paling mudah salah, dan salahnya tidak bisa diperbaiki
@@ -37,6 +47,27 @@ sudah memasang APK lama akan melihat *"App not installed"*
 **kehilangan Daftar Saya dan riwayat tontonan** yang tersimpan di perangkat.
 
 Jadi pakai keystore yang sudah ada:
+
+Dua cara. **Cara berkas** lebih disarankan karena tidak butuh sesi interaktif
+dan bisa diulang:
+
+```bash
+cd apps/mobile
+cp credentials.example.json credentials.json
+# isi kedua password di credentials.json (sudah di-gitignore)
+```
+
+lalu tambahkan ke profil yang dipakai di `eas.json`:
+
+```json
+"preview": {
+  "android": { "buildType": "apk" },
+  "credentialsSource": "local",
+  "distribution": "internal"
+}
+```
+
+**Cara interaktif**, kalau lebih suka menyimpan keystore di server Expo:
 
 ```bash
 npx eas-cli credentials
