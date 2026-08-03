@@ -110,12 +110,19 @@ export default function ProfileScreen() {
       </View>
 
       {!loggedIn && (
-        <Link href="/(auth)/login" asChild>
-          <Pressable style={({ pressed }) => [s.btn, pressed && s.pressed]}>
-            <LogIn size={iconSize.sm} color={onAccent} strokeWidth={iconStroke} />
-            <Text style={s.btnText}>Masuk dengan Google</Text>
-          </Pressable>
-        </Link>
+        <View style={s.authBaris}>
+          <Link href="/(auth)/login" asChild>
+            <Pressable style={({ pressed }) => [s.btn, s.btnIsi, pressed && s.pressed]}>
+              <LogIn size={iconSize.sm} color={onAccent} strokeWidth={iconStroke} />
+              <Text style={s.btnText}>Masuk</Text>
+            </Pressable>
+          </Link>
+          <Link href="/(auth)/register" asChild>
+            <Pressable style={({ pressed }) => [s.btnGaris, s.btnIsi, pressed && s.pressed]}>
+              <Text style={s.btnGarisTeks}>Daftar akun</Text>
+            </Pressable>
+          </Link>
+        </View>
       )}
 
       {/* Konten milik user ditaruh di ATAS pengaturan. Yang dicari orang saat
@@ -269,7 +276,19 @@ const s = StyleSheet.create({
   },
   statValue: { color: colors.text, fontSize: font.size.xl, fontWeight: '700' },
   statLabel: { color: colors.textDim, fontSize: font.size.xs },
-  btnWrap: { paddingHorizontal: space.lg },
+  authBaris: { flexDirection: 'row', gap: space.md, paddingHorizontal: space.lg },
+  btnIsi: { flex: 1 },
+  btnGaris: {
+    minHeight: MIN_TOUCH,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  btnGarisTeks: { color: colors.text, fontSize: font.size.md, fontWeight: '600' },
   btn: {
     minHeight: MIN_TOUCH,
     backgroundColor: colors.accent,

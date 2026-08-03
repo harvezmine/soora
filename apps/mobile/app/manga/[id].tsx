@@ -150,7 +150,7 @@ export default function MangaInfoScreen() {
                 </Text>
               </Pressable>
             ) : null}
-            <GenreChips genres={genres} />
+            <GenreChips genres={genres} kind="manga" />
             <SectionTitle>Chapter</SectionTitle>
             <ChapterToolbar
               jumlah={chapters.length}

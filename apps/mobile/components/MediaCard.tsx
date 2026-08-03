@@ -1,6 +1,8 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Star } from 'lucide-react-native';
 import { Poster, type ImageSource } from './Poster';
 import { colors, font, radius, space } from '../theme/tokens';
 
@@ -82,6 +84,25 @@ export const MediaCard = memo(function MediaCard({
             </Text>
           </View>
         ) : null}
+
+        {/* Skor sudah lama ada di MediaItem tapi tidak pernah dirender.
+            Ditaruh di sudut bawah dengan gradien di belakangnya supaya tetap
+            terbaca di poster terang. */}
+        {typeof item.rating === 'number' && item.rating > 0 ? (
+          <>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.75)']}
+              style={s.kabut}
+              pointerEvents="none"
+            />
+            <View style={s.skor}>
+              <Star size={10} color="#fbbf24" fill="#fbbf24" strokeWidth={0} />
+              <Text style={s.skorTeks}>
+                {item.rating > 10 ? Math.round(item.rating) + '%' : item.rating.toFixed(1)}
+              </Text>
+            </View>
+          </>
+        ) : null}
       </View>
 
       <Text style={s.title} numberOfLines={2}>
@@ -98,6 +119,21 @@ export const MediaCard = memo(function MediaCard({
 
 const s = StyleSheet.create({
   wrap: { width: CARD_WIDTH },
+  kabut: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%' },
+  skor: {
+    position: 'absolute',
+    left: 6,
+    bottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  skorTeks: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
   wrapFill: { width: '100%' },
   // Hanya opacity: transform akan menggeser tetangganya saat menggulir.
   pressed: { opacity: 0.7 },

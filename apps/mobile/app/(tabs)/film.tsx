@@ -34,8 +34,6 @@ export default function FilmScreen() {
     ]);
   }, [movie.data]);
 
-  const spotlight = sections[0]?.items?.[0] ?? null;
-
   if (movie.status === 'loading') {
     return (
       <ScrollView style={s.screen}>
@@ -68,7 +66,7 @@ export default function FilmScreen() {
     >
       {movie.stale && <StaleBanner />}
       <SearchEntry bagian="movie" />
-      {spotlight ? <HeroSpotlight item={spotlight} /> : null}
+      <HeroSpotlight items={(sections[0]?.items ?? []).slice(0, 5)} />
 
       {sections.length === 0 ? (
         <EmptyState

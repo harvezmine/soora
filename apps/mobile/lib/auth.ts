@@ -54,6 +54,42 @@ export async function exchangeGoogleIdToken(idToken: string): Promise<SooraUser>
   return data.user ?? {};
 }
 
+/**
+ * Masuk atau daftar dengan email dan sandi.
+ *
+ * Satu fungsi untuk kedua endpoint: bentuk permintaan, penanganan galat, dan
+ * penyimpanan tokennya identik — memisahkannya hanya menghasilkan dua salinan
+ * yang perlahan berbeda.
+ */
+export async function authWithPassword(
+  mode: 'login' | 'register',
+  body: { email: string; password: string; name?: string }
+): Promise<SooraUser> {
+  const res = await fetch(`${API_BASE}/auth/${mode}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const data = (await res.json().catch(() => null)) as
+    | { token?: string; user?: SooraUser; error?: string }
+    | null;
+
+  if (!res.ok) {
+    // Pesan dari server dipakai apa adanya kalau ada — backend sudah menulis
+    // kalimat yang jelas ("Email atau password salah"), dan menggantinya dengan
+    // "HTTP 401" justru menghilangkan informasi.
+    throw new Error(data?.error || `Gagal ${mode === 'login' ? 'masuk' : 'mendaftar'} (HTTP ${res.status}).`);
+  }
+  if (!data?.token) throw new Error('Server tidak mengembalikan token.');
+
+  const kv = getRuntime().kv;
+  kv.set(TOKEN_KEY, data.token);
+  if (data.user) kv.set(USER_KEY, JSON.stringify(data.user));
+
+  return data.user ?? {};
+}
+
 export function signOut() {
   const kv = getRuntime().kv;
   kv.remove(TOKEN_KEY);

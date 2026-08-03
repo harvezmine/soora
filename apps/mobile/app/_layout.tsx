@@ -61,7 +61,8 @@ export default function RootLayout() {
         {/* Watch dan Read immersive: tanpa header, tanpa tab bar. */}
         <Stack.Screen name="watch/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="read/[chapter]" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/login" options={{ title: 'Masuk' }} />
+        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
         <Stack.Screen name="spike" options={{ title: 'Spike Referer' }} />
       </Stack>
       {/* Di atas Stack, bukan menggantikannya: navigator tetap dipasang dan

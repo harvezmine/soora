@@ -135,11 +135,9 @@ export default function MovieInfoScreen() {
         item={{ id: String(id), listType: isTV ? 'tv' : 'movie', title, poster }}
       />
 
-      <GenreChips
-        genres={(info?.genres ?? [])
-          .map((g: { name?: string }) => String(g?.name ?? ''))
-          .filter(Boolean)}
-      />
+      {/* Objek genre TMDB diteruskan apa adanya: id numeriknya yang dipakai
+          discover, dan mengubahnya jadi nama lebih dulu membuang id itu. */}
+      <GenreChips genres={info?.genres ?? []} kind={isTV ? 'tv' : 'movie'} />
 
       {isTV && seasons.length > 0 ? (
         <>

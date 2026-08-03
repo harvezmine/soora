@@ -1,5 +1,15 @@
+import { useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Play } from 'lucide-react-native';
 import { Poster } from './Poster';
@@ -13,12 +23,13 @@ import { colors, font, iconSize, iconStroke, onAccent, radius, space, MIN_TOUCH 
  * memastikan judul tetap terbaca berapa pun terangnya gambar — tanpa itu,
  * judul putih di atas poster cerah bisa turun jauh di bawah rasio kontras 4.5:1.
  */
-export function HeroSpotlight({ item }: { item: MediaItem }) {
+/** Satu kartu sorotan. */
+function Kartu({ item, lebar }: { item: MediaItem; lebar: number }) {
   const router = useRouter();
 
   return (
     <Pressable
-      style={({ pressed }) => [s.wrap, pressed && s.pressed]}
+      style={({ pressed }) => [s.wrap, { width: lebar }, pressed && s.pressed]}
       onPress={() => router.push(hrefFor(item) as never)}
       accessibilityRole="button"
       accessibilityLabel={`Sorotan: ${item.title}`}
@@ -45,7 +56,92 @@ export function HeroSpotlight({ item }: { item: MediaItem }) {
   );
 }
 
+/**
+ * Sorotan berbentuk carousel.
+ *
+ * Menerima satu item atau beberapa. Dengan satu item ia berperilaku persis
+ * seperti sebelumnya — tanpa titik indikator dan tanpa pergantian otomatis,
+ * karena carousel satu halaman hanya menambah elemen yang tidak berarti.
+ *
+ * Pergantian otomatis berhenti begitu user menggeser sendiri. Carousel yang
+ * terus berpindah saat sedang dilihat membuat orang kehilangan judul yang baru
+ * saja menarik perhatiannya.
+ */
+export function HeroSpotlight({
+  item,
+  items,
+}: {
+  item?: MediaItem | null;
+  items?: MediaItem[];
+}) {
+  const daftar = (items && items.length ? items : item ? [item] : []).slice(0, 5);
+  const { width } = useWindowDimensions();
+  const [aktif, setAktif] = useState(0);
+  const [otomatis, setOtomatis] = useState(true);
+  const listRef = useRef<FlatList<MediaItem> | null>(null);
+
+  useEffect(() => {
+    if (!otomatis || daftar.length < 2) return;
+    const t = setInterval(() => {
+      setAktif((i) => {
+        const berikut = (i + 1) % daftar.length;
+        listRef.current?.scrollToOffset({ offset: berikut * width, animated: true });
+        return berikut;
+      });
+    }, 5000);
+    return () => clearInterval(t);
+  }, [otomatis, daftar.length, width]);
+
+  if (daftar.length === 0) return null;
+
+  const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / width);
+    setAktif(Math.min(daftar.length - 1, Math.max(0, i)));
+  };
+
+  return (
+    <View>
+      <FlatList
+        ref={listRef}
+        data={daftar}
+        keyExtractor={(x) => `${x.kind}:${x.id}`}
+        renderItem={({ item: x }) => <Kartu item={x} lebar={width} />}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onScrollEnd}
+        onScrollBeginDrag={() => setOtomatis(false)}
+        // Lebar tetap per halaman; tanpa ini FlatList mengukur tiap kartu dan
+        // scrollToOffset bisa meleset setengah halaman.
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+      />
+
+      {daftar.length > 1 ? (
+        <View style={s.titik} pointerEvents="none">
+          {daftar.map((x, i) => (
+            <View key={`${x.kind}:${x.id}`} style={[s.titikSatu, i === aktif && s.titikAktif]} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  titik: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: -space.md,
+    marginBottom: space.sm,
+  },
+  titikSatu: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  titikAktif: { backgroundColor: colors.accent, width: 18 },
   wrap: {
     height: 260,
     marginHorizontal: space.lg,

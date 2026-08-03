@@ -1,5 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { MediaCard, type MediaItem } from './MediaCard';
 import { colors, font, space } from '../theme/tokens';
 
@@ -16,12 +17,37 @@ const keyOf = (item: MediaItem) => `${item.kind}:${item.id}`;
 const Separator = () => <View style={sep} />;
 const sep = { width: 12 };
 
-export function SectionRow({ title, items }: { title: string; items: MediaItem[] }) {
+export function SectionRow({
+  title,
+  items,
+  onLihatSemua,
+}: {
+  title: string;
+  items: MediaItem[];
+  /** Kalau diisi, judul baris dapat tombol "Lihat semua". */
+  onLihatSemua?: () => void;
+}) {
   if (!items.length) return null;
 
   return (
     <View style={s.wrap}>
-      <Text style={s.title}>{title}</Text>
+      {/* Baris mendatar itu buntu: judul ke-21 tidak bisa dijangkau sama
+          sekali tanpa jalan keluar ke daftar penuh. */}
+      <View style={s.kepala}>
+        <Text style={s.title}>{title}</Text>
+        {onLihatSemua ? (
+          <Pressable
+            onPress={onLihatSemua}
+            style={({ pressed }) => [s.semua, pressed && { opacity: 0.7 }]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Lihat semua ${title}`}
+          >
+            <Text style={s.semuaTeks}>Lihat semua</Text>
+            <ChevronRight size={14} color={colors.accent} strokeWidth={2.5} />
+          </Pressable>
+        ) : null}
+      </View>
       <FlashList
         data={items}
         horizontal
@@ -46,4 +72,12 @@ const s = StyleSheet.create({
     paddingHorizontal: space.lg,
   },
   list: { paddingHorizontal: space.lg },
+  kepala: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: space.lg,
+  },
+  semua: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: space.xs },
+  semuaTeks: { color: colors.accent, fontSize: font.size.sm, fontWeight: '600' },
 });

@@ -95,7 +95,7 @@ export default function AnimeInfoScreen() {
         <WatchLaterButton
           item={{ id: String(id), listType: 'anime', title, poster: info?.image }}
         />
-        <GenreChips genres={genres} />
+        <GenreChips genres={genres} kind="anime" />
 
         <SectionTitle>Episode</SectionTitle>
         {episodes.length === 0 ? (

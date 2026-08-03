@@ -58,8 +58,6 @@ export default function HomeScreen() {
     ]);
   }, [anime.data]);
 
-  const spotlight = sections[0]?.items?.[0] ?? null;
-
   if (anime.status === 'loading') {
     return (
       <ScrollView style={s.screen}>
@@ -92,7 +90,7 @@ export default function HomeScreen() {
     >
       {anime.stale && <StaleBanner />}
       <SearchEntry bagian="anime" />
-      {spotlight ? <HeroSpotlight item={spotlight} /> : null}
+      <HeroSpotlight items={(sections[0]?.items ?? []).slice(0, 5)} />
 
       <ContinueRow items={continueItems} />
 
