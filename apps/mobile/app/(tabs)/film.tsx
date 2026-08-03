@@ -4,6 +4,7 @@ import { getMovieHomeBundle } from '@soora/core/api';
 import { buildSections, unwrap } from '@soora/core/models';
 import { useCatalog } from '../../lib/useCatalog';
 import { HeroSpotlight } from '../../components/HeroSpotlight';
+import { SearchEntry } from '../../components/SearchEntry';
 import { SectionRow } from '../../components/SectionRow';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState, StaleBanner } from '../../components/States';
@@ -66,6 +67,7 @@ export default function FilmScreen() {
       }
     >
       {movie.stale && <StaleBanner />}
+      <SearchEntry bagian="movie" />
       {spotlight ? <HeroSpotlight item={spotlight} /> : null}
 
       {sections.length === 0 ? (

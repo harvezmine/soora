@@ -9,6 +9,8 @@ import { DetailHeader, ListRow, SectionTitle } from '../../components/Detail';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState } from '../../components/States';
 import { SaveButton } from '../../components/SaveButton';
+import { ChapterToolbar, type Urutan } from '../../components/ChapterToolbar';
+import { GenreChips } from '../../components/GenreChips';
 import { getReadingPos, type ReadingPos } from '../../lib/reading';
 import { colors, font, onAccent, radius, space, MIN_TOUCH } from '../../theme/tokens';
 
@@ -31,6 +33,8 @@ export default function MangaInfoScreen() {
   );
 
   const [posBaca, setPosBaca] = useState<ReadingPos | null>(null);
+  const [cariCh, setCariCh] = useState('');
+  const [urutan, setUrutan] = useState<Urutan>('terbaru');
   // Dibaca ulang tiap layar mendapat fokus: user kembali ke sini tepat
   // setelah membaca, dan tombol lanjut harus menunjuk chapter terbaru.
   useFocusEffect(
@@ -46,6 +50,37 @@ export default function MangaInfoScreen() {
     const c = info?.chapters;
     return Array.isArray(c) ? c : [];
   }, [info]);
+
+  const genres: string[] = useMemo(() => {
+    const g = info?.genres;
+    return Array.isArray(g) ? g.map(String) : [];
+  }, [info]);
+
+  /**
+   * Urutan dan filter chapter.
+   *
+   * Nomor diambil dari judul kalau `chapterNumber` kosong — sebagian
+   * penyedia hanya mengisi judul seperti "Chapter 52". Tanpa itu seluruh
+   * daftar dianggap bernomor 0 dan pengurutan tidak melakukan apa-apa.
+   */
+  const tersaring = useMemo(() => {
+    const nomor = (ch: Chapter) => {
+      const n = Number(ch.chapterNumber);
+      if (Number.isFinite(n) && n !== 0) return n;
+      const m = String(ch.title ?? '').match(/([\d.]+)/);
+      return m ? Number(m[1]) : 0;
+    };
+    const urut = [...chapters].sort((a, b) =>
+      urutan === 'terbaru' ? nomor(b) - nomor(a) : nomor(a) - nomor(b)
+    );
+    const q = cariCh.trim().toLowerCase();
+    if (!q) return urut;
+    return urut.filter(
+      (ch) =>
+        String(ch.title ?? '').toLowerCase().includes(q) ||
+        String(ch.chapterNumber ?? '').toLowerCase().includes(q)
+    );
+  }, [chapters, urutan, cariCh]);
 
   if (status === 'loading') {
     return (
@@ -71,7 +106,7 @@ export default function MangaInfoScreen() {
     <View style={s.screen}>
       <Stack.Screen options={{ title }} />
       <FlashList
-        data={chapters}
+        data={tersaring}
         keyExtractor={(ch, i) => ch.id ?? `ch-${i}`}
         contentContainerStyle={s.content}
         ListHeaderComponent={
@@ -111,15 +146,31 @@ export default function MangaInfoScreen() {
                 </Text>
               </Pressable>
             ) : null}
+            <GenreChips genres={genres} />
             <SectionTitle>Chapter</SectionTitle>
+            <ChapterToolbar
+              jumlah={chapters.length}
+              cari={cariCh}
+              onCari={setCariCh}
+              urutan={urutan}
+              onUrutan={setUrutan}
+            />
           </>
         }
         ListEmptyComponent={
-          <EmptyState
-            title="Belum ada chapter"
-            body="Penyedia tidak mengembalikan daftar chapter untuk judul ini."
-            onRetry={refresh}
-          />
+          cariCh.trim() ? (
+            <EmptyState
+              title="Tidak ada yang cocok"
+              body={`Tidak ada chapter yang mengandung "${cariCh.trim()}".`}
+              onRetry={() => setCariCh('')}
+            />
+          ) : (
+            <EmptyState
+              title="Belum ada chapter"
+              body="Penyedia tidak mengembalikan daftar chapter untuk judul ini."
+              onRetry={refresh}
+            />
+          )
         }
         renderItem={({ item: ch, index }) => {
           const label = ch.title || `Chapter ${ch.chapterNumber ?? index + 1}`;

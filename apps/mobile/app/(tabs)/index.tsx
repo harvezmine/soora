@@ -7,6 +7,7 @@ import { useCatalog } from '../../lib/useCatalog';
 import { listProgress, type ProgressEntry } from '../../lib/progress';
 import { ContinueRow } from '../../components/ContinueRow';
 import { HeroSpotlight } from '../../components/HeroSpotlight';
+import { SearchEntry } from '../../components/SearchEntry';
 import { SectionRow } from '../../components/SectionRow';
 import { SkeletonHero, SkeletonRow } from '../../components/Skeleton';
 import { EmptyState, ErrorState, StaleBanner } from '../../components/States';
@@ -90,6 +91,7 @@ export default function HomeScreen() {
       }
     >
       {anime.stale && <StaleBanner />}
+      <SearchEntry bagian="anime" />
       {spotlight ? <HeroSpotlight item={spotlight} /> : null}
 
       <ContinueRow items={continueItems} />

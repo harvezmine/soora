@@ -156,9 +156,10 @@ export function useCatalog<T>(
  * bisa datang tidak berurutan sehingga daftar berkedip ke hasil kueri lama.
  *
  * @param query Teks mentah dari input.
- * @param delay Milidetik menunggu. 350 ms terasa responsif tanpa memicu badai request.
+ * @param delay Milidetik menunggu. 500 ms, sama dengan pencarian di web, supaya
+ *   ritme mengetik terasa sama di kedua platform.
  */
-export function useDebounced<T>(query: T, delay = 350): T {
+export function useDebounced<T>(query: T, delay = 500): T {
   const [debounced, setDebounced] = useState(query);
 
   useEffect(() => {

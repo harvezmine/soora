@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Search as SearchIcon, X } from 'lucide-react-native';
-import { searchSamehadaku, searchMoviesTMDB } from '@soora/core/api';
+import { searchSamehadaku, searchMoviesTMDB, searchManga } from '@soora/core/api';
 import { normalizeList, unwrap } from '@soora/core/models';
 import { getRuntime } from '@soora/core';
+import { useLocalSearchParams } from 'expo-router';
 import { useCatalog, useDebounced } from '../../lib/useCatalog';
 import { MediaGrid } from '../../components/MediaGrid';
 import { SkeletonGrid } from '../../components/Skeleton';
@@ -37,33 +38,60 @@ function pushRecent(q: string) {
  * request dan hasil yang datang tidak berurutan membuat daftar berkedip ke
  * hasil kueri lama.
  */
+type Bagian = 'all' | 'anime' | 'movie' | 'manga';
+
+const PLACEHOLDER: Record<Bagian, string> = {
+  all: 'Cari anime, film, serial…',
+  anime: 'Cari anime…',
+  movie: 'Cari film dan serial…',
+  manga: 'Cari manga dan manhwa…',
+};
+
 export default function SearchScreen() {
+  // Bagian aktif datang dari tab yang membuka layar ini. Mencari manga di
+  // antara ratusan judul film tidak berguna; tiap bagian mencari di
+  // penyedianya sendiri.
+  const { type } = useLocalSearchParams<{ type?: string }>();
+  const bagian: Bagian = type === 'anime' || type === 'movie' || type === 'manga' ? type : 'all';
+
   const [raw, setRaw] = useState('');
   const query = useDebounced(raw.trim(), 350);
+  // Minimal 2 huruf, berbeda dari web yang memicu sejak 1 huruf. Satu huruf
+  // menghasilkan ribuan judul yang praktis acak, dan di ponsel tiap kueri
+  // itu memakan kuota serta satu perjalanan penuh ke tiga penyedia.
   const enabled = query.length >= 2;
   const [recent, setRecent] = useState<string[]>(() => readRecent());
 
   const fetcher = useCallback(async () => {
-    // Dua provider dijalankan bersamaan dan kegagalan salah satu tidak
-    // membatalkan yang lain — anime sering mati sementara TMDB tetap hidup.
-    // Anime lewat Samehadaku — penyedia English tidak bisa dijangkau dari VPS.
-    const [animeRes, movieRes] = await Promise.allSettled([
-      searchSamehadaku(query),
-      searchMoviesTMDB(query),
-    ]);
+    // Penyedia dijalankan bersamaan dan kegagalan salah satu tidak membatalkan
+    // yang lain — anime sering mati sementara TMDB tetap hidup.
+    // Anime lewat Samehadaku: penyedia English tidak bisa dijangkau dari VPS.
+    const tugas = {
+      anime: () => searchSamehadaku(query),
+      movie: () => searchMoviesTMDB(query),
+      manga: () => searchManga(query),
+    };
+    const aktif = bagian === 'all' ? (['anime', 'movie'] as const) : ([bagian] as const);
 
-    const animeItems =
-      animeRes.status === 'fulfilled'
-        ? normalizeList(
-            unwrap(animeRes.value)?.animeList ?? unwrap(animeRes.value)?.results,
-            'anime',
-            'samehadaku'
-          )
-        : [];
-    const movieItems =
-      movieRes.status === 'fulfilled'
-        ? normalizeList(unwrap(movieRes.value)?.results, 'movie', 'tmdb')
-        : [];
+    const hasil = await Promise.allSettled(aktif.map((k) => tugas[k]()));
+
+    const items: ReturnType<typeof normalizeList> = [];
+    let gagal = false;
+    aktif.forEach((k, idx) => {
+      const r = hasil[idx];
+      if (r.status !== 'fulfilled') {
+        gagal = true;
+        return;
+      }
+      const d = unwrap(r.value);
+      if (k === 'anime') {
+        items.push(...normalizeList(d?.animeList ?? d?.results, 'anime', 'samehadaku'));
+      } else if (k === 'movie') {
+        items.push(...normalizeList(d?.results, 'movie', 'tmdb'));
+      } else {
+        items.push(...normalizeList(d?.results ?? d, 'manga', 'mangapill'));
+      }
+    });
 
     // Kegagalan parsial tidak boleh diam-diam ter-cache 15 menit.
     //
@@ -71,26 +99,19 @@ export default function SearchScreen() {
     // (hanya film). Menyimpannya berarti saat anime pulih 30 detik kemudian,
     // kueri yang sama tetap mengembalikan hasil tanpa anime selama sisa TTL,
     // dan user tidak punya cara memaksa muat ulang dari layar ini.
-    if (animeRes.status === 'rejected' || movieRes.status === 'rejected') {
-      return { animeItems, movieItems, partial: true };
-    }
-
-    return { animeItems, movieItems, partial: false };
-  }, [query]);
+    return { items, partial: gagal };
+  }, [query, bagian]);
 
   const { data, status, error, refresh } = useCatalog(
     'search',
-    query,
+    `${bagian}:${query}`,
     fetcher,
     enabled,
     // Jangan simpan hasil yang salah satu penyedianya gagal.
     (d) => !d?.partial
   );
 
-  const items = useMemo(() => {
-    if (!data) return [];
-    return [...(data.animeItems ?? []), ...(data.movieItems ?? [])];
-  }, [data]);
+  const items = useMemo(() => data?.items ?? [], [data]);
 
   const submit = () => {
     if (!enabled) return;
@@ -111,7 +132,7 @@ export default function SearchScreen() {
           value={raw}
           onChangeText={setRaw}
           onSubmitEditing={submit}
-          placeholder="Cari anime, film, serial…"
+          placeholder={PLACEHOLDER[bagian]}
           placeholderTextColor={colors.textDim}
           style={s.input}
           returnKeyType="search"

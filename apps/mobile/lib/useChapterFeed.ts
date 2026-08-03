@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import { getMangaChapterPages, getKomikuChapterPages } from '@soora/core/api';
 import {
   normalizeChapterPages,
@@ -188,6 +189,46 @@ export function useChapterFeed({
       ),
     [segmen]
   );
+
+  /**
+   * Unduh awal beberapa halaman chapter berikutnya di latar belakang.
+   *
+   * Dijalankan begitu chapter sekarang siap, jauh sebelum pembaca sampai
+   * ujung. Saat sambungan terjadi, gambar pertamanya sudah ada di cache
+   * disk sehingga peralihannya tidak menampilkan kotak kosong.
+   *
+   * Hanya 3 halaman: itu cukup menutupi jeda sambungan, sementara mengunduh
+   * seluruh chapter di latar belakang akan menghabiskan kuota untuk chapter
+   * yang mungkin tidak jadi dibaca.
+   */
+  useEffect(() => {
+    const terakhir = segmen[segmen.length - 1];
+    if (!terakhir || menyambung) return;
+    const berikut = nextChapterAfter(urut, terakhir.chId) as Chapter | null;
+    if (!berikut?.id || sudahDimuat.current.has(berikut.id)) return;
+
+    let batal = false;
+    (async () => {
+      try {
+        const halaman = await ambilHalaman(berikut.id as string, provider);
+        if (batal || !hidup.current) return;
+        const awal = halaman.slice(0, 3);
+        if (!awal.length) return;
+        // Header WAJIB dibawa. CDN manga menolak permintaan tanpa Referer,
+        // jadi prefetch tanpa header hanya menghasilkan 403 dan tidak
+        // menyimpan apa pun — optimasi yang diam-diam tidak bekerja.
+        await Image.prefetch(
+          awal.map((h) => h.uri),
+          { cachePolicy: 'disk', headers: awal[0].headers }
+        );
+      } catch {
+        // Prefetch hanya optimasi; kegagalannya tidak boleh terlihat user.
+      }
+    })();
+    return () => {
+      batal = true;
+    };
+  }, [segmen, urut, provider, menyambung]);
 
   const indeksChapter = useCallback(
     (chId: string) => urut.findIndex((c) => c.id === chId),

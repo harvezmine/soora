@@ -10,6 +10,12 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -54,6 +60,22 @@ export default function ReadScreen() {
   useKeepAwake();
 
   const provider = providerParam || detectMangaProvider(chapter);
+
+  /**
+   * Zoom cubit.
+   *
+   * Skala diterapkan pada WADAH daftar, bukan pada tiap halaman: FlashList
+   * mendaur ulang view, jadi skala per-halaman akan ikut berpindah ke
+   * halaman lain saat digulir.
+   *
+   * Gulir vertikal tetap ditangani daftar seperti biasa — cubit butuh dua
+   * jari, jadi keduanya tidak pernah berebut. Geser satu jari untuk
+   * menggeser gambar hanya aktif saat sedang diperbesar.
+   */
+  const skala = useSharedValue(1);
+  const skalaAwal = useSharedValue(1);
+  const geserX = useSharedValue(0);
+  const geserXAwal = useSharedValue(0);
 
   const [tampilKontrol, setTampilKontrol] = useState(true);
   const [chAktif, setChAktif] = useState(chapter);
@@ -154,6 +176,60 @@ export default function ReadScreen() {
     [feed, chAktif, provider, title, mangaId, router]
   );
 
+  const cubit = Gesture.Pinch()
+    .onStart(() => {
+      'worklet';
+      skalaAwal.value = skala.value;
+    })
+    .onUpdate((e) => {
+      'worklet';
+      // Dibatasi 1x sampai 3x. Di bawah 1x halaman mengambang di tengah
+      // layar hitam; di atas 3x gambar sumber sudah pecah.
+      const v = skalaAwal.value * e.scale;
+      skala.value = Math.min(3, Math.max(1, v));
+    })
+    .onEnd(() => {
+      'worklet';
+      if (skala.value <= 1.02) {
+        skala.value = withTiming(1, { duration: 160 });
+        geserX.value = withTiming(0, { duration: 160 });
+      }
+    });
+
+  // Geser mendatar hanya berguna saat diperbesar; saat 1x, sumbu itu milik
+  // daftar sepenuhnya.
+  const geser = Gesture.Pan()
+    .minPointers(1)
+    .maxPointers(1)
+    .activeOffsetX([-12, 12])
+    .onStart(() => {
+      'worklet';
+      geserXAwal.value = geserX.value;
+    })
+    .onUpdate((e) => {
+      'worklet';
+      if (skala.value <= 1) return;
+      const batas = (width * (skala.value - 1)) / 2;
+      const v = geserXAwal.value + e.translationX;
+      geserX.value = Math.min(batas, Math.max(-batas, v));
+    });
+
+  const ketuk = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      'worklet';
+      // Ketuk ganda: bolak-balik antara 1x dan 2x, jalan pintas dari cubit.
+      const target = skala.value > 1.05 ? 1 : 2;
+      skala.value = withTiming(target, { duration: 180 });
+      if (target === 1) geserX.value = withTiming(0, { duration: 180 });
+    });
+
+  const gestur = Gesture.Simultaneous(cubit, geser, ketuk);
+
+  const gayaZoom = useAnimatedStyle(() => ({
+    transform: [{ scale: skala.value }, { translateX: geserX.value }],
+  }));
+
   const idxAktif = feed.indeksChapter(chAktif);
   const adaSebelum = idxAktif > 0;
   const adaBerikut = idxAktif >= 0 && idxAktif < feed.urut.length - 1;
@@ -197,7 +273,9 @@ export default function ReadScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar hidden={!tampilKontrol} animated />
 
-      <Pressable style={s.isi} onPress={() => setTampilKontrol((v) => !v)}>
+      <GestureDetector gesture={gestur}>
+        <Animated.View style={[s.isi, gayaZoom]}>
+        <Pressable style={s.isi} onPress={() => setTampilKontrol((v) => !v)}>
         <FlashList
           data={feed.baris}
           keyExtractor={(b) => b.kunci}
@@ -239,7 +317,9 @@ export default function ReadScreen() {
             ) : null
           }
         />
-      </Pressable>
+        </Pressable>
+        </Animated.View>
+      </GestureDetector>
 
       {tampilKontrol && (
         <>
