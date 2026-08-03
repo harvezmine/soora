@@ -36,6 +36,7 @@ export function NativePlayer({
   onProgress,
   onError,
   onBack,
+  onSelesai,
 }: {
   uri: string;
   title?: string;
@@ -43,8 +44,14 @@ export function NativePlayer({
   onProgress?: (position: number, duration: number) => void;
   onError?: (message: string) => void;
   onBack?: () => void;
+  /** Dipanggil saat video habis — dipakai untuk lanjut ke episode berikutnya. */
+  onSelesai?: () => void;
 }) {
   const [ready, setReady] = useState(false);
+  // Terpisah dari `ready`. Sebelumnya keduanya satu indikator, sehingga
+  // tersendat di tengah tontonan terlihat sama persis dengan memuat dari
+  // awal — user mengira app-nya hang.
+  const [menyangga, setMenyangga] = useState(false);
   const [sheet, setSheet] = useState<null | 'audio' | 'subtitle' | 'speed'>(null);
   const [tampilKontrol, setTampilKontrol] = useState(true);
   const [bermain, setBermain] = useState(true);
@@ -102,6 +109,19 @@ export function NativePlayer({
   });
 
   useEventListener(player, 'playingChange', ({ isPlaying }) => setBermain(isPlaying));
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    setMenyangga(status === 'loading' && ready);
+  });
+
+  // Lanjut otomatis ke episode berikutnya. Dijaga ref supaya tidak terpicu
+  // dua kali kalau event playToEnd datang berulang.
+  const sudahSelesai = useRef(false);
+  useEventListener(player, 'playToEnd', () => {
+    if (sudahSelesai.current) return;
+    sudahSelesai.current = true;
+    onSelesai?.();
+  });
 
   // Posisi terakhir yang diketahui, disimpan di ref supaya tetap terbaca saat
   // unmount. Membaca `player.currentTime` di cleanup TIDAK bisa diandalkan:
@@ -286,6 +306,12 @@ export function NativePlayer({
         </View>
       </GestureDetector>
 
+      {menyangga && ready && (
+        <View style={s.sangga} pointerEvents="none">
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      )}
+
       {!ready && (
         <View style={s.loading} pointerEvents="none">
           <ActivityIndicator color={colors.accent} size="large" />
@@ -371,6 +397,16 @@ const s = StyleSheet.create({
     gap: space.md,
   },
   loadingText: { color: colors.textMuted, fontSize: font.size.sm, paddingHorizontal: space.xl },
+  // Kecil dan di sudut, bukan di tengah layar: tersendat sesaat tidak boleh
+  // menutupi gambar yang sedang ditonton.
+  sangga: {
+    position: 'absolute',
+    top: '48%',
+    alignSelf: 'center',
+    padding: space.md,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
 
   lompatIndikator: {
     position: 'absolute',

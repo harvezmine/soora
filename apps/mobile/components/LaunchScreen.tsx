@@ -11,6 +11,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { colors } from '../theme/tokens';
 
 /** Berapa lama layar sambutan bertahan sebelum memudar. */
@@ -94,7 +95,27 @@ export function LaunchScreen({ onSelesai }: Props) {
 
   return (
     <Animated.View style={[s.lapisan, gayaLuar]} pointerEvents="none">
-      <Animated.View style={[s.cahaya, { width: lebarLogo, height: lebarLogo }, gayaCahaya]} />
+      {/* Cahaya digambar sebagai gradien radial SVG, bukan View berwarna
+          dengan borderRadius. React Native tidak punya filter: blur(), jadi
+          lingkaran berwarna solid tampil sebagai cakram keras bertepi tajam —
+          bukan cahaya. Versi web mulus karena memakai blur CSS. */}
+      <Animated.View
+        style={[s.cahaya, { width: lebarLogo * 2, height: lebarLogo * 2 }, gayaCahaya]}
+        pointerEvents="none"
+      >
+        <Svg width="100%" height="100%">
+          <Defs>
+            <RadialGradient id="cahaya" cx="50%" cy="50%" r="50%">
+              {/* Jingga merek dari huruf S. Berhenti di transparan penuh di
+                  tepi supaya tidak ada garis batas yang terlihat. */}
+              <Stop offset="0%" stopColor="#ff6b4a" stopOpacity="0.55" />
+              <Stop offset="45%" stopColor="#ff6b4a" stopOpacity="0.18" />
+              <Stop offset="100%" stopColor="#ff6b4a" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#cahaya)" />
+        </Svg>
+      </Animated.View>
       <Animated.View style={gayaLogo}>
         <Image
           source={require('../assets/logo-wordmark.png')}
@@ -125,12 +146,5 @@ const s = StyleSheet.create({
     backgroundColor: colors.bg,
     zIndex: 100,
   },
-  cahaya: {
-    position: 'absolute',
-    borderRadius: 999,
-    // Jingga merek dari huruf S. Radius besar dengan opasitas rendah membaca
-    // sebagai cahaya, bukan sebagai lingkaran.
-    backgroundColor: '#ff6b4a',
-    opacity: 0.4,
-  },
+  cahaya: { position: 'absolute' },
 });

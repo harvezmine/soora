@@ -189,6 +189,26 @@ export default function WatchScreen() {
     [id, kind, title]
   );
 
+  /**
+   * Lanjut ke episode berikutnya setelah video habis.
+   *
+   * Hanya untuk serial: nomor episode ada di parameter rute, jadi tidak
+   * perlu memuat ulang daftar. Anime memakai id episode yang tidak berurutan
+   * sehingga tidak bisa ditebak dari nomor — untuk itu user kembali ke daftar.
+   *
+   * `replace`, bukan `push`: kalau tidak, menonton lima episode berturut-turut
+   * menumpuk lima layar pemutar dan tombol kembali harus ditekan lima kali.
+   */
+  const lanjutEpisode = useCallback(() => {
+    if (kind !== 'tv') return;
+    const berikut = (Number(ep) || 1) + 1;
+    router.replace(
+      `/watch/${encodeURIComponent(String(id))}?kind=tv` +
+        `&season=${season ?? 1}&ep=${berikut}` +
+        `&title=${encodeURIComponent(`${String(title || '')} — S${season ?? 1}E${berikut}`)}` as never
+    );
+  }, [kind, ep, season, id, title, router]);
+
   const onPlayerError = useCallback(
     (message: string) => {
       // Token m3u8 kedaluwarsa di tengah tontonan panjang: ambil sumber baru
@@ -235,11 +255,17 @@ export default function WatchScreen() {
           onProgress={onProgress}
           onError={onPlayerError}
           onBack={() => router.back()}
+          onSelesai={lanjutEpisode}
         />
       )}
 
       {status === 'ready' && source?.mode === 'embed' && (
-        <EmbedPlayer uri={source.uri} label={source.label} onError={onPlayerError} />
+        <EmbedPlayer
+          uri={source.uri}
+          label={source.label}
+          onError={onPlayerError}
+          onBack={() => router.back()}
+        />
       )}
     </View>
   );

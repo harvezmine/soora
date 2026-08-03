@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { colors, font, radius, space } from '../../theme/tokens';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowLeft, Maximize, Minimize } from 'lucide-react-native';
+import { colors, font, iconSize, iconStroke, radius, space, MIN_TOUCH } from '../../theme/tokens';
 
 /**
  * Pemutar cadangan berbasis WebView, untuk sumber yang hanya tersedia sebagai
@@ -22,13 +25,31 @@ export function EmbedPlayer({
   uri,
   label,
   onError,
+  onBack,
 }: {
   uri: string;
   label?: string;
   onError?: (message: string) => void;
+  onBack?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState(0);
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const lanskap = width > height;
+
+  /**
+   * Layar penuh memutar orientasi, bukan membesarkan view.
+   *
+   * Halaman embed hampir selalu 16:9; di potret ia hanya memakai sekitar
+   * sepertiga tinggi layar. Keluar memakai unlockAsync, bukan mengunci
+   * potret — mengunci berlaku untuk seluruh proses dan layar lain ikut
+   * terkunci sampai app ditutup paksa.
+   */
+  const togglePenuh = () => {
+    if (lanskap) void ScreenOrientation.unlockAsync();
+    else void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+  };
 
   // useMemo, bukan ref yang ditulis saat render: host harus dihitung ulang
   // kalau `uri` berganti (mis. saat tombol ganti server ditambahkan nanti),
@@ -54,6 +75,15 @@ export function EmbedPlayer({
         mediaPlaybackRequiresUserAction={false}
         onLoadEnd={() => setLoading(false)}
         onError={(e) => onError?.(e.nativeEvent.description || 'Gagal memuat embed')}
+        // Halaman embed yang membalas 404 atau 403 tetap memicu onLoadEnd
+        // dan tampak "berhasil" — layarnya hanya hitam. Tanpa penanganan ini
+        // user menatap layar kosong tanpa tahu sumbernya memang mati.
+        onHttpError={(e) => {
+          const st = e.nativeEvent.statusCode;
+          if (st >= 400) {
+            onError?.(`Sumber embed membalas HTTP ${st}. Sumber ini kemungkinan sudah mati.`);
+          }
+        }}
         onShouldStartLoadWithRequest={(req) => {
           // Navigasi awal selalu diizinkan.
           if (req.url === uri) return true;
@@ -86,6 +116,33 @@ export function EmbedPlayer({
           return true;
         }}
       />
+
+      <View style={[s.barAtas, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
+        <Pressable
+          onPress={() => onBack?.()}
+          style={s.ikonBtn}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+        >
+          <ArrowLeft size={iconSize.md} color={colors.text} strokeWidth={iconStroke} />
+        </Pressable>
+        <Text style={s.judul} numberOfLines={1}>
+          {label || 'Mode kompatibilitas'}
+        </Text>
+        <Pressable
+          onPress={togglePenuh}
+          style={s.ikonBtn}
+          accessibilityRole="button"
+          accessibilityLabel={lanskap ? 'Keluar dari layar penuh' : 'Layar penuh'}
+        >
+          {lanskap ? (
+            <Minimize size={iconSize.md} color={colors.text} strokeWidth={iconStroke} />
+          ) : (
+            <Maximize size={iconSize.md} color={colors.text} strokeWidth={iconStroke} />
+          )}
+        </Pressable>
+      </View>
 
       {loading && (
         <View style={s.loading} pointerEvents="none">
@@ -129,4 +186,23 @@ const s = StyleSheet.create({
   },
   badgeText: { color: colors.warning, fontSize: font.size.xs, fontWeight: '600' },
   badgeSub: { color: colors.textDim, fontSize: font.size.xs },
+  barAtas: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    paddingBottom: space.sm,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  ikonBtn: {
+    width: MIN_TOUCH,
+    height: MIN_TOUCH,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  judul: { flex: 1, color: colors.text, fontSize: font.size.md, fontWeight: font.weight.semibold },
 });
