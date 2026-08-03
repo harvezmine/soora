@@ -65,16 +65,28 @@ export function SectionRow({
 
 const s = StyleSheet.create({
   wrap: { paddingTop: space.xl, gap: space.md },
+  // Turun satu tingkat dari sebelumnya. Judul bagian yang hampir sebesar
+  // judul layar bersaing perhatian dengan poster yang seharusnya jadi
+  // bintangnya.
   title: {
     color: colors.text,
-    fontSize: font.size.lg,
-    fontWeight: '600',
-    paddingHorizontal: space.lg,
+    // base (16), turun dari lg (20). Judul bagian sebesar lg bersaing
+    // perhatian dengan poster yang seharusnya jadi bintangnya.
+    fontSize: font.size.base,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    paddingLeft: space.lg,
+    // Jarak vertikal blok diserahkan ke wadah beranda, bukan diatur
+    // komponen ini — kalau tiap komponen mengatur marginnya sendiri,
+    // jarak antar bagian jadi tidak sama tanpa alasan.
+    paddingBottom: space.sm,
   },
   list: { paddingHorizontal: space.lg },
   kepala: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // baseline, bukan center: judul dan "Lihat semua" berbeda ukuran, dan
+    // center membuat keduanya terlihat tidak sejajar.
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     paddingRight: space.lg,
   },

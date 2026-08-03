@@ -51,7 +51,6 @@ const s = StyleSheet.create({
     gap: space.sm,
     minHeight: MIN_TOUCH,
     marginHorizontal: space.lg,
-    marginTop: space.md,
     paddingHorizontal: space.md,
     borderRadius: radius.pill,
     borderWidth: 1,

@@ -181,11 +181,16 @@ const s = StyleSheet.create({
     maxWidth: CARD_WIDTH - space.sm,
   },
   badgeText: { color: colors.text, fontSize: font.size.xs, fontWeight: '600' },
+  // Tinggi dikunci dua baris. Tanpa itu kartu berjudul satu baris jadi
+  // lebih pendek dan barisnya terlihat bergerigi.
   title: {
     color: colors.text,
     fontSize: font.size.sm,
     marginTop: space.xs,
     lineHeight: font.size.sm * font.lineHeight.tight,
+    // Dikunci dua baris. Tanpa ini kartu berjudul satu baris jadi lebih
+    // pendek dan deretannya terlihat bergerigi.
+    height: font.size.sm * font.lineHeight.tight * 2,
   },
   subtitle: { color: colors.textDim, fontSize: font.size.xs, marginTop: 2 },
 });

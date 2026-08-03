@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   FlatList,
@@ -26,15 +27,52 @@ import { colors, font, iconSize, iconStroke, onAccent, radius, space, MIN_TOUCH 
 /** Satu kartu sorotan. */
 function Kartu({ item, lebar }: { item: MediaItem; lebar: number }) {
   const router = useRouter();
+  // Tinggi mengikuti lebar layar, bukan 260dp tetap: di ponsel sempit 260dp
+  // terasa menjulang, di tablet terlalu pendek. 0.56 mendekati 16:9 setelah
+  // dikurangi margin kiri-kanan.
+  const tinggi = Math.round((lebar - space.lg * 2) * 0.56);
 
   return (
+    // Pembungkus selebar SATU HALAMAN persis. Margin ditaruh di kartu di
+    // dalamnya, bukan di pembungkus — versi sebelumnya memberi kartu lebar
+    // penuh layar DITAMBAH margin 16dp di kiri-kanan, sehingga satu item
+    // sebenarnya selebar layar+32 sementara pagingEnabled menjentik per
+    // selebar layar. Selisih itu menumpuk tiap geseran dan membuat gambar
+    // tidak pernah berhenti pas di tengah.
+    <View style={{ width: lebar }}>
     <Pressable
-      style={({ pressed }) => [s.wrap, { width: lebar }, pressed && s.pressed]}
+      style={({ pressed }) => [s.wrap, { height: tinggi }, pressed && s.pressed]}
       onPress={() => router.push(hrefFor(item) as never)}
       accessibilityRole="button"
       accessibilityLabel={`Sorotan: ${item.title}`}
     >
-      <Poster source={item.backdrop ?? item.poster} recyclingKey={`hero-${item.id}`} />
+      {/* Manga tidak punya backdrop — normalizer hanya mengisinya untuk anime
+          dan film. Tanpa penanganan ini, poster POTRET dipaksa ke kotak lebar
+          260px dan `cover` memangkasnya habis; itulah banner manga yang
+          terlihat ter-zoom.
+
+          Kalau backdrop tidak ada: salinan poster yang dikaburkan mengisi
+          latar, dan posternya sendiri ditampilkan utuh di depan. Cara yang
+          sama dipakai aplikasi musik untuk sampul album di layar lebar. */}
+      {item.backdrop ? (
+        <Poster source={item.backdrop} recyclingKey={`hero-${item.id}`} />
+      ) : (
+        <>
+          {item.poster?.uri ? (
+            <Image
+              source={item.poster}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              blurRadius={38}
+              recyclingKey={`herobg-${item.id}`}
+              transition={160}
+            />
+          ) : null}
+          <View style={s.posterTengah}>
+            <Poster source={item.poster} recyclingKey={`hero-${item.id}`} contentFit="contain" />
+          </View>
+        </>
+      )}
 
       <LinearGradient
         colors={['transparent', 'rgba(6,6,14,0.75)', colors.bg]}
@@ -53,6 +91,7 @@ function Kartu({ item, lebar }: { item: MediaItem; lebar: number }) {
         </View>
       </View>
     </Pressable>
+    </View>
   );
 }
 
@@ -133,12 +172,24 @@ export function HeroSpotlight({
 }
 
 const s = StyleSheet.create({
+  // Poster utuh di tengah, dengan lebar yang mengikuti rasio sampul manga
+  // (~1:1.42) agar tidak ada ruang kosong di atas maupun bawah.
+  posterTengah: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    alignSelf: 'center',
+    aspectRatio: 1 / 1.42,
+  },
+  // Di DALAM kartu, di sudut kanan ATAS. Menggantung di bawah kartu membuat
+  // titik terbaca sebagai milik blok berikutnya; di tengah bawah ia menimpa
+  // judul dan tombol yang sudah menempati sudut itu.
   titik: {
+    position: 'absolute',
+    top: space.md,
+    right: space.lg + space.md,
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 6,
-    marginTop: -space.md,
-    marginBottom: space.sm,
   },
   titikSatu: {
     width: 6,
@@ -148,9 +199,7 @@ const s = StyleSheet.create({
   },
   titikAktif: { backgroundColor: colors.accent, width: 18 },
   wrap: {
-    height: 260,
     marginHorizontal: space.lg,
-    marginTop: space.lg,
     borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: colors.surfaceRaised,

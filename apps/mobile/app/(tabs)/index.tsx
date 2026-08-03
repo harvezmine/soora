@@ -112,5 +112,8 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: space.xxxl },
+  // gap menyeragamkan jarak antar blok besar; sebelumnya tiap komponen
+  // mengatur marginnya sendiri sehingga jarak sorotan->pencarian berbeda
+  // dari pencarian->baris pertama tanpa alasan.
+  content: { gap: space.lg, paddingBottom: space.xxxl },
 });
