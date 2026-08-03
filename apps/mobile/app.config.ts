@@ -23,6 +23,10 @@ const config: ExpoConfig = {
   scheme: ['soora', 'fun.soora.app'],
   userInterfaceStyle: 'dark',
   backgroundColor: BRAND_BG,
+  // Diambil dari ikon PWA di apps/web/public/icons. 512x512 cukup untuk Android
+  // (foreground adaptive icon terbesar yang dipakai xxxhdpi hanya 192 px);
+  // ukuran 1024 baru diperlukan kalau nanti rilis ke iOS.
+  icon: './assets/icon.png',
   android: {
     package: 'fun.soora.app',
     // Harus > versionCode APK Capacitor lama (yang bernilai 1), kalau tidak
@@ -32,8 +36,11 @@ const config: ExpoConfig = {
     // dipakai: EAS harus menulis balik nilainya ke berkas konfigurasi, dan itu
     // mustahil untuk app.config.ts yang dinamis — build-nya gagal sebelum
     // menyentuh apa pun.
-    versionCode: 2,
+    versionCode: 3,
     adaptiveIcon: {
+      // Versi maskable: motifnya berada di dalam safe zone, jadi tidak terpotong
+      // saat launcher memangkasnya jadi lingkaran, kotak bulat, atau squircle.
+      foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: BRAND_BG,
     },
   },
@@ -43,6 +50,17 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
+    // Tanpa ini splash memakai bawaan Expo yang putih — berkedip terang sesaat
+    // sebelum UI gelap muncul, di app yang userInterfaceStyle-nya 'dark'.
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/splash-icon.png',
+        imageWidth: 180,
+        resizeMode: 'contain',
+        backgroundColor: BRAND_BG,
+      },
+    ],
     'expo-sqlite',
     'expo-web-browser',
     // supportsBackgroundPlayback WAJIB di sini, bukan cukup menyetel

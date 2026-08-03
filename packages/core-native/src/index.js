@@ -6,7 +6,12 @@
  * supaya tetap bisa diuji.
  */
 
-import { MMKV } from 'react-native-mmkv';
+// react-native-mmkv v4 menghapus kelas `MMKV`; yang tersisa dengan nama itu
+// hanya sebuah TYPE. Meng-import-nya sebagai nilai lolos typecheck tetapi
+// bernilai undefined saat runtime, dan `new undefined()` menjatuhkan app saat
+// expo-router memuat _layout — "undefined cannot be used as a constructor",
+// tanpa layar error karena terjadi saat modul dimuat.
+import { createMMKV } from 'react-native-mmkv';
 import { createMMKVKV } from './kv.js';
 
 /**
@@ -17,8 +22,8 @@ import { createMMKVKV } from './kv.js';
  * di level instance berarti tombol "Bersihkan cache" nanti cukup memanggil
  * `cacheStorage.clearAll()` tanpa risiko ikut menghapus sesi login user.
  */
-export const kvStorage = new MMKV({ id: 'soora-kv' });
-export const cacheStorage = new MMKV({ id: 'soora-cache' });
+export const kvStorage = createMMKV({ id: 'soora-kv' });
+export const cacheStorage = createMMKV({ id: 'soora-cache' });
 
 /** Penyimpanan persisten — auth token, progress, settings. */
 export const nativePersistentKV = createMMKVKV(kvStorage);

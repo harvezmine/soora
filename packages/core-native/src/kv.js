@@ -14,7 +14,8 @@
  * @typedef {object} MMKVLike
  * @property {(key: string) => string | undefined} getString
  * @property {(key: string, value: string) => void} set
- * @property {(key: string) => void} delete
+ * @property {(key: string) => boolean} [remove] Nama method di v4.
+ * @property {(key: string) => void} [delete] Nama method di v3 ke bawah.
  */
 
 /**
@@ -29,7 +30,17 @@
  * @returns {KVPort}
  */
 export function createMMKVKV(storage) {
-  const missing = ['getString', 'set', 'delete'].filter((m) => typeof storage?.[m] !== 'function');
+  // v4 mengganti nama `delete` jadi `remove`. Menerima keduanya supaya file ini
+  // tetap netral terhadap versi, seperti yang dijanjikan MMKVLike di atas.
+  const removeFn =
+    typeof storage?.remove === 'function'
+      ? (key) => storage.remove(key)
+      : typeof storage?.delete === 'function'
+        ? (key) => storage.delete(key)
+        : null;
+
+  const missing = ['getString', 'set'].filter((m) => typeof storage?.[m] !== 'function');
+  if (!removeFn) missing.push('remove/delete');
   if (missing.length) {
     throw new TypeError(`createMMKVKV: instance MMKV kekurangan method: ${missing.join(', ')}`);
   }
@@ -56,7 +67,7 @@ export function createMMKVKV(storage) {
     },
     remove: (key) => {
       try {
-        storage.delete(key);
+        removeFn(key);
       } catch {
         /* sama seperti di atas */
       }

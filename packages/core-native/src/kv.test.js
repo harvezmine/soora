@@ -1,15 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { createMMKVKV } from './kv.js';
 
-/** Tiruan MMKV — sengaja meniru perilaku `undefined` untuk key yang tidak ada. */
-function fakeMMKV(initial = {}) {
+/**
+ * Tiruan MMKV — sengaja meniru perilaku `undefined` untuk key yang tidak ada.
+ *
+ * `bentuk` memilih nama method penghapus: v4 memakai `remove` yang
+ * mengembalikan boolean, v3 memakai `delete`. Keduanya diuji karena adapter
+ * menjanjikan netral terhadap versi, dan justru pergantian nama seperti inilah
+ * yang lolos ke rilis pertama.
+ */
+function fakeMMKV(initial = {}, bentuk = 'v4') {
   const store = new Map(Object.entries(initial));
-  return {
+  const dasar = {
     getString: (k) => (store.has(k) ? store.get(k) : undefined),
     set: (k, v) => store.set(k, v),
-    delete: (k) => store.delete(k),
     _store: store,
   };
+  return bentuk === 'v4'
+    ? { ...dasar, remove: (k) => store.delete(k) }
+    : { ...dasar, delete: (k) => store.delete(k) };
 }
 
 describe('createMMKVKV', () => {
@@ -27,8 +36,14 @@ describe('createMMKVKV', () => {
     expect(kv.get('soora_token')).toBe('jwt-abc');
   });
 
-  it('remove menghapus key', () => {
-    const kv = createMMKVKV(fakeMMKV({ a: '1' }));
+  it('remove menghapus key lewat method remove (v4)', () => {
+    const kv = createMMKVKV(fakeMMKV({ a: '1' }, 'v4'));
+    kv.remove('a');
+    expect(kv.get('a')).toBeNull();
+  });
+
+  it('remove menghapus key lewat method delete (v3)', () => {
+    const kv = createMMKVKV(fakeMMKV({ a: '1' }, 'v3'));
     kv.remove('a');
     expect(kv.get('a')).toBeNull();
   });
@@ -45,7 +60,7 @@ describe('createMMKVKV', () => {
   });
 
   it('menyebutkan method mana yang kurang', () => {
-    expect(() => createMMKVKV({ getString: () => '' })).toThrow(/set, delete/);
+    expect(() => createMMKVKV({ getString: () => '' })).toThrow(/set, remove\/delete/);
   });
 
   it('tidak pernah melempar walau MMKV gagal — kontrak KVPort', () => {
