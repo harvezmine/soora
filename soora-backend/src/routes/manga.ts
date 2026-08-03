@@ -3,6 +3,7 @@ import * as consumet from '../services/consumet';
 import { cached, cachedSWR, CACHE_TTL } from '../services/cache';
 import { parallel, extractResults } from '../utils/normalize';
 import { reportRouteError } from '../services/telegram';
+import { mangapillInfo } from '../services/mangapill';
 
 const qs = (v: any): string => String(v ?? '');
 
@@ -94,7 +95,22 @@ router.get('/info/:id', async (req: Request, res: Response) => {
     const lang2 = qs(req.query.lang) || 'en';
 
     const cacheKey = `manga:info:${provider}:${id}:${lang2}`;
-    const data = await cached(cacheKey, () => {
+    const data = await cached(cacheKey, async () => {
+      // mangapill: pakai scraper sendiri lebih dulu.
+      //
+      // Parser consumet untuk provider ini menggantung sampai timeout sejak
+      // 2026-08-03 (diuji 60 detik, tidak pernah membalas), sehingga daftar
+      // chapter tidak bisa diambil sama sekali — padahal halaman sumbernya
+      // sendiri terambil dalam 0,7 detik. Consumet tetap dipakai sebagai
+      // cadangan kalau markup mangapill berubah dan scraper kita gagal.
+      if (provider === 'mangapill') {
+        try {
+          return await mangapillInfo(id);
+        } catch (e: any) {
+          console.warn('[manga/info] scraper mangapill gagal, coba consumet:', e?.message);
+        }
+      }
+
       const params: Record<string, any> = {};
       if (provider === 'mangadex') params.lang = lang2;
       return consumet.mangaInfo(id, provider, params);
