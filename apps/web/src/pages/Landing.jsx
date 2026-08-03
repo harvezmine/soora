@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import SplashIntro from '../components/SplashIntro';
 import { useEffect, useRef, useState } from 'react';
 
 /* ── PWA install prompt cache ── */
@@ -210,6 +211,7 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
 
   return (
     <div className="landing-page">
+      <SplashIntro />
       <canvas ref={canvasRef} className="landing-particles" />
 
       {/* Gradient orbs */}
@@ -278,19 +280,19 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
           ))}
         </div>
 
-        {/* Bar mengambang di atas hanya muncul di ponsel dan hilang begitu app
-            terpasang. Tautan ini permanen, supaya pengguna desktop yang ingin
-            memasang di ponselnya tetap punya jalan menemukannya. */}
-        <div className="landing-download-link">
-          <Link to="/download" className="landing-download-pill">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
+        {/* Kartu unduh sejajar dengan tiga kartu bagian di atas, bukan pil
+            kecil yang menempel di footer. Selalu tampil termasuk di desktop:
+            orang sering menemukan situsnya di laptop lalu memasang di ponsel. */}
+        <Link to="/download" className="landing-app-cta">
+          <span className="landing-app-cta-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
+              <rect x="6" y="2" width="12" height="20" rx="3" />
+              <line x1="10" y1="18.5" x2="14" y2="18.5" />
             </svg>
-            Unduh aplikasi Android
-          </Link>
-        </div>
+          </span>
+          <span className="landing-app-cta-text">Download Soora Mobile</span>
+          <span className="landing-app-cta-arrow" aria-hidden="true">→</span>
+        </Link>
 
         <footer className="landing-footer">
           <p>&copy; 2026 soora. Open-source entertainment platform.</p>

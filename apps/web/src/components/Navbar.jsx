@@ -84,11 +84,12 @@ export default function Navbar({ section = 'sooranime' }) {
         style={{ cursor: 'pointer' }}
       >
         <span className="logo">
+          {/* Satu mark untuk ketiga bagian. Sebelumnya SVG lingkaran-plus-S
+              buatan tangan yang mewarnai dirinya dari currentColor bagian,
+              jadi logonya berubah rupa tiap pindah bagian. Nama bagian di
+              sebelahnya yang membedakan, bukan marknya. */}
           <span className="logo-mark" aria-hidden="true">
-            <svg viewBox="0 0 28 28" width="22" height="22" fill="none">
-              <circle cx="14" cy="14" r="12" stroke="currentColor" strokeWidth="1.6" opacity="0.7"/>
-              <path d="M9 18.5C9.8 19.5 11.5 20.5 14 20.5c3.5 0 5.5-2 5.5-4.2 0-2.3-1.8-3.2-4.5-3.8l-1-.2C11.5 11.8 10 11 10 9.3 10 7.5 11.8 6 14.2 6c1.8 0 3.2.7 4 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-            </svg>
+            <img src="/icons/icon-192x192.png" alt="" width="26" height="26" />
           </span>
           <span className="logo-text">
             <span className="logo-name">

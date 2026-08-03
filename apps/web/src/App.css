@@ -13377,9 +13377,86 @@ a:hover {
    perlu breakpoint terpisah, dan max-width menjaga agar tidak melar di layar
    lebar. Rasio aslinya 1024x458. */
 .landing-logo-img {
-  width: clamp(220px, 52vw, 420px);
+  width: clamp(180px, 34vw, 300px);
   height: auto;
   display: block;
   filter: drop-shadow(0 12px 42px rgba(255, 107, 74, 0.35));
 }
 .landing-logo { display: flex; justify-content: center; }
+
+/* ── Layar pembuka situs ── */
+.splash-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: #06060e;
+  opacity: 1;
+  transition: opacity 520ms ease;
+}
+.splash-intro-out { opacity: 0; pointer-events: none; }
+.splash-intro-logo {
+  position: relative;
+  width: clamp(200px, 42vw, 360px);
+  height: auto;
+  animation: splash-pop 620ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+.splash-intro-glow {
+  position: absolute;
+  width: clamp(220px, 46vw, 400px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 107, 74, 0.5), transparent);
+  filter: blur(30px);
+  animation: splash-breathe 1.5s ease-in-out infinite;
+}
+@keyframes splash-pop {
+  from { opacity: 0; transform: scale(0.86); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes splash-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.94); }
+  50% { opacity: 0.8; transform: scale(1.06); }
+}
+
+/* ── Kartu unduh aplikasi di landing ── */
+.landing-app-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 420px);
+  margin: 28px auto 8px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  color: #e8e8f5;
+  text-decoration: none;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+.landing-app-cta:hover {
+  border-color: rgba(255, 107, 74, 0.55);
+  background: rgba(255, 107, 74, 0.08);
+  transform: translateY(-2px);
+}
+.landing-app-cta:focus-visible { outline: 3px solid #7c5cfc; outline-offset: 3px; }
+.landing-app-cta-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: rgba(255, 107, 74, 0.14);
+  color: #ff8a5c;
+}
+.landing-app-cta-text { flex: 1; font-size: 15px; font-weight: 600; }
+.landing-app-cta-arrow { color: #9a9ab0; font-size: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-intro-logo, .splash-intro-glow { animation: none; }
+  .splash-intro { transition: none; }
+  .landing-app-cta { transition: none; }
+  .landing-app-cta:hover { transform: none; }
+}

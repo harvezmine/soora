@@ -58,10 +58,16 @@ function AppLayout() {
 
   // Hide navbar on manga reader page for immersive reading
   const isMangaReader = location.pathname === '/manga/read';
+  // Halaman unduh berdiri sendiri: ia bukan bagian dari sooranime,
+  // sooraflix, maupun sooramics, jadi navbar bagian di atasnya justru
+  // menyesatkan. Ia juga punya tautan kembali ke beranda sendiri.
+  const isDownload = location.pathname === '/download';
 
   return (
     <MiniPlayerProvider>
-      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && !isAdmin && <Navbar section={section} />}
+      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && !isAdmin && !isDownload && (
+        <Navbar section={section} />
+      )}
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -110,7 +116,9 @@ function AppLayout() {
         <Route path="/series/info" element={<LegacyMovieRedirect />} />
       </Routes>
       </Suspense>
-      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && !isAdmin && <MiniPlayer />}
+      {!isLanding && !isAuthPage && !isMangaReader && !isSooramicsPlus && !isAdmin && !isDownload && (
+        <MiniPlayer />
+      )}
     </MiniPlayerProvider>
   );
 }
