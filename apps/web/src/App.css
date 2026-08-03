@@ -13157,3 +13157,60 @@ a:hover {
 @media (prefers-reduced-motion: reduce) {
   .admin-bar-fill, .admin-modal, .admin-toast, .admin-action-menu { animation: none; transition: none; }
 }
+
+/* ===== Halaman unduh APK ===== */
+.download-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 64px;
+  background: #06060e;
+}
+.download-card {
+  width: 100%;
+  max-width: 620px;
+  background: #0e0e1a;
+  border: 1px solid #23233a;
+  border-radius: 16px;
+  padding: 32px 24px;
+  color: #f3f4f8;
+}
+.download-card h1 { font-size: 26px; font-weight: 700; margin: 0 0 12px; }
+.download-card h2 { font-size: 17px; font-weight: 600; margin: 24px 0 8px; }
+.download-lead { color: #9a9ab0; line-height: 1.6; margin: 0 0 24px; }
+.download-muted { color: #7d7d99; font-size: 14px; line-height: 1.6; }
+.download-note { margin-top: 28px; }
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  border-radius: 10px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 180ms ease;
+}
+.download-btn:hover { background: #be123c; }
+.download-btn span { font-weight: 400; opacity: 0.85; }
+
+.download-soon {
+  border: 1px solid #23233a;
+  border-radius: 10px;
+  padding: 16px;
+  background: #16162a;
+}
+.download-soon strong { display: block; margin-bottom: 6px; }
+.download-soon p { color: #9a9ab0; margin: 0; line-height: 1.6; }
+
+.download-changelog p { color: #9a9ab0; line-height: 1.6; margin: 0; white-space: pre-wrap; }
+.download-help ol { color: #9a9ab0; line-height: 1.7; padding-left: 20px; margin: 0 0 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .download-btn { transition: none; }
+}

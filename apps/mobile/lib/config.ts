@@ -20,10 +20,13 @@ export const STREAM_PROXY = 'https://stream.soora.fun/proxy';
  * itu. Kalau salah satu tidak cocok, login gagal dengan DEVELOPER_ERROR yang
  * tidak menjelaskan apa-apa.
  *
- * Diisi di fase 1 setelah client ID Android dibuat. Selama masih kosong,
- * layar login menampilkan pesan setup, bukan mencoba lalu gagal misterius.
+ * Backend juga harus menerima client ID ini (`GOOGLE_ANDROID_CLIENT_ID` di
+ * ecosystem.config.js). Token dari app membawa `aud` milik client Android,
+ * bukan client web — kalau backend hanya menerima yang web, Google akan sukses
+ * tapi verifikasi di server menolaknya.
  */
-export const GOOGLE_ANDROID_CLIENT_ID = '';
+export const GOOGLE_ANDROID_CLIENT_ID =
+  '1046486298812-9sfsvpj2932ehb4ailakqft91djbfdej.apps.googleusercontent.com';
 
 /** Client ID web — dipakai backend untuk memverifikasi ID token. */
 export const GOOGLE_WEB_CLIENT_ID =

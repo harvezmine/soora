@@ -34,4 +34,15 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // Skrip build, fungsi serverless, dan konfigurasi Vite berjalan di Node,
+    // bukan di peramban. Tanpa global Node di sini, `process`, `console`,
+    // `Buffer`, dan `__dirname` semuanya dilaporkan sebagai variabel tak
+    // dikenal — puluhan error palsu yang menenggelamkan temuan sungguhan.
+    files: ['scripts/**/*.js', 'api/**/*.js', 'vite.config.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: 'module',
+    },
+  },
 ])

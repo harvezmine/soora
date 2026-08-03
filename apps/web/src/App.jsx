@@ -14,6 +14,7 @@ import './App.css';
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Landing = lazy(() => import('./pages/Landing'));
+const Download = lazy(() => import('./pages/Download'));
 const Home = lazy(() => import('./pages/Home'));
 const MovieHome = lazy(() => import('./pages/MovieHome'));
 const MangaHome = lazy(() => import('./pages/MangaHome'));
@@ -64,6 +65,7 @@ function AppLayout() {
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/download" element={<Download />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         {/* sooramics+ hidden route */}
