@@ -2,17 +2,31 @@
 // wajib selesai sebelum modul mana pun sempat membuat request.
 import '../lib/core';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setCurrentPath } from '../lib/core';
+import { LaunchScreen } from '../components/LaunchScreen';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { colors } from '../theme/tokens';
 
+// Dipanggil di lingkup modul, bukan di dalam effect: effect pertama berjalan
+// SETELAH render pertama, dan pada saat itu splash native sudah sempat
+// disembunyikan otomatis — layarnya akan berkedip putih sesaat.
+void SplashScreen.preventAutoHideAsync();
+
 export default function RootLayout() {
   const pathname = usePathname();
+  const [sambutanSelesai, setSambutanSelesai] = useState(false);
+
+  // Lepas splash native begitu React siap menggambar. LaunchScreen memakai
+  // latar dan ikon yang sama, jadi user tidak melihat pergantian.
+  useEffect(() => {
+    void SplashScreen.hideAsync();
+  }, []);
 
   // Jaga agar laporan error tahu user sedang di layar mana.
   useEffect(() => {
@@ -50,6 +64,9 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)/login" options={{ title: 'Masuk' }} />
         <Stack.Screen name="spike" options={{ title: 'Spike Referer' }} />
       </Stack>
+      {/* Di atas Stack, bukan menggantikannya: navigator tetap dipasang dan
+          layar pertama sudah selesai memuat di belakang layar sambutan. */}
+      {!sambutanSelesai && <LaunchScreen onSelesai={() => setSambutanSelesai(true)} />}
     </SafeAreaProvider>
     </GestureHandlerRootView>
   );
