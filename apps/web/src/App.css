@@ -10617,9 +10617,6 @@ a:hover {
   .landing-orb {
     display: none;
   }
-  .landing-android-badge {
-    display: flex;
-  }
 
 }
 @media (max-width: 480px) {
@@ -13500,6 +13497,16 @@ a:hover {
   .splash-intro { transition: none; }
   .landing-android-badge { transition: none; }
   .landing-android-badge:hover { transform: none; }
+}
+/* Ditulis setelah aturan dasar (display:none) di atas, bukan digabung ke
+   media query landing lain yang letaknya lebih awal di berkas ini — dua
+   aturan display untuk selektor sama, yang belakangan menang di layar
+   sempit sekalipun; kalau override mobile ditulis lebih dulu, none dasar
+   yang menang dan badge tidak pernah muncul. */
+@media (max-width: 768px) {
+  .landing-android-badge {
+    display: flex;
+  }
 }
 
 /* ===== KOMENTAR ===== */
