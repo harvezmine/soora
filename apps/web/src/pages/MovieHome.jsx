@@ -18,6 +18,7 @@ import Top10Section from '../components/Top10Section';
 import SkeletonHero from '../components/SkeletonHero';
 import SkeletonSection from '../components/SkeletonSection';
 import CustomSelect from '../components/CustomSelect';
+import { IconGlobe, FlagID } from '../components/icons';
 
 
 /* ── filter options ── */
@@ -450,13 +451,13 @@ export default function MovieHome() {
                       className={`af-pill ${selectedLang === 'en' ? 'active' : ''}`}
                       onClick={() => setSelectedLang('en')}
                     >
-                      🌐 English
+                      <IconGlobe /> English
                     </button>
                     <button
                       className={`af-pill ${selectedLang === 'id' ? 'active' : ''}`}
                       onClick={() => setSelectedLang('id')}
                     >
-                      🇮🇩 Indonesia
+                      <FlagID /> Indonesia
                     </button>
                   </div>
                 </div>
@@ -750,7 +751,7 @@ export default function MovieHome() {
                 style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', cursor: 'pointer' }}
                 onClick={() => setSelectedLang('id')}
               >
-                🇮🇩 Switch to Indonesian Movies
+                <FlagID /> Switch to Indonesian Movies
               </button>
             </>
           )}

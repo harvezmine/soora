@@ -19,6 +19,7 @@ import Top10Section from '../components/Top10Section';
 import ContinueRow from '../components/ContinueRow';
 import SkeletonHero from '../components/SkeletonHero';
 import SkeletonSection from '../components/SkeletonSection';
+import { IconGlobe, FlagID } from '../components/icons';
 
 /* ── Section configs per language ── */
 const POPULAR_QUERIES = [
@@ -415,13 +416,13 @@ export default function MangaHome() {
                       className={`af-pill ${selectedLang === 'en' ? 'active' : ''}`}
                       onClick={() => setSelectedLang('en')}
                     >
-                      🌐 English
+                      <IconGlobe /> English
                     </button>
                     <button
                       className={`af-pill ${selectedLang === 'id' ? 'active' : ''}`}
                       onClick={() => setSelectedLang('id')}
                     >
-                      🇮🇩 Indonesia
+                      <FlagID /> Indonesia
                     </button>
                   </div>
                 </div>

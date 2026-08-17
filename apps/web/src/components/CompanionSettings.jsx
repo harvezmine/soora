@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { IconHewan, IconPaw, IconGear } from './icons';
 
 const ANIMALS = ['cat', 'fox', 'raccoon', 'bird'];
 const ANIMAL_LABELS = { cat: 'Cat', fox: 'Fox', raccoon: 'Raccoon', bird: 'Bird' };
-const ANIMAL_EMOJI  = { cat: '🐱', fox: '🦊', raccoon: '🦝', bird: '🐦' };
 
 const LS_ANIMAL  = 'soora_companion_animal';
 const LS_VISIBLE = 'soora_companion_visible';
@@ -47,7 +47,7 @@ export default function CompanionSettings({ animal, setAnimal, visible, setVisib
     <div className="companion-settings" ref={panelRef}>
       {open && (
         <div className="companion-settings-panel">
-          <div className="companion-settings-title">🐾 Animal Companion</div>
+          <div className="companion-settings-title"><IconPaw size={15} /> Animal Companion</div>
           <div className="companion-animal-picker">
             {ANIMALS.map(a => (
               <button
@@ -56,7 +56,7 @@ export default function CompanionSettings({ animal, setAnimal, visible, setVisib
                 onClick={() => setAnimal(a)}
                 title={ANIMAL_LABELS[a]}
               >
-                <span>{ANIMAL_EMOJI[a]}</span>
+                <span className="companion-animal-ikon"><IconHewan nama={a} /></span>
                 <span>{ANIMAL_LABELS[a]}</span>
               </button>
             ))}
@@ -77,7 +77,7 @@ export default function CompanionSettings({ animal, setAnimal, visible, setVisib
         onClick={() => setOpen(o => !o)}
         title="Companion settings"
       >
-        ⚙
+        <IconGear size={17} />
       </button>
     </div>
   );

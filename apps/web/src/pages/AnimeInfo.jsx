@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { getAnimeInfo, getHiAnimeInfo, getSamehadakuAnimeInfo, getSubIndoGenre } from '@soora/core/api';
 import { useSEO, buildAnimeSchema, buildAnimeUrl } from '../utils/seo';
+import { FlagID } from '../components/icons';
 
 /* ===== Skeleton Loader (inline, no extra component) ===== */
 function AnimeInfoSkeleton() {
@@ -446,7 +447,7 @@ export default function AnimeInfo() {
                       `/watch/anime?title=${encodeURIComponent(title)}&animeId=${encodeURIComponent(id)}&subIndo=1`
                     )}
                   >
-                    🇮🇩 Try Sub Indo
+                    <FlagID /> Try Sub Indo
                   </button>
                 </div>
               )}

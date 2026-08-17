@@ -14708,3 +14708,26 @@ a:hover {
 @media (max-width: 480px) {
   .wpg-btn { width: 100%; }
 }
+
+/* ===== IKON BERDAMPINGAN TEKS =====
+   Ikon SVG tidak duduk pada garis dasar teks seperti emoji, jadi tombol dan
+   label yang memuat keduanya diratakan sendiri. Satu tempat, supaya tiap
+   pemakaian baru tidak perlu mengaturnya lagi. */
+.af-pill,
+.kp-card-meta,
+.kp-detail-meta span,
+.companion-settings-title,
+.companion-animal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.kp-card-meta,
+.kp-detail-meta span { gap: 0.28rem; }
+.af-pill svg,
+.kp-card-meta svg,
+.kp-detail-meta span svg,
+.companion-settings-title svg { flex: none; }
+.companion-animal-btn { flex-direction: column; gap: 0.25rem; }
+.companion-animal-ikon { display: grid; place-items: center; }
+.kp-sep { opacity: 0.45; }

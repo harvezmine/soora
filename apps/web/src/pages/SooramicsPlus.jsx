@@ -14,6 +14,10 @@ import SkeletonHero from '../components/SkeletonHero';
 import SkeletonSection from '../components/SkeletonSection';
 import CustomSelect from '../components/CustomSelect';
 import Landing from './Landing';
+import {
+  IconGlobe, FlagJP, FlagCN, IconHeart, IconStar, IconBook,
+  IconFolder, IconPen, IconPages, IconHash, IconCalendar,
+} from '../components/icons';
 
 /* ════════════════════════════════════════════════════════
    CONSTANTS
@@ -31,9 +35,9 @@ const HOME_SECTIONS = [
 /** Language filter options (used with nhentai search syntax: language:xxx) */
 const LANG_OPTIONS = [
   { value: '', label: 'Semua' },
-  { value: 'english', label: '🌐 English' },
-  { value: 'japanese', label: '🇯🇵 Japanese' },
-  { value: 'chinese', label: '🇨🇳 Chinese' },
+  { value: 'english', label: 'English', ikon: IconGlobe },
+  { value: 'japanese', label: 'Japanese', ikon: FlagJP },
+  { value: 'chinese', label: 'Chinese', ikon: FlagCN },
 ];
 
 /** Type filter options (used with nhentai search syntax: category:xxx) */
@@ -214,7 +218,7 @@ function HScrollSection({ title, items, color, onItemClick }) {
               </div>
               <div className="kp-card-body">
                 <div className="kp-card-title">{book.title?.pretty || book.title?.english || `#${book.id}`}</div>
-                <div className="kp-card-meta">{book.num_pages}p • ❤️ {book.num_favorites || 0}</div>
+                <div className="kp-card-meta">{book.num_pages}p <span className="kp-sep">·</span> <IconHeart size={12} /> {book.num_favorites || 0}</div>
               </div>
             </div>
           ))}
@@ -1119,11 +1123,11 @@ export default function SooramicsPlus() {
                   ))}
                 </div>
                 <div className="kp-detail-meta">
-                  {djDetail.status && <span>📖 {djDetail.status}</span>}
-                  {djDetail.type && <span>📁 {djDetail.type}</span>}
-                  {djDetail.author && <span>✍️ {djDetail.author}</span>}
-                  {djDetail.score && <span>⭐ {djDetail.score}</span>}
-                  <span>📑 {djDetail.chapters?.length || 0} chapter{djDetail.chapters?.length !== 1 ? 's' : ''}</span>
+                  {djDetail.status && <span><IconBook size={13} /> {djDetail.status}</span>}
+                  {djDetail.type && <span><IconFolder size={13} /> {djDetail.type}</span>}
+                  {djDetail.author && <span><IconPen size={13} /> {djDetail.author}</span>}
+                  {djDetail.score && <span><IconStar size={13} /> {djDetail.score}</span>}
+                  <span><IconPages size={13} /> {djDetail.chapters?.length || 0} chapter{djDetail.chapters?.length !== 1 ? 's' : ''}</span>
                 </div>
                 {djDetail.synopsis && (
                   <p className="kp-detail-subtitle" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, opacity: 0.8 }}>{djDetail.synopsis}</p>
@@ -1201,10 +1205,10 @@ export default function SooramicsPlus() {
                   ))}
                 </div>
                 <div className="kp-detail-meta">
-                  <span>📖 {detailBook.num_pages} pages</span>
-                  <span>❤️ {detailBook.num_favorites || 0}</span>
-                  <span>🆔 #{detailBook.id}</span>
-                  {detailBook.upload_date && <span>🗓️ {new Date(detailBook.upload_date * 1000).toLocaleDateString()}</span>}
+                  <span><IconBook size={13} /> {detailBook.num_pages} pages</span>
+                  <span><IconHeart size={13} /> {detailBook.num_favorites || 0}</span>
+                  <span><IconHash size={13} /> {detailBook.id}</span>
+                  {detailBook.upload_date && <span><IconCalendar size={13} /> {new Date(detailBook.upload_date * 1000).toLocaleDateString()}</span>}
                 </div>
                 <div className="kp-detail-actions">
                   <button className="btn-play sooramicsplus-btn-play" onClick={() => openReader(0)}>
@@ -1431,7 +1435,7 @@ export default function SooramicsPlus() {
                   <div className="kp-card-body">
                     <div className="kp-card-title">{item.title || 'Untitled'}</div>
                     <div className="kp-card-meta">
-                      {item.score && `⭐ ${item.score}`}
+                      {item.score && <><IconStar size={12} /> {item.score}</>}
                       {item.chapter && ` • ${item.chapter}`}
                     </div>
                   </div>
@@ -1486,7 +1490,7 @@ export default function SooramicsPlus() {
                     <span className="af-label">Bahasa</span>
                     <div className="af-pills">
                       {LANG_OPTIONS.map((o) => (
-                        <button key={o.value} className={`af-pill ${browseLang === o.value ? 'active' : ''}`} onClick={() => { setBrowseLang(o.value); setSearchMode(false); }}>{o.label}</button>
+                        <button key={o.value} className={`af-pill ${browseLang === o.value ? 'active' : ''}`} onClick={() => { setBrowseLang(o.value); setSearchMode(false); }}>{o.ikon ? <o.ikon size={13} /> : null}{o.label}</button>
                       ))}
                     </div>
                   </div>
@@ -1495,7 +1499,7 @@ export default function SooramicsPlus() {
                     <span className="af-label">Tipe</span>
                     <div className="af-pills">
                       {TYPE_OPTIONS.map((o) => (
-                        <button key={o.value} className={`af-pill ${browseType === o.value ? 'active' : ''}`} onClick={() => { setBrowseType(o.value); setSearchMode(false); }}>{o.label}</button>
+                        <button key={o.value} className={`af-pill ${browseType === o.value ? 'active' : ''}`} onClick={() => { setBrowseType(o.value); setSearchMode(false); }}>{o.ikon ? <o.ikon size={13} /> : null}{o.label}</button>
                       ))}
                     </div>
                   </div>
@@ -1548,7 +1552,7 @@ export default function SooramicsPlus() {
                     <span className="af-label">Sort</span>
                     <div className="af-pills">
                       {SORT_OPTIONS.map((o) => (
-                        <button key={o.value} className={`af-pill ${filterSort === o.value ? 'active' : ''}`} onClick={() => { setFilterSort(o.value); setSearchMode(false); }}>{o.label}</button>
+                        <button key={o.value} className={`af-pill ${filterSort === o.value ? 'active' : ''}`} onClick={() => { setFilterSort(o.value); setSearchMode(false); }}>{o.ikon ? <o.ikon size={13} /> : null}{o.label}</button>
                       ))}
                     </div>
                   </div>
@@ -1610,7 +1614,7 @@ export default function SooramicsPlus() {
                   </div>
                   <div className="kp-card-body">
                     <div className="kp-card-title">{book.title?.pretty || book.title?.english || `#${book.id}`}</div>
-                    <div className="kp-card-meta">{book.num_pages}p • ❤️ {book.num_favorites || 0}</div>
+                    <div className="kp-card-meta">{book.num_pages}p <span className="kp-sep">·</span> <IconHeart size={12} /> {book.num_favorites || 0}</div>
                   </div>
                 </div>
               ))}
@@ -1749,7 +1753,7 @@ export default function SooramicsPlus() {
                     <div className="kp-card-body">
                       <div className="kp-card-title">{item.title || 'Untitled'}</div>
                       <div className="kp-card-meta">
-                        {item.score && `⭐ ${item.score}`}
+                        {item.score && <><IconStar size={12} /> {item.score}</>}
                         {item.chapter && ` • ${item.chapter}`}
                       </div>
                     </div>
@@ -1793,7 +1797,7 @@ export default function SooramicsPlus() {
                   <div className="kp-card-body">
                     <div className="kp-card-title">{item.title || 'Untitled'}</div>
                     <div className="kp-card-meta">
-                      {item.score && `⭐ ${item.score}`}
+                      {item.score && <><IconStar size={12} /> {item.score}</>}
                       {item.chapter && ` • ${item.chapter}`}
                     </div>
                   </div>
@@ -1891,7 +1895,7 @@ export default function SooramicsPlus() {
                   <span className="af-label">Bahasa</span>
                   <div className="af-pills">
                     {LANG_OPTIONS.map((o) => (
-                      <button key={o.value} className={`af-pill ${homeFilterLang === o.value ? 'active' : ''}`} onClick={() => setHomeFilterLang(o.value)}>{o.label}</button>
+                      <button key={o.value} className={`af-pill ${homeFilterLang === o.value ? 'active' : ''}`} onClick={() => setHomeFilterLang(o.value)}>{o.ikon ? <o.ikon size={13} /> : null}{o.label}</button>
                     ))}
                   </div>
                 </div>
@@ -1900,7 +1904,7 @@ export default function SooramicsPlus() {
                   <span className="af-label">Tipe</span>
                   <div className="af-pills">
                     {TYPE_OPTIONS.map((o) => (
-                      <button key={o.value} className={`af-pill ${homeFilterType === o.value ? 'active' : ''}`} onClick={() => setHomeFilterType(o.value)}>{o.label}</button>
+                      <button key={o.value} className={`af-pill ${homeFilterType === o.value ? 'active' : ''}`} onClick={() => setHomeFilterType(o.value)}>{o.ikon ? <o.ikon size={13} /> : null}{o.label}</button>
                     ))}
                   </div>
                 </div>
@@ -1953,7 +1957,7 @@ export default function SooramicsPlus() {
                   <span className="af-label">Sort</span>
                   <div className="af-pills">
                     {SORT_OPTIONS.map((o) => (
-                      <button key={o.value} className={`af-pill ${homeFilterSort === o.value ? 'active' : ''}`} onClick={() => setHomeFilterSort(o.value)}>{o.label}</button>
+                      <button key={o.value} className={`af-pill ${homeFilterSort === o.value ? 'active' : ''}`} onClick={() => setHomeFilterSort(o.value)}>{o.ikon ? <o.ikon size={13} /> : null}{o.label}</button>
                     ))}
                   </div>
                 </div>
@@ -2023,7 +2027,7 @@ export default function SooramicsPlus() {
                   </div>
                   <div className="kp-card-body">
                     <div className="kp-card-title">{book.title?.pretty || book.title?.english || `#${book.id}`}</div>
-                    <div className="kp-card-meta">{book.num_pages}p • ❤️ {book.num_favorites || 0}</div>
+                    <div className="kp-card-meta">{book.num_pages}p <span className="kp-sep">·</span> <IconHeart size={12} /> {book.num_favorites || 0}</div>
                   </div>
                 </div>
               ))}

@@ -45,7 +45,6 @@ const THEME = {
     title: 'Anime',
     subtitle: 'Find your next favorite anime',
     placeholder: 'Search anime...',
-    icon: '🎬',
     cls: 'sooranime',
   },
   movie: {
@@ -57,7 +56,6 @@ const THEME = {
     title: 'Movies & TV Shows',
     subtitle: 'Discover the latest movies and series',
     placeholder: 'Search movies & TV shows...',
-    icon: '🎬',
     cls: 'sooraflix',
   },
   manga: {
@@ -69,7 +67,6 @@ const THEME = {
     title: 'Manga & Comics',
     subtitle: 'Find your next favorite manga, manhwa, or manhua',
     placeholder: 'Search manga, manhwa, manhua...',
-    icon: '📖',
     cls: 'sooramics',
   },
 };
