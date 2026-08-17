@@ -48,6 +48,13 @@ const BITRATE_MAKS = 48_000;
 const METER_MS = 60;
 
 /**
+ * Jarak antar-sapuan sambungan yang macet. Cukup lama supaya sambungan yang
+ * sedang berjalan normal tidak pernah tersapu, cukup sering supaya orang
+ * tidak sempat menyimpulkan temannya diam saja.
+ */
+const PENGAWAS_MS = 5000;
+
+/**
  * Setelan tangkapan mikrofon.
  *
  * `latency` hanya berupa petunjuk; peramban boleh mengabaikannya, tapi bila
@@ -106,11 +113,15 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   const koneksi = new Map();
   /** @type {Map<string, HTMLAudioElement>} */
   const suara = new Map();
-  const analisis = new Map(); // id -> { an, data, vad }
+  const analisis = new Map(); // id -> { an, data, vad, src, gain, tersambung }
   // Keadaan tawar-menawar per lawan. Harus per sambungan, bukan satu untuk
   // semua: tabrakan dengan satu orang tidak boleh membatalkan tawaran ke
   // orang lain.
   const nego = new Map(); // id -> { menawar, abaikan, sudahUlangIce }
+  const gagalUlang = new Map(); // id -> berapa kali sudah dibangun ulang
+  const jadwalPulih = new Map(); // id -> timer
+  /** Siapa saja yang seharusnya ada di mesh sekarang. */
+  let roster = new Set();
   // Cuplikan statistik sebelumnya per lawan, untuk menghitung selisih.
   const statsLalu = new Map(); // id -> { delay, count }
   // Volume yang diminta per peserta, 0..2. Disimpan lepas dari elemen audio
@@ -122,6 +133,7 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   let audioCtx = null;
   let meterTimer = null;
   let statsTimer = null;
+  let pengawasTimer = null;
   let mati = false;
   let bisu = false;
   let deafen = false;
@@ -129,12 +141,46 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   // dikembalikan persis begitu deafen dimatikan.
   let bisuSebelumDeafen = false;
 
-  /** Terapkan volume tersimpan (bila ada) ke sebuah elemen audio yang baru dibuat. */
+  /**
+   * Terapkan volume seseorang, 0..VOLUME_MAX.
+   *
+   * Dua lapis, karena HTMLMediaElement.volume dibatasi peramban ke 0..1:
+   * sampai 100% cukup elemennya sendiri, di atas itu elemennya dibisukan dan
+   * Web Audio yang memutar sekaligus menguatkan.
+   *
+   * Sebelumnya penguatnya tidak pernah ada — nilainya cuma dititipkan ke
+   * sebuah properti lalu tidak pernah dibaca siapa pun, jadi menggeser slider
+   * ke atas 100% sama sekali tidak terdengar. Itu sebabnya orang yang
+   * mikrofonnya pelan tetap pelan walau volumenya sudah dinaikkan.
+   */
   const terapkanVolume = (id, el) => {
-    const v = volumeDiminta.get(id);
-    const { element, gain } = volumeToElementGain(v ?? 1);
-    el.volume = element;
-    el._soorGain = gain; // dibaca ulang kalau nanti dipasangi GainNode
+    const target = el || suara.get(id);
+    const { element, gain } = volumeToElementGain(volumeDiminta.get(id) ?? 1);
+    const a = analisis.get(id);
+    // Penguat hanya dipakai bila konteks audionya benar-benar berjalan.
+    // Kalau tidak, memindahkan pemutaran ke Web Audio justru membuat sunyi
+    // total — lebih buruk daripada sekadar kurang keras.
+    const pakaiPenguat = gain > 1 && a?.gain && audioCtx?.state === 'running';
+
+    if (pakaiPenguat) {
+      if (target) target.muted = true;
+      a.gain.gain.value = deafen ? 0 : gain;
+      if (!a.tersambung) { a.gain.connect(audioCtx.destination); a.tersambung = true; }
+      return;
+    }
+    if (a?.tersambung) {
+      try { a.gain.disconnect(audioCtx.destination); } catch { /* sudah lepas */ }
+      a.tersambung = false;
+    }
+    if (target) { target.muted = deafen; target.volume = element; }
+  };
+
+  /** Lepas simpul Web Audio milik seseorang. */
+  const lepasAudio = (id) => {
+    const a = analisis.get(id);
+    if (!a) return;
+    try { if (a.tersambung) a.gain.disconnect(audioCtx.destination); } catch { /* sudah lepas */ }
+    try { a.src.disconnect(); } catch { /* sudah lepas */ }
   };
 
   /**
@@ -149,6 +195,11 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     const pc = koneksi.get(idLawan);
     const n = nego.get(idLawan);
     if (!pc || !n) return;
+    // Menawar hanya dari keadaan tenang. Bila sedang di tengah tawar-menawar,
+    // peramban menyalakan lagi peristiwa negotiationneeded begitu keadaannya
+    // kembali stabil — jadi menundanya di sini tidak menghilangkan apa pun,
+    // sementara memaksa createOffer di keadaan lain justru melempar galat.
+    if (pc.signalingState !== 'stable') return;
     try {
       n.menawar = true;
       const offer = await pc.createOffer();
@@ -217,59 +268,65 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
         const n = nego.get(idLawan);
         // ICE bisa pulih tanpa membangun sambungan baru — jalur yang tadinya
         // hilang sering kembali setelah kandidat dikumpulkan ulang. Dicoba
-        // sekali, dan hanya oleh sisi yang tidak sopan, supaya dua sisi tidak
+        // dulu, dan hanya oleh sisi yang tidak sopan, supaya dua sisi tidak
         // me-restart bersamaan lalu saling membatalkan.
         if (n && !n.sudahUlangIce && !akuYangSopan(selfId, idLawan)) {
           n.sudahUlangIce = true;
-          try { pc.restartIce(); return; } catch { /* peramban lama: lanjut menyerah */ }
+          try { pc.restartIce(); return; } catch { /* peramban lama: bangun ulang saja */ }
         }
-        // Hampir selalu berarti NAT simetris tanpa TURN. Dikatakan, bukan
-        // dibiarkan terlihat seperti lawan bicara yang diam saja.
-        onError?.('Sambungan suara ke salah satu peserta gagal. Jaringanmu mungkin memblokirnya.');
-        putus(idLawan);
+        bangunUlang(idLawan);
       } else if (keadaan === 'closed') {
         putus(idLawan);
       } else if (keadaan === 'connected') {
-        // Pulih: izinkan satu percobaan ICE lagi bila nanti gagal lagi.
+        // Pulih: hitungan percobaan disetel ulang, supaya gangguan berikutnya
+        // dapat jatah penuh lagi dan bukan langsung menyerah.
         const n = nego.get(idLawan);
         if (n) n.sudahUlangIce = false;
+        gagalUlang.delete(idLawan);
       }
     };
 
-    /**
-     * Siapa yang menyiapkan jalur audio pertama.
-     *
-     * Punya mikrofon berarti harus addTrack — tanpa itu tidak ada yang
-     * dikirim. Tanpa mikrofon, jalurnya dibuka HANYA oleh sisi yang tidak
-     * sopan; sisi sopan sengaja tidak membuat apa-apa dan menunggu tawaran
-     * datang.
-     *
-     * Alasannya ditemukan lewat uji dua peramban sungguhan: kalau kedua sisi
-     * sama-sama memanggil addTransceiver lalu sama-sama menawar, sisi sopan
-     * membatalkan tawarannya dan menerima tawaran lawan — tapi Chrome TIDAK
-     * memakai ulang transceiver yang sudah telanjur ia buat sendiri. Ia
-     * membuat yang kedua. Hasilnya SDP dengan dua m=audio; yang kedua tidak
-     * pernah selesai dirundingkan, dan justru ke situlah trek mikrofon
-     * dipasang belakangan. Sambungan tampak "connected", penanda bicara
-     * menyala, paket audio nol.
-     *
-     * Dengan hanya satu sisi yang membuka, tawaran pertama tidak pernah
-     * bertabrakan sama sekali, dan sisi sopan mendapat transceiver-nya dari
-     * tawaran itu — satu m=audio, dipakai bersama selamanya.
-     */
-    if (lokal) {
-      setelPengirim(pc.addTrack(lokal.getAudioTracks()[0], lokal));
-    } else if (!akuYangSopan(selfId, idLawan)) {
-      pc.addTransceiver('audio', { direction: 'recvonly' });
-    }
+    // Jalur audio TIDAK dibuat di sini. Lihat bukaJalur().
     koneksi.set(idLawan, pc);
     return pc;
   };
 
+  /**
+   * Buka satu-satunya jalur audio untuk sebuah sambungan.
+   *
+   * Hanya sisi yang tidak sopan yang boleh membukanya, dan hanya secara
+   * proaktif — tidak pernah sebagai reaksi atas sinyal yang masuk. Sisi sopan
+   * sengaja tidak membuat apa pun; ia menerima jalurnya dari tawaran lawan.
+   *
+   * Aturan sekaku ini lahir dari dua kali salah. Kalau kedua sisi sama-sama
+   * membuat transceiver lalu sama-sama menawar, sisi sopan membatalkan
+   * tawarannya sendiri dan menerima tawaran lawan — tapi Chrome TIDAK memakai
+   * ulang transceiver yang telanjur ia buat. Ia membuat yang kedua. Hasilnya
+   * SDP dengan dua m=audio; yang kedua tidak pernah selesai dirundingkan, dan
+   * justru ke situlah trek mikrofon dipasang. Sambungan tampak "connected",
+   * penanda bicara menyala, paket audio nol.
+   *
+   * Sekali sisi pembuka ditetapkan, tawaran pertama tidak pernah bertabrakan,
+   * dan seterusnya cuma ada satu m=audio yang dipakai bersama.
+   */
+  const bukaJalur = (pc, idLawan) => {
+    if (akuYangSopan(selfId, idLawan)) return; // menunggu tawaran
+    if (transceiverAudio(pc)) return;          // sudah terbuka
+    if (lokal) setelPengirim(pc.addTrack(lokal.getAudioTracks()[0], lokal));
+    else pc.addTransceiver('audio', { direction: 'recvonly' });
+  };
+
   /** Pasang atau ganti trek kirim pada satu sambungan, ubah arahnya jadi sendrecv. */
-  const pasangTrekKirim = async (pc, track) => {
+  const pasangTrekKirim = async (pc, track, idLawan) => {
     const trans = transceiverAudio(pc);
-    if (!trans) { setelPengirim(pc.addTrack(track, lokal)); return; }
+    if (!trans) {
+      // Belum ada jalur. Sisi sopan tidak boleh membuatnya sendiri — treknya
+      // dipasang di terima(), begitu tawaran lawan membuka jalurnya. Kalau ia
+      // memaksa addTrack di sini, lahir m=audio kedua dan suaranya hilang.
+      if (akuYangSopan(selfId, idLawan)) return;
+      setelPengirim(pc.addTrack(track, lokal));
+      return;
+    }
     if (trans.direction !== 'sendrecv') trans.direction = 'sendrecv';
     await trans.sender.replaceTrack(track);
     // Lekatkan stream-nya supaya msid ikut tertulis di SDP. Penerima sudah
@@ -294,12 +351,24 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       // Peramban memulai konteks audio dalam keadaan tertahan sampai ada
       // gerak pengguna.
       if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      lepasAudio(id); // simpul lama, bila trek diganti di tengah jalan
       const src = audioCtx.createMediaStreamSource(stream);
       const an = audioCtx.createAnalyser();
       an.fftSize = 512;
       an.smoothingTimeConstant = 0.2;
       src.connect(an);
-      analisis.set(id, { an, data: new Uint8Array(an.frequencyBinCount), vad: createVad() });
+      // Penguat disiapkan tapi belum tersambung ke keluaran: selama volumenya
+      // masih 100% ke bawah, elemen audio yang memutar.
+      const gain = audioCtx.createGain();
+      gain.gain.value = 1;
+      src.connect(gain);
+      analisis.set(id, {
+        an, data: new Uint8Array(an.frequencyBinCount), vad: createVad(),
+        src, gain, tersambung: false,
+      });
+      // Volume dipasang ulang sekarang penguatnya ada — permintaan di atas
+      // 100% yang datang sebelum ini baru bisa berlaku di sini.
+      if (id !== selfId) terapkanVolume(id);
       mulaiMeter();
     } catch { /* meter hanya penanda; kegagalannya tidak boleh mematikan suara */ }
   };
@@ -360,7 +429,73 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     }, 4000);
   };
 
+  /** Berapa kali sambungan ke satu orang boleh dibangun ulang sebelum menyerah. */
+  const MAKS_BANGUN_ULANG = 3;
+
+  /**
+   * Bangun ulang sambungan yang gagal.
+   *
+   * Sebelumnya sambungan gagal hanya ditutup lalu dilupakan — dan tidak ada
+   * yang pernah mencobanya lagi, sebab mesh cuma disusun ulang saat daftar
+   * peserta berubah. Akibatnya satu gangguan sesaat membuat satu orang bisu
+   * selamanya bagi satu orang lain, sementara semua pasangan lain terdengar
+   * normal. Persis keluhan "cuma dia yang tidak kedengaran".
+   */
+  const bangunUlang = (idLawan) => {
+    if (mati) return;
+    const percobaan = (gagalUlang.get(idLawan) || 0) + 1;
+    putus(idLawan);
+    if (!roster.has(idLawan)) return; // orangnya memang sudah pergi
+    if (percobaan > MAKS_BANGUN_ULANG) {
+      gagalUlang.delete(idLawan);
+      // Baru sekarang dikatakan, setelah benar-benar dicoba berkali-kali —
+      // bukan pada kedipan pertama.
+      onError?.('Tidak bisa menyambung suara ke salah satu peserta. Biasanya karena jaringan salah satu pihak memblokir sambungan langsung.');
+      return;
+    }
+    gagalUlang.set(idLawan, percobaan);
+    // Mundur bertahap: dua sisi bisa sama-sama mencoba, dan jeda yang makin
+    // panjang mencegah keduanya terus bertabrakan.
+    const jeda = Math.min(8000, 800 * 2 ** (percobaan - 1));
+    clearTimeout(jadwalPulih.get(idLawan));
+    jadwalPulih.set(idLawan, setTimeout(() => {
+      jadwalPulih.delete(idLawan);
+      if (mati || !roster.has(idLawan) || koneksi.has(idLawan)) return;
+      const pc = buatKoneksi(idLawan);
+      bukaJalur(pc, idLawan);
+      // Sisi sopan tidak membuka jalur, jadi ia hanya menunggu. Kalau lawan
+      // juga sedang menunggu, ronde berikutnya yang menyelesaikan.
+      if (lokal) pasangTrekKirim(pc, lokal.getAudioTracks()[0], idLawan);
+    }, jeda));
+  };
+
+  /**
+   * Sapu berkala sambungan yang tidak pernah berangkat.
+   *
+   * `connectionState` yang masih "new" beberapa detik setelah sambungan
+   * dibuat berarti tawarannya tidak pernah terkirim atau hilang di jalan —
+   * bukan sekadar lambat, sebab begitu tawaran terpasang keadaannya langsung
+   * pindah ke "connecting". Tanpa sapuan ini satu amplop sinyal yang hilang
+   * membuat sepasang orang bisu satu sama lain selamanya, sementara semua
+   * pasangan lain terdengar normal — dan itu yang paling membingungkan
+   * dilihat dari dalam ruang.
+   */
+  const mulaiPengawas = () => {
+    if (pengawasTimer) return;
+    pengawasTimer = setInterval(() => {
+      for (const [id, pc] of koneksi) {
+        if (!roster.has(id) || pc.connectionState !== 'new') continue;
+        if (akuYangSopan(selfId, id)) continue; // bukan pembuka; menunggu saja
+        bukaJalur(pc, id);
+        tawarkan(id);
+      }
+    }, PENGAWAS_MS);
+  };
+
   const putus = (idLawan) => {
+    clearTimeout(jadwalPulih.get(idLawan));
+    jadwalPulih.delete(idLawan);
+    lepasAudio(idLawan);
     koneksi.get(idLawan)?.close();
     koneksi.delete(idLawan);
     const el = suara.get(idLawan);
@@ -384,7 +519,7 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       pasangMeter(selfId, lokal);
       mulaiStats();
       const track = lokal.getAudioTracks()[0];
-      for (const pc of koneksi.values()) await pasangTrekKirim(pc, track);
+      for (const [id, pc] of koneksi) await pasangTrekKirim(pc, track, id);
       return lokal;
     },
 
@@ -437,7 +572,10 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       const mau = !!nilai;
       if (mau === deafen) return;
       deafen = mau;
-      for (const el of suara.values()) el.muted = deafen;
+      // Lewat terapkanVolume, bukan menyetel `muted` langsung: yang volumenya
+      // di atas 100% diputar oleh penguat Web Audio, dan membisukan elemennya
+      // saja tidak menghentikan apa pun di jalur itu.
+      for (const id of suara.keys()) terapkanVolume(id);
       if (deafen) {
         bisuSebelumDeafen = bisu;
         api.setBisu(true);
@@ -452,8 +590,13 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
      */
     setVolume(idLawan, v) {
       volumeDiminta.set(idLawan, v);
-      const el = suara.get(idLawan);
-      if (el) terapkanVolume(idLawan, el);
+      // Konteks audio bisa masih tertahan sampai ada gerak pengguna; menggeser
+      // slider itu sendiri sudah gerak pengguna, jadi dibangunkan di sini —
+      // tanpa itu penguat di atas 100% tidak akan berbunyi.
+      if (audioCtx?.state === 'suspended') {
+        audioCtx.resume().then(() => terapkanVolume(idLawan)).catch(() => {});
+      }
+      terapkanVolume(idLawan);
     },
     getVolume(idLawan) { return volumeDiminta.get(idLawan) ?? 1; },
 
@@ -484,6 +627,12 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
           if (putusan.rollback) await pc.setLocalDescription({ type: 'rollback' });
           await pc.setRemoteDescription(data);
           if (putusan.jawab) {
+            // Sisi sopan tidak pernah membuka jalur sendiri, jadi inilah saat
+            // pertama trek mikrofonnya punya tempat. Dipasang SEBELUM jawaban
+            // dibuat supaya arah sendrecv ikut terbawa — kalau dipasang
+            // sesudahnya, perlu satu putaran tawar-menawar lagi dan ada jeda
+            // bisu di antaranya.
+            if (lokal) await pasangTrekKirim(pc, lokal.getAudioTracks()[0], from);
             const answer = await pc.createAnswer();
             // Setelan Opus juga dipasang di jawaban: keduanya harus sepakat
             // agar berlaku dua arah.
@@ -513,8 +662,13 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
      */
     selaraskan(idBergabung) {
       const perlu = new Set(idBergabung.filter((id) => id !== selfId));
+      roster = perlu;
       for (const id of koneksi.keys()) if (!perlu.has(id)) putus(id);
-      for (const id of perlu) if (!koneksi.has(id)) buatKoneksi(id);
+      // bukaJalur dipanggil juga untuk sambungan yang sudah ada: sambungan
+      // bisa lahir lebih dulu dari sinyal yang masuk (mis. kandidat ICE
+      // menyusul lebih cepat), dan yang lahir begitu sengaja belum berjalur.
+      for (const id of perlu) bukaJalur(buatKoneksi(id), id);
+      if (perlu.size) mulaiPengawas();
     },
 
     putus,
@@ -524,6 +678,11 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       mati = true;
       clearInterval(meterTimer); meterTimer = null;
       clearInterval(statsTimer); statsTimer = null;
+      clearInterval(pengawasTimer); pengawasTimer = null;
+      for (const t of jadwalPulih.values()) clearTimeout(t);
+      jadwalPulih.clear();
+      gagalUlang.clear();
+      roster = new Set();
       api.matikanMic();
       for (const id of [...koneksi.keys()]) putus(id);
       audioCtx?.close().catch(() => {});

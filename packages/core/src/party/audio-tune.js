@@ -227,7 +227,12 @@ export function nilaiLatensi(ms) {
  */
 export const VOLUME_MIN = 0;
 export const VOLUME_DEFAULT = 1;
-export const VOLUME_MAX = 2;
+/**
+ * 300%. Batas ini praktis, bukan teoretis: mikrofon laptop yang jauh dari
+ * mulut sering tetap terlalu pelan di 200%, dan menaikkannya jauh lebih
+ * murah daripada meminta orangnya mengatur ulang perangkat.
+ */
+export const VOLUME_MAX = 3;
 
 export function clampVolume(v) {
   const n = Number(v);

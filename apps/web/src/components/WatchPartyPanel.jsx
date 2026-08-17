@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { nilaiLatensi, TINGKAT_SUARA_MAKS } from '@soora/core/party/audio-tune';
+import {
+  nilaiLatensi, TINGKAT_SUARA_MAKS, VOLUME_MIN, VOLUME_MAX,
+} from '@soora/core/party/audio-tune';
 import {
   IconMicOn, IconMicOff, IconHeadsetOn, IconHeadsetOff, IconPhoneOff, IconGear,
 } from './icons';
@@ -240,8 +242,8 @@ export default function WatchPartyPanel({
                       <input
                         type="range"
                         className="wpp-vol-slider"
-                        min={0}
-                        max={2}
+                        min={VOLUME_MIN}
+                        max={VOLUME_MAX}
                         step={0.05}
                         value={volumes[o.id] ?? 1}
                         onChange={(e) => onSetVolume?.(o.id, parseFloat(e.target.value))}
@@ -314,8 +316,13 @@ export default function WatchPartyPanel({
         ) : (
           <>
             <div className="wpp-suara-baris">
+              {/* Hijau hanya bila suaranya benar-benar terkirim. Mikrofon yang
+                  belum pernah dibuka dan mikrofon yang dibisukan sama-sama
+                  merah: keduanya berarti tidak ada yang mendengarmu, dan
+                  keadaan netral berwarna putih dulu membuat orang mengira
+                  dirinya sedang terdengar. */}
               <button
-                className={`wpp-bulat ${micOn && !bisu ? 'nyala' : ''} ${micOn && bisu ? 'bisu' : ''}`}
+                className={`wpp-bulat ${micOn && !bisu ? 'nyala' : 'bisu'}`}
                 // Mikrofon yang belum pernah dibuka: tekan untuk membukanya.
                 // Sudah terbuka: tekan hanya membisukan/membunyikan lagi —
                 // perangkatnya tetap dipegang, tak perlu minta izin ulang
