@@ -7942,12 +7942,15 @@ a:hover {
   border-radius: 3px;
   pointer-events: none;
 }
+/* Merah, bukan warna vertikal: bar merah adalah konvensi pemutar video
+   (YouTube, Netflix). Kefamiliaran di sini lebih berharga daripada
+   konsistensi merek. */
 .nf-progress-filled {
   position: absolute;
   left: 0;
   top: 0;
   height: 100%;
-  background: var(--accent);
+  background: var(--flix);
   border-radius: 3px;
   pointer-events: none;
 }
@@ -7956,11 +7959,11 @@ a:hover {
   top: 50%;
   left: 100%;
   transform: translate(-50%, -50%) scale(0);
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px rgba(124,92,252,0.5);
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.55);
   transition: transform 0.15s ease;
   pointer-events: none;
 }
@@ -8001,7 +8004,7 @@ a:hover {
 .nf-btn:hover {
   background: rgba(255,255,255,0.12);
 }
-.nf-btn-on { color: var(--accent, #7c5cfc); }
+.nf-btn-on { color: var(--flix); }
 .nf-btn-on::after {
   content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
   width: 4px; height: 4px; border-radius: 50%; background: var(--accent, #7c5cfc);
