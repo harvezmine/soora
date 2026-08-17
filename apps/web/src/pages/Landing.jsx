@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import SplashIntro from '../components/SplashIntro';
 import { useEffect, useRef, useState } from 'react';
+import { ACCENTS, alpha } from '../theme';
 
 /* ── PWA install prompt cache ── */
 let _deferredPrompt = null;
@@ -76,7 +77,7 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
         vy: (Math.random() - 0.5) * 0.3,
         r: Math.random() * 2 + 0.5,
         alpha: Math.random() * 0.5 + 0.1,
-        color: ['#7c5cfc', '#ff6b9d', '#00d4aa', '#fbbf24'][Math.floor(Math.random() * 4)],
+        color: [ACCENTS.anime, ACCENTS.flix, ACCENTS.mics, ACCENTS.gold][Math.floor(Math.random() * 4)],
       });
     }
 
@@ -99,7 +100,7 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
 
       // Draw connections
       ctx.globalAlpha = 0.03;
-      ctx.strokeStyle = '#7c5cfc';
+      ctx.strokeStyle = ACCENTS.anime;
       ctx.lineWidth = 0.5;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
@@ -129,7 +130,7 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
     {
       name: 'sooranime',
       accent: 'anime',
-      color: '#7c5cfc',
+      color: ACCENTS.anime,
       glow: 'rgba(124, 92, 252, 0.3)',
       icon: (
         <svg viewBox="0 0 64 64" fill="none" width="48" height="48">
@@ -148,8 +149,8 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
     {
       name: 'sooraflix',
       accent: 'aflix',
-      color: '#ff6b9d',
-      glow: 'rgba(255, 107, 157, 0.3)',
+      color: ACCENTS.flix,
+      glow: alpha('flix', 0.3),
       icon: (
         <svg viewBox="0 0 64 64" fill="none" width="48" height="48">
           <rect x="8" y="14" width="48" height="32" rx="4" stroke="currentColor" strokeWidth="2" opacity="0.3"/>
@@ -167,7 +168,7 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
     {
       name: 'sooramics',
       accent: 'amics',
-      color: '#00d4aa',
+      color: ACCENTS.mics,
       glow: 'rgba(0, 212, 170, 0.3)',
       icon: (
         <svg viewBox="0 0 64 64" fill="none" width="48" height="48">

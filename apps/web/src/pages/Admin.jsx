@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { ACCENTS } from '../theme';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const PASS_KEY = 'soora_admin_pass';
@@ -32,7 +33,7 @@ const dayLabel = (iso) => {
 };
 
 /* ════ tiny inline SVG charts (no chart lib — keeps bundle lean) ════ */
-function AreaChart({ data, accent = '#7c5cfc' }) {
+function AreaChart({ data, accent = ACCENTS.anime }) {
   const W = 320, H = 90, P = 6;
   const max = Math.max(1, ...data.map((d) => d.count));
   const step = data.length > 1 ? (W - P * 2) / (data.length - 1) : 0;
@@ -87,7 +88,7 @@ function Donut({ segments, size = 132 }) {
   );
 }
 
-function BarList({ items, accent = '#7c5cfc' }) {
+function BarList({ items, accent = ACCENTS.anime }) {
   const max = Math.max(1, ...items.map((i) => i.totalSeconds));
   if (!items.length || max <= 1) return <div className="admin-bars-empty">Belum ada data waktu tonton.</div>;
   return (
@@ -204,7 +205,7 @@ export default function Admin() {
     });
 
   const HERO = [
-    { label: 'Total User', value: s.totalUsers ?? 0, sub: `+${s.newWeek ?? 0} minggu ini`, accent: '#7c5cfc',
+    { label: 'Total User', value: s.totalUsers ?? 0, sub: `+${s.newWeek ?? 0} minggu ini`, accent: ACCENTS.anime,
       icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></> },
     { label: 'Online Sekarang', value: s.online ?? 0, sub: 'aktif < 2 menit', accent: '#22c55e', live: true,
       icon: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></> },
@@ -281,9 +282,9 @@ export default function Admin() {
         <div className="admin-panel">
           <div className="admin-panel-head"><h3>Aktivitas Section</h3></div>
           <Donut segments={[
-            { label: 'Anime', value: sec.anime, color: '#7c5cfc' },
-            { label: 'Film', value: sec.movie, color: '#ff6b9d' },
-            { label: 'Manga', value: sec.manga, color: '#00d4aa' },
+            { label: 'Anime', value: sec.anime, color: ACCENTS.anime },
+            { label: 'Film', value: sec.movie, color: ACCENTS.flix },
+            { label: 'Manga', value: sec.manga, color: ACCENTS.mics },
           ]} />
         </div>
         <div className="admin-panel admin-panel-wide">

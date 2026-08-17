@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
+import { ACCENTS } from '../theme';
 
 /* ── SVG Icon components — clean, no emojis ── */
 const Icons = {
   play: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
   arrow: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20"><path d="M5 12h14M12 5l7 7-7 7"/></svg>,
-  check: (c = '#00d4aa') => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>,
+  check: (c = ACCENTS.mics) => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>,
   x: <svg viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   film: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><rect x="2" y="2" width="20" height="20" rx="3"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="12" x2="22" y2="12"/><line x1="17" y1="17" x2="22" y2="17"/></svg>,
   book: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="28" height="28"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>,
@@ -84,18 +85,18 @@ export default function MarketingLanding() {
   }, []);
 
   const features = [
-    { icon: Icons.film, title: 'Streaming Tanpa Batas', desc: 'Tonton anime, film, dan serial TV tanpa batasan. Library konten diperbarui setiap hari.', color: '#7c5cfc' },
-    { icon: Icons.book, title: 'Baca Manga Gratis', desc: 'Koleksi manga, manhwa, dan manhua terlengkap. Chapter terbaru secepat rilisnya.', color: '#00d4aa' },
-    { icon: Icons.server, title: 'Multi-Server Backup', desc: 'Server down? Switch ke cadangan. Tidak ada lagi buffering tanpa akhir.', color: '#ff6b9d' },
-    { icon: Icons.globe, title: 'Subtitle Indonesia', desc: 'Mayoritas konten dilengkapi subtitle Bahasa Indonesia berkualitas.', color: '#fbbf24' },
+    { icon: Icons.film, title: 'Streaming Tanpa Batas', desc: 'Tonton anime, film, dan serial TV tanpa batasan. Library konten diperbarui setiap hari.', color: ACCENTS.anime },
+    { icon: Icons.book, title: 'Baca Manga Gratis', desc: 'Koleksi manga, manhwa, dan manhua terlengkap. Chapter terbaru secepat rilisnya.', color: ACCENTS.mics },
+    { icon: Icons.server, title: 'Multi-Server Backup', desc: 'Server down? Switch ke cadangan. Tidak ada lagi buffering tanpa akhir.', color: ACCENTS.flix },
+    { icon: Icons.globe, title: 'Subtitle Indonesia', desc: 'Mayoritas konten dilengkapi subtitle Bahasa Indonesia berkualitas.', color: ACCENTS.gold },
     { icon: Icons.zap, title: 'Loading Super Cepat', desc: 'CDN global memastikan streaming lancar tanpa loading lama.', color: '#22d3ee' },
     { icon: Icons.shield, title: 'Tanpa Iklan Popup', desc: 'Pengalaman bersih. Tidak ada popup, redirect, atau iklan mengganggu.', color: '#a78bfa' },
   ];
 
   const platforms = [
-    { name: 'sooranime', accent: '#7c5cfc', icon: Icons.tv, tag: 'Anime Streaming', desc: '10,000+ judul anime dengan sub Indonesia, update seasonal tiap minggu.' },
-    { name: 'sooraflix', accent: '#ff6b9d', icon: Icons.film, tag: 'Film & Series', desc: 'Film Hollywood, K-Drama, TV Series lengkap dengan multi-server.' },
-    { name: 'sooramics', accent: '#00d4aa', icon: Icons.book, tag: 'Manga & Comics', desc: '50,000+ chapter manga, manhwa, dan manhua — baca sepuasnya.' },
+    { name: 'sooranime', accent: ACCENTS.anime, icon: Icons.tv, tag: 'Anime Streaming', desc: '10,000+ judul anime dengan sub Indonesia, update seasonal tiap minggu.' },
+    { name: 'sooraflix', accent: ACCENTS.flix, icon: Icons.film, tag: 'Film & Series', desc: 'Film Hollywood, K-Drama, TV Series lengkap dengan multi-server.' },
+    { name: 'sooramics', accent: ACCENTS.mics, icon: Icons.book, tag: 'Manga & Comics', desc: '50,000+ chapter manga, manhwa, dan manhua — baca sepuasnya.' },
   ];
 
   const freeFeatures = ['Streaming anime unlimited', 'Nonton film & series', 'Baca manga sepuasnya', 'Kualitas hingga 720p', 'Multi-server backup', 'Subtitle Indonesia', 'Update konten harian', 'Tanpa iklan popup'];
@@ -261,7 +262,7 @@ export default function MarketingLanding() {
             <div className="ml-price-badge">Rekomendasi</div>
             <div className="ml-price-head"><span className="ml-price-name">Login</span><div className="ml-price-amount"><span className="ml-price-currency">Rp</span><span className="ml-price-number">0</span></div><span className="ml-price-period">Cukup buat akun gratis</span></div>
             <p className="ml-price-desc">Daftar untuk unlock fitur sosial, bookmark, dan HD 1080p 1x/hari.</p>
-            <ul className="ml-price-list">{loginFeatures.map((f, i) => <li key={i}>{Icons.check('#7c5cfc')}<span>{f}</span></li>)}</ul>
+            <ul className="ml-price-list">{loginFeatures.map((f, i) => <li key={i}>{Icons.check(ACCENTS.anime)}<span>{f}</span></li>)}</ul>
             <button className="ml-btn-primary ml-price-btn" onClick={() => navigate('/register')}>Daftar Sekarang</button>
           </div>
           {/* VIP */}
@@ -269,7 +270,7 @@ export default function MarketingLanding() {
             <div className="ml-price-vip-badge">{Icons.crown}<span>VIP</span></div>
             <div className="ml-price-head"><span className="ml-price-name">VIP</span><div className="ml-price-amount"><span className="ml-price-currency">Rp</span><span className="ml-price-number">19K</span></div><span className="ml-price-period">/ bulan</span></div>
             <p className="ml-price-desc">HD 1080p unlimited, semua fitur terbuka penuh, prioritas server.</p>
-            <ul className="ml-price-list">{vipFeatures.map((f, i) => <li key={i}>{Icons.check('#fbbf24')}<span>{f}</span></li>)}</ul>
+            <ul className="ml-price-list">{vipFeatures.map((f, i) => <li key={i}>{Icons.check(ACCENTS.gold)}<span>{f}</span></li>)}</ul>
             <button className="ml-btn-vip ml-price-btn" onClick={() => navigate('/register')}>Upgrade ke VIP</button>
           </div>
         </div>
@@ -283,8 +284,8 @@ export default function MarketingLanding() {
               <div key={i} className="ml-compare-row">
                 <div className="ml-compare-feat">{r.feature}</div>
                 <div>{r.free === true ? Icons.check() : r.free === false ? Icons.x : <span className="ml-compare-sp">{r.free}</span>}</div>
-                <div>{r.login === true ? Icons.check('#7c5cfc') : r.login === false ? Icons.x : <span className="ml-compare-sp">{r.login}</span>}</div>
-                <div className="ml-compare-vip">{r.vip === true ? Icons.check('#fbbf24') : r.vip === false ? Icons.x : <span className="ml-compare-sp">{r.vip}</span>}</div>
+                <div>{r.login === true ? Icons.check(ACCENTS.anime) : r.login === false ? Icons.x : <span className="ml-compare-sp">{r.login}</span>}</div>
+                <div className="ml-compare-vip">{r.vip === true ? Icons.check(ACCENTS.gold) : r.vip === false ? Icons.x : <span className="ml-compare-sp">{r.vip}</span>}</div>
               </div>
             ))}
           </div>
@@ -319,7 +320,7 @@ export default function MarketingLanding() {
       {/* STATS */}
       <section className="ml-stats" data-section="stats">
         <div className={`ml-stats-inner ${visibleSections.has('stats') ? 'visible' : ''}`}>
-          {[{ label: 'Anime', value: statCounts.anime, suffix: '+', color: '#7c5cfc' }, { label: 'Film & Series', value: statCounts.movies, suffix: '+', color: '#ff6b9d' }, { label: 'Chapter Manga', value: statCounts.manga, suffix: '+', color: '#00d4aa' }, { label: 'Pengguna Aktif', value: statCounts.users, suffix: '+', color: '#fbbf24' }].map((s, i) => (
+          {[{ label: 'Anime', value: statCounts.anime, suffix: '+', color: ACCENTS.anime }, { label: 'Film & Series', value: statCounts.movies, suffix: '+', color: ACCENTS.flix }, { label: 'Chapter Manga', value: statCounts.manga, suffix: '+', color: ACCENTS.mics }, { label: 'Pengguna Aktif', value: statCounts.users, suffix: '+', color: ACCENTS.gold }].map((s, i) => (
             <div key={i} className="ml-stat"><span className="ml-stat-value" style={{ color: s.color }}>{s.value.toLocaleString()}{s.suffix}</span><span className="ml-stat-label">{s.label}</span></div>
           ))}
         </div>
@@ -334,9 +335,9 @@ export default function MarketingLanding() {
         <div className={`ml-testimonials-grid ${visibleSections.has('testimonials') ? 'visible' : ''}`}>
           {testimonials.map((t, i) => (
             <div key={i} className="ml-testimonial" style={{ animationDelay: `${i * 0.1}s` }}>
-              <div className="ml-testimonial-stars">{Array.from({ length: t.rating }).map((_, j) => <span key={j} style={{ color: '#fbbf24' }}>{Icons.star}</span>)}</div>
+              <div className="ml-testimonial-stars">{Array.from({ length: t.rating }).map((_, j) => <span key={j} style={{ color: ACCENTS.gold }}>{Icons.star}</span>)}</div>
               <p className="ml-testimonial-text">"{t.text}"</p>
-              <div className="ml-testimonial-author"><div className="ml-testimonial-avatar" style={{ background: ['#7c5cfc', '#ff6b9d', '#00d4aa', '#fbbf24'][i] }}>{t.name[0]}</div><span>{t.name}</span></div>
+              <div className="ml-testimonial-author"><div className="ml-testimonial-avatar" style={{ background: [ACCENTS.anime, ACCENTS.flix, ACCENTS.mics, ACCENTS.gold][i] }}>{t.name[0]}</div><span>{t.name}</span></div>
             </div>
           ))}
         </div>

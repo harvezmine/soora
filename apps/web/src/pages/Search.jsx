@@ -21,6 +21,7 @@ import {
 } from '@soora/core/api';
 import Card from '../components/Card';
 import SkeletonSearchGrid from '../components/SkeletonSearchGrid';
+import { VERTICALS, alpha } from '../theme';
 
 const ANIME_GENRES = [
   'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
@@ -36,10 +37,10 @@ const MANGA_GENRES = [
 /* ── Theme config per section ── */
 const THEME = {
   anime: {
-    accent: '#7c5cfc',
-    accentHover: '#9b7dff',
-    glow: 'rgba(124, 92, 252, 0.25)',
-    gradient: 'linear-gradient(135deg, #7c5cfc 0%, #b44dff 100%)',
+    accent: VERTICALS.anime.accent,
+    accentHover: VERTICALS.anime.accentHover,
+    glow: alpha('anime', 0.25),
+    gradient: VERTICALS.anime.gradient,
     label: 'SOORANIME',
     title: 'Anime',
     subtitle: 'Find your next favorite anime',
@@ -48,10 +49,10 @@ const THEME = {
     cls: 'sooranime',
   },
   movie: {
-    accent: '#ff6b9d',
-    accentHover: '#ff85b1',
-    glow: 'rgba(255, 107, 157, 0.25)',
-    gradient: 'linear-gradient(135deg, #ff6b9d 0%, #e84393 100%)',
+    accent: VERTICALS.flix.accent,
+    accentHover: VERTICALS.flix.accentHover,
+    glow: alpha('flix', 0.25),
+    gradient: VERTICALS.flix.gradient,
     label: 'SOORAFLIX',
     title: 'Movies & TV Shows',
     subtitle: 'Discover the latest movies and series',
@@ -60,10 +61,10 @@ const THEME = {
     cls: 'sooraflix',
   },
   manga: {
-    accent: '#00d4aa',
-    accentHover: '#2eecc4',
-    glow: 'rgba(0, 212, 170, 0.25)',
-    gradient: 'linear-gradient(135deg, #00d4aa 0%, #00b894 100%)',
+    accent: VERTICALS.mics.accent,
+    accentHover: VERTICALS.mics.accentHover,
+    glow: alpha('mics', 0.25),
+    gradient: VERTICALS.mics.gradient,
     label: 'SOORAMICS',
     title: 'Manga & Comics',
     subtitle: 'Find your next favorite manga, manhwa, or manhua',

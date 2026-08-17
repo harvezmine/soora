@@ -10,9 +10,24 @@
   --accent: #7c5cfc;
   --accent-hover: #9b7dff;
   --accent-glow: rgba(124, 92, 252, 0.25);
+  --accent-glow-strong: rgba(124, 92, 252, 0.4);
   --gold: #fbbf24;
+  /* Vertikal sooraflix (film & series) — merah sinema.
+     --flix untuk isian/garis, --flix-text untuk teks di latar gelap
+     (merah pekat sebagai teks kecil kontrasnya hanya ~4,2:1). */
+  --flix: #e50914;
+  --flix-rgb: 229, 9, 20;
+  --flix-hover: #ff2a34;
+  --flix-text: #ff4d57;
+  --flix-glow: rgba(229, 9, 20, 0.28);
   --border: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.12);
+  /* Tombol kaca — dipakai .btn-primary dkk. Satu tempat, biar ganti tema
+     nanti tidak perlu menyisir tiap tombol. */
+  --btn-glass: rgba(255, 255, 255, 0.06);
+  --btn-glass-hover: rgba(255, 255, 255, 0.11);
+  --btn-glass-active: rgba(255, 255, 255, 0.09);
+  --btn-glass-border: rgba(255, 255, 255, 0.16);
   --radius: 12px;
   --radius-lg: 16px;
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -124,7 +139,7 @@ a:hover {
   color: var(--accent);
 }
 .logo-accent-flix {
-  color: #ff6b9d;
+  color: var(--flix-text);
 }
 .logo-accent-mics {
   color: #00d4aa;
@@ -132,46 +147,46 @@ a:hover {
 
 /* ===== SOORAFLIX NAVBAR THEME ===== */
 .navbar-sooraflix .logo svg {
-  color: #ff6b9d;
+  color: var(--flix-text);
 }
 .navbar-sooraflix .logo .logo-mark {
-  border-color: rgba(255, 107, 157, 0.15);
+  border-color: rgba(var(--flix-rgb), 0.15);
 }
 .navbar-sooraflix nav a.active {
-  color: #ff6b9d;
-  background: rgba(255, 107, 157, 0.15);
+  color: var(--flix-text);
+  background: rgba(var(--flix-rgb), 0.15);
 }
 .navbar-sooraflix .nav-hamburger span {
-  background: #ff6b9d;
+  background: var(--flix);
 }
 
 /* Sooraflix search genre chips */
 .sooraflix-page .genre-chip.active,
 .search-page.sooraflix .genre-chip.active {
-  background: rgba(255, 107, 157, 0.15);
-  border-color: #ff6b9d;
-  color: #ff6b9d;
-  box-shadow: 0 0 12px rgba(255, 107, 157, 0.2);
+  background: rgba(var(--flix-rgb), 0.15);
+  border-color: var(--flix);
+  color: var(--flix-text);
+  box-shadow: 0 0 12px rgba(var(--flix-rgb), 0.2);
 }
 
 /* ===== SOORAFLIX PAGE THEME ===== */
 .sooraflix-page .section-title {
-  background: linear-gradient(90deg, #ff6b9d, #ff9ec4);
+  background: linear-gradient(90deg, var(--flix), #ff6169);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .sooraflix-badge {
-  background: linear-gradient(135deg, #ff6b9d, #e84393) !important;
+  background: linear-gradient(135deg, var(--flix), #8e0610) !important;
 }
 .sooraflix-btn-play {
-  background: linear-gradient(135deg, #ff6b9d, #e84393) !important;
+  background: linear-gradient(135deg, var(--flix), #8e0610) !important;
 }
 .sooraflix-btn-play:hover {
-  background: linear-gradient(135deg, #ff85b1, #ff6b9d) !important;
+  background: linear-gradient(135deg, #ff3b45, var(--flix)) !important;
 }
 .sooraflix-hero .hero-dot.active {
-  background: #ff6b9d !important;
+  background: var(--flix) !important;
 }
 
 /* ===== SOORAMICS NAVBAR THEME ===== */
@@ -2429,25 +2444,77 @@ a:hover {
 }
 
 /* ===== BUTTONS ===== */
+/* Primary CTA — kaca semi-transparan dengan garis tipis. Netral saat diam,
+   aksen baru muncul saat disentuh/hover, jadi tetap terbaca sebagai aksi
+   utama tanpa blok warna pekat. */
 .btn-primary {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.7rem 1.5rem;
-  border-radius: 10px;
-  border: none;
-  background: var(--accent);
-  color: white;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 44px; /* sasaran sentuh minimum */
+  padding: 0.72rem 1.6rem;
+  border-radius: 12px;
+  border: 1px solid var(--btn-glass-border);
+  background: var(--btn-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
   letter-spacing: -0.01em;
 }
+.btn-primary svg { flex-shrink: 0; }
 .btn-primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 4px 20px var(--accent-glow);
+  background: var(--btn-glass-hover);
+  border-color: var(--accent);
+  box-shadow:
+    0 8px 28px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+  background: var(--btn-glass-active);
+}
+.btn-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: var(--btn-glass-border);
+  background: var(--btn-glass);
+}
+/* Varian pekat — untuk layar yang butuh satu aksi benar-benar dominan. */
+.btn-primary.btn-solid {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.btn-primary.btn-solid:hover {
+  background: var(--accent-hover);
+  border-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary,
+  .btn-primary:hover,
+  .btn-primary:active {
+    transform: none;
+    transition: background 0.01ms, border-color 0.01ms;
+  }
 }
 .btn-ghost {
   display: inline-flex;
@@ -3685,21 +3752,21 @@ a:hover {
 
 /* Sooraflix accent overrides for active pills */
 .sooraflix-page .af-pill.active {
-  background: #ff6b9d;
-  box-shadow: 0 2px 12px rgba(255,107,157,0.25);
+  background: var(--flix);
+  box-shadow: 0 2px 12px rgba(var(--flix-rgb), 0.25);
 }
 .sooraflix-page .af-year-btn.active {
-  background: #ff6b9d;
-  box-shadow: 0 2px 12px rgba(255,107,157,0.25);
+  background: var(--flix);
+  box-shadow: 0 2px 12px rgba(var(--flix-rgb), 0.25);
 }
 .sooraflix-page .af-year-select:focus {
-  border-color: #ff6b9d;
+  border-color: var(--flix);
 }
 .sooraflix-page .af-header-count {
-  background: #ff6b9d;
+  background: var(--flix);
 }
 .sooraflix-page .filter-spinner {
-  border-top-color: #ff6b9d;
+  border-top-color: var(--flix);
 }
 
 /* responsive filter panel */
@@ -3795,7 +3862,7 @@ a:hover {
   pointer-events: none;
 }
 .sooraflix-page .section-header::before {
-  background: #ff6b9d;
+  background: var(--flix);
   opacity: 0.08;
 }
 .sooramics-page .section-header::before {
@@ -4006,11 +4073,11 @@ a:hover {
 
 /* SooraFlix accent for Top 10 */
 .sooraflix-page .top10-badge {
-  background: linear-gradient(135deg, #ff6b9d, #ee5a24);
+  background: linear-gradient(135deg, var(--flix), #ee5a24);
 }
 .sooraflix-page .top10-item:hover .top10-rank {
-  -webkit-text-stroke: 3px #ff6b9d;
-  filter: drop-shadow(0 0 30px rgba(255, 107, 157, 0.3));
+  -webkit-text-stroke: 3px var(--flix);
+  filter: drop-shadow(0 0 30px rgba(var(--flix-rgb), 0.3));
 }
 
 /* SooraMics accent for Top 10 */
@@ -4083,13 +4150,13 @@ a:hover {
 }
 .card:active { transform: translateY(-4px) scale(1.0); transition-duration: 0.12s; }
 .sooraflix-page .card::after {
-  background: linear-gradient(135deg, transparent 40%, #ff6b9d 100%);
+  background: linear-gradient(135deg, transparent 40%, var(--flix) 100%);
 }
 .sooraflix-page .card:hover,
 .sooraflix-page .card.card-hovered {
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.5),
-    0 0 30px rgba(255, 107, 157, 0.12);
+    0 0 30px rgba(var(--flix-rgb), 0.12);
 }
 .sooramics-page .card::after {
   background: linear-gradient(135deg, transparent 40%, #00d4aa 100%);
@@ -4217,7 +4284,7 @@ a:hover {
 }
 .card:hover .card-title,
 .card.card-hovered .card-title { color: var(--accent); }
-.sooraflix-page .card:hover .card-title { color: #ff6b9d; }
+.sooraflix-page .card:hover .card-title { color: var(--flix-text); }
 .sooramics-page .card:hover .card-title { color: #00d4aa; }
 .card-meta {
   display: flex;
@@ -4717,13 +4784,13 @@ a:hover {
 
 /* Theme variants */
 .skeleton-hero-sooraflix .skeleton-hero-btn:first-child {
-  background: rgba(255, 107, 157, 0.18);
+  background: rgba(var(--flix-rgb), 0.18);
 }
 .skeleton-hero-sooramics .skeleton-hero-btn:first-child {
   background: rgba(0, 212, 170, 0.18);
 }
 .skeleton-hero-sooramicsplus .skeleton-hero-btn:first-child {
-  background: rgba(255, 107, 157, 0.18);
+  background: rgba(var(--flix-rgb), 0.18);
 }
 
 /* Mobile adjustments */
@@ -6990,10 +7057,14 @@ a:hover {
   align-items: center;
 }
 .btn-glow {
-  box-shadow: 0 4px 20px var(--accent-glow);
+  box-shadow:
+    0 4px 20px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .btn-glow:hover {
-  box-shadow: 0 6px 28px rgba(124, 92, 252, 0.4);
+  box-shadow:
+    0 6px 28px var(--accent-glow-strong),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 .btn-sub-indo {
   display: inline-flex;
@@ -8731,13 +8802,13 @@ a:hover {
   color: #00d4aa;
 }
 .loading-sooraflix .pulse-ring {
-  border-color: #ff6b9d;
+  border-color: var(--flix);
 }
 .loading-sooraflix .pulse-dot {
-  background: #ff6b9d;
+  background: var(--flix);
 }
 .loading-sooraflix p {
-  color: #ff6b9d;
+  color: var(--flix-text);
 }
 
 /* ── Route-level lazy loading fallback ── */
@@ -10155,7 +10226,7 @@ a:hover {
 .landing-orb-2 {
   width: 450px;
   height: 450px;
-  background: radial-gradient(circle, rgba(255, 107, 157, 0.12), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--flix-rgb), 0.12), transparent 70%);
   top: 30%;
   right: -8%;
   animation-delay: -4s;
@@ -10527,7 +10598,7 @@ a:hover {
     padding: 0.55rem 1.3rem;
     border: none;
     border-radius: 12px;
-    background: linear-gradient(135deg, #7c5cfc 0%, #a855f7 50%, #ff6b9d 100%);
+    background: linear-gradient(135deg, #7c5cfc 0%, #a855f7 50%, var(--flix) 100%);
     color: #fff;
     font-size: 0.82rem;
     font-weight: 700;
@@ -11911,9 +11982,9 @@ a:hover {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: rgba(255,107,157,0.08);
-  border: 1px solid rgba(255,107,157,0.12);
-  color: #ff6b9d;
+  background: rgba(var(--flix-rgb), 0.08);
+  border: 1px solid rgba(var(--flix-rgb), 0.12);
+  color: var(--flix-text);
   flex-shrink: 0;
 }
 .auth-benefit-card strong {
@@ -12934,7 +13005,7 @@ a:hover {
 .profile-hero-bg { height: 150px; background: linear-gradient(135deg, #7c5cfc 0%, #4c2fb5 60%, #1a1a2e 100%); }
 .profile-hero-inner { display: flex; align-items: flex-end; gap: 1.2rem; padding: 0 1.5rem 1.4rem; margin-top: -52px; }
 .profile-avatar { width: 104px; height: 104px; border-radius: 50%; object-fit: cover; border: 4px solid #0d0d14; background: #2a2a3e; box-shadow: 0 8px 24px rgba(0,0,0,0.5); flex: 0 0 auto; }
-.profile-avatar-fallback { display: grid; place-items: center; font-size: 2.2rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #7c5cfc, #ff6b9d); }
+.profile-avatar-fallback { display: grid; place-items: center; font-size: 2.2rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #7c5cfc, var(--flix)); }
 .profile-id { padding-bottom: 0.4rem; min-width: 0; }
 .profile-name { font-size: 1.6rem; font-weight: 800; color: #fff; margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .profile-email { color: rgba(255,255,255,0.55); font-size: 0.92rem; margin: 0.2rem 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -13178,7 +13249,7 @@ a:hover {
   position: absolute;
   inset: -40% 20% auto 20%;
   height: 420px;
-  background: radial-gradient(closest-side, rgba(255, 107, 157, 0.22), transparent);
+  background: radial-gradient(closest-side, rgba(var(--flix-rgb), 0.22), transparent);
   filter: blur(40px);
   pointer-events: none;
 }
@@ -13211,7 +13282,7 @@ a:hover {
   letter-spacing: -0.02em;
 }
 .download-title-accent {
-  background: linear-gradient(120deg, #7c5cfc, #ff6b9d 55%, #00d4aa);
+  background: linear-gradient(120deg, #7c5cfc, var(--flix) 55%, #00d4aa);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

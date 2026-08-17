@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGoogleLogin } from '../hooks/useGoogleLogin';
+import { VERTICALS, alpha } from '../theme';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -42,9 +43,9 @@ export default function Register() {
         if (p.x < 0) p.x = c.width; if (p.x > c.width) p.x = 0;
         if (p.y < 0) p.y = c.height; if (p.y > c.height) p.y = 0;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,107,157,${p.a})`; ctx.fill();
+        ctx.fillStyle = `rgba(${VERTICALS.flix.rgb},${p.a})`; ctx.fill();
       });
-      ctx.strokeStyle = 'rgba(255,107,157,0.02)'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = alpha('flix', 0.02); ctx.lineWidth = 0.5;
       for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
         const dx = ps[i].x - ps[j].x, dy = ps[i].y - ps[j].y;
         if (dx * dx + dy * dy < 8000) { ctx.beginPath(); ctx.moveTo(ps[i].x, ps[i].y); ctx.lineTo(ps[j].x, ps[j].y); ctx.stroke(); }

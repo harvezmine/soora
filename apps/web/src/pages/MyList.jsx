@@ -4,12 +4,13 @@ import { getMyList, removeFromMyList } from '../utils/mylist';
 import { mangaImgProxy } from '@soora/core/api';
 import { buildAnimeUrl, buildMovieUrl, buildMangaUrl } from '../utils/seo';
 import CustomSelect from '../components/CustomSelect';
+import { ACCENTS } from '../theme';
 
 /* -- Section definitions -- */
 const SECTIONS = [
-  { key: 'anime', label: 'Anime', accent: '#7c5cfc', path: '/anime/mylist', homePath: '/anime', browsePath: '/anime/search', browseLabel: 'Browse Anime' },
-  { key: 'movie', label: 'Movies & TV', accent: '#ff6b9d', path: '/movies/mylist', homePath: '/movies', browsePath: '/movies/search', browseLabel: 'Browse Movies' },
-  { key: 'manga', label: 'Manga', accent: '#00d4aa', path: '/manga/mylist', homePath: '/manga', browsePath: '/manga/search', browseLabel: 'Browse Manga' },
+  { key: 'anime', label: 'Anime', accent: ACCENTS.anime, path: '/anime/mylist', homePath: '/anime', browsePath: '/anime/search', browseLabel: 'Browse Anime' },
+  { key: 'movie', label: 'Movies & TV', accent: ACCENTS.flix, path: '/movies/mylist', homePath: '/movies', browsePath: '/movies/search', browseLabel: 'Browse Movies' },
+  { key: 'manga', label: 'Manga', accent: ACCENTS.mics, path: '/manga/mylist', homePath: '/manga', browsePath: '/manga/search', browseLabel: 'Browse Manga' },
 ];
 
 const SORT_OPTIONS = [

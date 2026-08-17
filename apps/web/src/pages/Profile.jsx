@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getMyList } from '../utils/mylist';
 import { getProgressList, removeProgress } from '../utils/progress';
+import { ACCENTS } from '../theme';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -44,9 +45,9 @@ export default function Profile() {
   };
 
   const QUICK = [
-    { label: 'My List Anime', value: counts.listAnime, path: '/anime/mylist', accent: '#7c5cfc' },
-    { label: 'My List Film', value: counts.listMovie, path: '/movies/mylist', accent: '#ff6b9d' },
-    { label: 'My List Manga', value: counts.listManga, path: '/manga/mylist', accent: '#00d4aa' },
+    { label: 'My List Anime', value: counts.listAnime, path: '/anime/mylist', accent: ACCENTS.anime },
+    { label: 'My List Film', value: counts.listMovie, path: '/movies/mylist', accent: ACCENTS.flix },
+    { label: 'My List Manga', value: counts.listManga, path: '/manga/mylist', accent: ACCENTS.mics },
     { label: 'Lanjutkan Nonton', value: counts.contAnime + counts.contMovie + counts.contManga, path: '/anime', accent: '#f59e0b' },
   ];
 
