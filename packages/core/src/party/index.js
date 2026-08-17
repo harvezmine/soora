@@ -181,6 +181,7 @@ export function connectRoom(roomId, on = {}) {
       if (msg.type === 'state') { on.state?.(msg); return; }
       if (msg.type === 'peers') { on.peers?.(msg); return; }
       if (msg.type === 'chat') { on.chat?.(msg.message); return; }
+      if (msg.type === 'speaking') { on.speaking?.(msg.id, !!msg.on); return; }
       if (msg.type === 'rtc') { on.rtc?.(msg); return; }
       if (msg.type === 'peer-left') { on.peerLeft?.(msg.id); return; }
       if (msg.type === 'host-away') { on.hostAway?.(msg); return; }
@@ -211,6 +212,8 @@ export function connectRoom(roomId, on = {}) {
     sendVoice: (on_) => kirim('voice', { on: on_ }),
     sendMic: (on_) => kirim('mic', { on: on_ }),
     sendDeafen: (on_) => kirim('deafen', { on: on_ }),
+    /** Penanda bicara untuk peserta lain. Dikirim hanya saat berubah. */
+    sendSpeaking: (on_) => kirim('speaking', { on: on_ }),
     /** Amplop sinyal WebRTC; isinya tidak dibaca server. */
     sendRtc: (to, kind, data) => kirim('rtc', { to, kind, data }),
     close: () => {

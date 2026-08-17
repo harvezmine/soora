@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { nilaiLatensi } from '@soora/core/party/audio-tune';
+import { nilaiLatensi, TINGKAT_SUARA_MAKS } from '@soora/core/party/audio-tune';
 import {
   IconMicOn, IconMicOff, IconHeadsetOn, IconHeadsetOff, IconPhoneOff, IconGear,
 } from './icons';
@@ -36,9 +36,37 @@ function LencanaSuara({ orang }) {
   );
 }
 
-function Avatar({ orang, bicara, ukuran = 'md' }) {
+/**
+ * Avatar dengan cincin suara.
+ *
+ * Cincinnya dua lapis dan sengaja berbeda sifat: satu cincin rapat yang
+ * ketebalannya mengikuti tenaga suara (jadi keras-lirihnya terlihat), dan
+ * beberapa riak yang mengembang keluar terus-menerus (jadi geraknya tidak
+ * pernah membeku walau suaranya rata). Tanpa riak, penanda ini cuma cincin
+ * yang berkedip; tanpa cincin yang mengikuti tenaga, riaknya terasa seperti
+ * animasi hiasan yang tidak berhubungan dengan suara siapa pun.
+ *
+ * `--lvl` (0..1) menyetir keduanya lewat CSS, bukan lewat render ulang React
+ * tiap bingkai: nilainya sudah dibulatkan di hulu, dan sisanya diperhalus
+ * transisi CSS yang jalan di luar utas utama.
+ */
+function Avatar({ orang, bicara, tingkat = 0, ukuran = 'md' }) {
+  // Bicara tanpa angka tenaga berarti kabarnya datang dari server, bukan dari
+  // pengukuran sendiri — penonton yang tidak ikut kanal suara tidak menerima
+  // audio siapa pun untuk diukur. Dipakai nilai tengah supaya cincinnya tetap
+  // hidup, bukan tampil selemah orang yang hampir tidak bersuara.
+  const efektif = bicara && !tingkat ? TINGKAT_SUARA_MAKS * 0.55 : tingkat;
+  const lvl = Math.max(0, Math.min(1, efektif / TINGKAT_SUARA_MAKS));
   return (
-    <span className={`wpp-av wpp-av-${ukuran} ${bicara ? 'is-bicara' : ''}`}>
+    <span
+      className={`wpp-av wpp-av-${ukuran} ${bicara ? 'is-bicara' : ''}`}
+      style={{ '--lvl': lvl }}
+    >
+      {bicara && (
+        <span className="wpp-av-riak" aria-hidden="true">
+          <i /><i /><i />
+        </span>
+      )}
       {orang.avatar
         ? <img src={orang.avatar} alt="" referrerPolicy="no-referrer" />
         : <span className="wpp-av-fallback">{inisial(orang.name)}</span>}
@@ -76,6 +104,7 @@ export default function WatchPartyPanel({
   onToggleDeafen,
   onToggleBisu,
   bicara,
+  tingkat = {},
   volumes = {},
   onSetVolume,
   selfId,
@@ -179,7 +208,7 @@ export default function WatchPartyPanel({
               return (
                 <li className={`wpp-orang-item ${bicara?.[o.id] ? 'is-bicara' : ''}`} key={o.id}>
                   <div className="wpp-orang-baris">
-                    <Avatar orang={o} bicara={bicara?.[o.id]} />
+                    <Avatar orang={o} bicara={bicara?.[o.id]} tingkat={tingkat?.[o.id] ?? 0} />
                     <span className="wpp-orang-nama">
                       {o.name}{o.id === selfId ? ' (kamu)' : ''}
                     </span>

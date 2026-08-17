@@ -1,8 +1,8 @@
 // Penyetelan audio yang murni — tanpa peramban, tanpa jaringan.
 //
-// Dipisahkan supaya bisa diuji: penyuntingan SDP dan penentuan "sedang
-// bicara" adalah bagian yang paling mudah salah, dan keduanya tidak butuh
-// RTCPeerConnection sama sekali.
+// Dipisahkan supaya bisa diuji: penyuntingan SDP, penentuan "sedang bicara",
+// dan keputusan tawar-menawar sinyal adalah bagian yang paling mudah salah,
+// dan tidak satu pun butuh RTCPeerConnection sungguhan.
 
 /**
  * Setelan Opus.
@@ -105,6 +105,37 @@ export function createVad({
 }
 
 /**
+ * Keputusan saat deskripsi sesi (offer/answer) masuk — pola "perfect
+ * negotiation" dari spesifikasi WebRTC.
+ *
+ * Sebelumnya hanya satu sisi (id lebih kecil) yang boleh menawar. Itu tampak
+ * aman, tapi berakibat: begitu sisi yang TIDAK menawar menyalakan mikrofon,
+ * arah transceiver-nya berubah jadi sendrecv dan `negotiationneeded` menyala —
+ * lalu diabaikan, karena ia bukan penawar. Lawannya tidak pernah diberi tahu
+ * ada trek baru, jadi suaranya tak pernah mengalir sementara arah sebaliknya
+ * berjalan normal. Gejalanya: "aku tidak bisa mendengar dia, dia bisa
+ * mendengarku", dan tampak acak sebab bergantung id siapa yang lebih kecil.
+ *
+ * Jadi kedua sisi kini boleh menawar, dan tabrakan diselesaikan lewat peran:
+ * yang "sopan" membatalkan tawarannya sendiri lalu menerima tawaran lawan,
+ * yang tidak sopan mengabaikan tawaran yang datang dan meneruskan miliknya.
+ * Perannya harus berlawanan di dua sisi — di sini ditentukan dari
+ * perbandingan id, satu-satunya nilai yang keduanya sama-sama tahu.
+ */
+export function keputusanSinyal({ tipe, sopan, sedangMenawar, signalingState }) {
+  const bentrok = tipe === 'offer' && (sedangMenawar || signalingState !== 'stable');
+  if (bentrok && !sopan) return { abaikan: true, rollback: false, jawab: false };
+  return {
+    abaikan: false,
+    // Rollback hanya sah bila tawaran sendiri memang sudah terpasang.
+    // `sedangMenawar` bisa true saat createOffer masih berjalan dan
+    // signalingState masih 'stable' — membatalkan di keadaan itu justru galat.
+    rollback: bentrok && signalingState === 'have-local-offer',
+    jawab: tipe === 'offer',
+  };
+}
+
+/**
  * Tenaga suara (RMS) dari cuplikan gelombang byte AnalyserNode.
  * 128 adalah titik diam pada data 8-bit.
  */
@@ -116,6 +147,30 @@ export function rmsDari(data) {
     jumlah += v * v;
   }
   return Math.sqrt(jumlah / data.length);
+}
+
+/**
+ * Tenaga suara dibulatkan ke beberapa tingkat, untuk penanda bicara di layar.
+ *
+ * RMS mentah berubah tiap 60 ms; kalau nilainya langsung masuk keadaan React,
+ * seluruh daftar peserta ikut dirender ulang ~16 kali per detik hanya untuk
+ * menggerakkan satu cincin. Dibulatkan lebih dulu, keadaan hanya berubah saat
+ * tingkatnya benar-benar berpindah, dan kehalusan gerakannya diserahkan ke
+ * transisi CSS yang jalan di luar utas utama.
+ *
+ * Skalanya logaritmik: telinga menilai kenyaringan secara logaritmik, dan RMS
+ * percakapan biasa menumpuk di bawah 0.15 — dipetakan linier, hampir semua
+ * suara terlihat lirih.
+ */
+export const TINGKAT_SUARA_MAKS = 5;
+
+export function tingkatSuara(rms) {
+  const n = Number(rms);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const db = 20 * Math.log10(n);
+  // -50 dB dianggap hening, -15 dB dianggap penuh.
+  const norm = (db + 50) / 35;
+  return Math.max(0, Math.min(TINGKAT_SUARA_MAKS, Math.round(norm * TINGKAT_SUARA_MAKS)));
 }
 
 /**

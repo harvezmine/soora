@@ -11,6 +11,9 @@ import {
   clampVolume,
   volumeToElementGain,
   VOLUME_DEFAULT,
+  keputusanSinyal,
+  tingkatSuara,
+  TINGKAT_SUARA_MAKS,
 } from './audio-tune.js';
 
 const SDP_DENGAN_FMTP = [
@@ -220,5 +223,89 @@ describe('volumeToElementGain', () => {
   it('di atas 100%, elemen penuh dan penguat yang menaikkan — elemen sendiri dibatasi peramban ke 0..1', () => {
     expect(volumeToElementGain(1.5)).toEqual({ element: 1, gain: 1.5 });
     expect(volumeToElementGain(2)).toEqual({ element: 1, gain: 2 });
+  });
+});
+
+describe('keputusanSinyal', () => {
+  const dasar = { sedangMenawar: false, signalingState: 'stable' };
+
+  it('tawaran saat tenang diterima dan dijawab oleh kedua peran', () => {
+    for (const sopan of [true, false]) {
+      expect(keputusanSinyal({ ...dasar, tipe: 'offer', sopan })).toEqual({
+        abaikan: false, rollback: false, jawab: true,
+      });
+    }
+  });
+
+  it('jawaban tidak pernah dianggap bentrok — hanya tawaran yang bisa bertabrakan', () => {
+    expect(keputusanSinyal({ tipe: 'answer', sopan: false, sedangMenawar: true, signalingState: 'have-local-offer' }))
+      .toEqual({ abaikan: false, rollback: false, jawab: false });
+  });
+
+  // Inti perbaikan bug "aku tidak bisa mendengar dia, dia bisa mendengarku":
+  // dua sisi kini boleh menawar, dan tabrakannya harus selesai secara
+  // berlawanan — tepat satu sisi yang mengalah.
+  it('bentrok: yang tidak sopan mengabaikan tawaran lawan', () => {
+    expect(keputusanSinyal({ tipe: 'offer', sopan: false, sedangMenawar: true, signalingState: 'stable' }))
+      .toEqual({ abaikan: true, rollback: false, jawab: false });
+  });
+
+  it('bentrok: yang sopan membatalkan tawarannya sendiri lalu menjawab', () => {
+    expect(keputusanSinyal({ tipe: 'offer', sopan: true, sedangMenawar: true, signalingState: 'have-local-offer' }))
+      .toEqual({ abaikan: false, rollback: true, jawab: true });
+  });
+
+  it('tepat satu sisi mengalah pada tabrakan yang sama', () => {
+    const keadaan = { tipe: 'offer', sedangMenawar: true, signalingState: 'have-local-offer' };
+    const a = keputusanSinyal({ ...keadaan, sopan: true });
+    const b = keputusanSinyal({ ...keadaan, sopan: false });
+    expect([a.abaikan, b.abaikan]).toEqual([false, true]);
+  });
+
+  it('rollback dilewati bila tawaran sendiri belum terpasang — membatalkan di keadaan stable justru galat', () => {
+    const k = keputusanSinyal({ tipe: 'offer', sopan: true, sedangMenawar: true, signalingState: 'stable' });
+    expect(k).toEqual({ abaikan: false, rollback: false, jawab: true });
+  });
+
+  it('bentrok terdeteksi dari signalingState walau penanda menawar sudah turun', () => {
+    expect(keputusanSinyal({ tipe: 'offer', sopan: false, sedangMenawar: false, signalingState: 'have-local-offer' }).abaikan)
+      .toBe(true);
+  });
+});
+
+describe('tingkatSuara', () => {
+  it('hening jadi nol', () => {
+    expect(tingkatSuara(0)).toBe(0);
+    expect(tingkatSuara(-1)).toBe(0);
+  });
+
+  it('nilai tidak masuk akal jadi nol, bukan NaN', () => {
+    expect(tingkatSuara(NaN)).toBe(0);
+    expect(tingkatSuara(undefined)).toBe(0);
+    expect(tingkatSuara('keras')).toBe(0);
+  });
+
+  it('tidak pernah keluar dari rentang 0..maks', () => {
+    for (const rms of [1e-9, 0.0001, 0.02, 0.2, 1, 99]) {
+      const t = tingkatSuara(rms);
+      expect(t).toBeGreaterThanOrEqual(0);
+      expect(t).toBeLessThanOrEqual(TINGKAT_SUARA_MAKS);
+    }
+  });
+
+  it('suara lebih keras tidak pernah memberi tingkat lebih rendah', () => {
+    const naik = [0.005, 0.01, 0.03, 0.06, 0.12, 0.3, 0.8];
+    const hasil = naik.map(tingkatSuara);
+    expect(hasil).toEqual([...hasil].sort((a, b) => a - b));
+  });
+
+  it('membedakan tenaga percakapan biasa, bukan menumpuk di satu tingkat', () => {
+    // Kalau dipetakan linier, semua nilai ini jatuh ke tingkat terendah.
+    const berbeda = new Set([0.01, 0.03, 0.08, 0.18].map(tingkatSuara));
+    expect(berbeda.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('mencapai tingkat penuh pada suara keras', () => {
+    expect(tingkatSuara(0.5)).toBe(TINGKAT_SUARA_MAKS);
   });
 });

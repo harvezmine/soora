@@ -14101,6 +14101,7 @@ a:hover {
 
 /* Avatar */
 .wpp-av {
+  --lvl: 0;
   position: relative;
   display: grid; place-items: center;
   flex: none;
@@ -14119,8 +14120,61 @@ a:hover {
 .wpp-av-md { width: 32px; height: 32px; font-size: 0.8rem; }
 .wpp-av-sm { width: 26px; height: 26px; font-size: 0.7rem; }
 .wpp-av-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
-/* Cincin menyala saat suaranya terdengar */
-.wpp-av.is-bicara { box-shadow: 0 0 0 2px var(--accent); }
+
+/* ── Penanda sedang bicara ──
+   Hijau tetap, bukan var(--accent): warnanya berbeda per vertikal, dan
+   "sedang bicara" harus berarti sama di sooranime, sooraflix, maupun
+   sooramics. Hijau juga sudah jadi kebiasaan di aplikasi suara. */
+.wpp-av {
+  --suara: #3ba55c;
+  --suara-rgb: 59, 165, 92;
+}
+/* Cincin rapat: ketebalan dan pendarnya mengikuti tenaga suara, jadi
+   keras-lirihnya kelihatan, bukan cuma nyala/mati. */
+.wpp-av.is-bicara {
+  box-shadow:
+    0 0 0 calc(2px + var(--lvl) * 1.6px) var(--suara),
+    0 0 calc(5px + var(--lvl) * 13px) rgba(var(--suara-rgb), calc(0.22 + var(--lvl) * 0.4));
+  /* Cukup cepat untuk terasa mengikuti suara, cukup lambat untuk tidak
+     berkedut di antara dua tingkat yang berdekatan. */
+  transition: box-shadow 110ms ease-out;
+}
+/* Riak yang mengembang terus-menerus. Tanpa ini penandanya membeku saat orang
+   bicara dengan tenaga rata — dan suara tidak pernah terasa beku. */
+.wpp-av-riak {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  /* Tenaga suara mengatur seberapa jelas riaknya, sehingga bisikan tidak
+     terlihat sama dengan teriakan. */
+  opacity: calc(0.28 + var(--lvl) * 0.72);
+  transition: opacity 120ms linear;
+}
+.wpp-av-riak i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--suara-rgb), 0.7);
+  /* Makin keras suaranya, makin cepat riaknya — inilah yang membuat geraknya
+     terbaca sebagai suara, bukan sebagai animasi yang jalan sendiri. */
+  animation: wppRiak calc(2.1s - var(--lvl) * 0.85s) cubic-bezier(0.25, 0.6, 0.3, 1) infinite;
+}
+/* Jeda antar-riak dibuat tidak rata: tiga riak berjarak sama terlihat seperti
+   mesin, sedangkan jarak yang sedikit berbeda terbaca sebagai gelombang. */
+.wpp-av-riak i:nth-child(2) { animation-delay: 0.42s; }
+.wpp-av-riak i:nth-child(3) { animation-delay: 0.95s; }
+@keyframes wppRiak {
+  0%   { transform: scale(1);    opacity: 0.6; }
+  60%  { opacity: 0.12; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Cincin yang mengikuti tenaga suara tetap ada — informasinya perlu.
+     Yang dibuang cuma riak yang bergerak terus. */
+  .wpp-av-riak { display: none; }
+  .wpp-av.is-bicara { transition: none; }
+}
 /* Lencana status suara — bentuknya beda per keadaan, bukan cuma warnanya,
    supaya tetap terbaca oleh yang sulit membedakan warna. */
 .wpp-av-badge {

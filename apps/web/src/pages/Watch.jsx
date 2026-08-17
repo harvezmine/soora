@@ -1580,6 +1580,8 @@ export default function Watch() {
           onToggleMic={party.toggleMic}
           onToggleDeafen={party.toggleDeafen}
           onToggleBisu={party.toggleBisu}
+          bicara={party.bicara}
+          tingkat={party.tingkat}
           volumes={party.volumes}
           onSetVolume={party.setVolumePeer}
           selfId={party.selfId}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   connectRoom,
   createRoom as apiCreateRoom,
@@ -7,6 +7,7 @@ import {
   projectPosition,
 } from '@soora/core/party';
 import { createVoice, daftarMikrofon } from '@soora/core/party/voice';
+import { tingkatSuara } from '@soora/core/party/audio-tune';
 
 /** Sesering apa tamu memeriksa selisihnya terhadap tuan rumah. */
 const PERIKSA_TIAP_MS = 1000;
@@ -49,8 +50,22 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const [micOn, setMicOn] = useState(false);
   const [bisu, setBisu] = useState(false);
   const [deafen, setDeafen] = useState(false);
-  /** id peserta yang sedang terdengar bicara */
-  const [bicara, setBicara] = useState({});
+  /**
+   * Siapa yang sedang bicara, dari dua sumber yang sengaja dipisah:
+   *
+   * - `bicaraLokal` diukur sendiri dari aliran audio yang masuk. Cepat (60 ms)
+   *   dan gratis, tapi hanya ada untuk orang yang audionya kita terima —
+   *   artinya cuma bila kita sendiri ikut kanal suara.
+   * - `bicaraJauh` datang dari server. Berlaku untuk semua orang, termasuk
+   *   penonton yang tidak ikut kanal suara dan karenanya tidak punya apa pun
+   *   untuk diukur.
+   *
+   * Yang lokal menang bila ada, karena ia lebih dulu tahu.
+   */
+  const [bicaraLokal, setBicaraLokal] = useState({});
+  const [bicaraJauh, setBicaraJauh] = useState({});
+  /** tingkat tenaga suara per peserta, 0..TINGKAT_SUARA_MAKS */
+  const [tingkat, setTingkat] = useState({});
   /** tenaga suara mikrofon sendiri, 0..1 — untuk penunjuk level saat menguji */
   const [levelSaya, setLevelSaya] = useState(0);
   /** mutu sambungan per lawan: { rtt, jitterMs, latencyMs, lossPct } */
@@ -87,6 +102,10 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   // langsung saat render — menulis ref di badan render dilarang React.
   const volumesRef = useRef(volumes);
   useEffect(() => { volumesRef.current = volumes; }, [volumes]);
+  // Penanda bicara sendiri yang terakhir dikirim ke server. Disimpan di ref,
+  // bukan keadaan: dibaca dari dalam callback yang jalan tiap 60 ms, dan
+  // tujuannya justru menekan pengiriman yang tidak berubah.
+  const bicaraSayaRef = useRef(false);
 
   /* ── Sambungan ── */
   useEffect(() => {
@@ -107,12 +126,17 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       state: (msg) => { state.current = msg; },
       peers: (msg) => {
         setPeers(msg);
+        // Daftar peserta ikut membawa status bicara terkini. Dipakai untuk
+        // menyelaraskan: yang baru masuk perlu tahu siapa yang sedang bicara
+        // sekarang, dan status yang tertinggal menyala ikut dibetulkan di sini.
+        setBicaraJauh(Object.fromEntries((msg.people || []).map((o) => [o.id, !!o.speaking])));
         // Mesh suara mengikuti daftar peserta: yang baru bergabung disambung
         // untuk didengarkan, yang keluar diputus. Ini terjadi terlepas dari
         // status mikrofon siapa pun.
         voice.current?.selaraskan((msg.people || []).filter((o) => o.voice).map((o) => o.id));
       },
       chat: (m) => setChat((prev) => [...prev.slice(-99), m]),
+      speaking: (id, on) => setBicaraJauh((p) => (p[id] === on ? p : { ...p, [id]: on })),
       rtc: (m) => voice.current?.terima(m),
       peerLeft: (id) => voice.current?.putus(id),
       hostAway: () => setNotice('Tuan rumah terputus. Menunggu ia kembali…'),
@@ -136,7 +160,10 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       setMicOn(false);
       setBisu(false);
       setDeafen(false);
-      setBicara({});
+      setBicaraLokal({});
+      setBicaraJauh({});
+      setTingkat({});
+      bicaraSayaRef.current = false;
       setSelfId(null);
       selfIdRef.current = null;
     };
@@ -221,15 +248,27 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     }
   }, [playerRef]);
 
+  /* Ukuran sendiri menang atas kabar dari server: ia lebih dulu tahu, dan
+     tidak menunggu perjalanan jaringan. Kabar server mengisi yang tidak bisa
+     kita ukur — orang yang audionya tidak kita terima. */
+  const bicara = useMemo(() => {
+    const gabung = { ...bicaraJauh };
+    for (const [id, aktif] of Object.entries(bicaraLokal)) gabung[id] = aktif;
+    return gabung;
+  }, [bicaraJauh, bicaraLokal]);
+
   /* ── Volume film mengalah saat ada yang bicara ──
      Ini yang paling terasa saat nonton bareng: tanpa itu, orang harus
      memilih antara mendengar film atau mendengar temannya. Yang dihitung
      hanya suara ORANG LAIN — suara sendiri tidak boleh meredam film yang
-     kita tonton sendiri. */
+     kita tonton sendiri. Hanya suara yang kita UKUR sendiri yang boleh
+     meredam: kabar dari server berlaku juga untuk penonton yang tidak ikut
+     kanal suara, dan film mereka tidak boleh ikut mengecil oleh percakapan
+     yang tidak mereka dengar. */
   useEffect(() => {
-    const adaYangBicara = Object.entries(bicara).some(([id, aktif]) => aktif && id !== selfId);
+    const adaYangBicara = Object.entries(bicaraLokal).some(([id, aktif]) => aktif && id !== selfId);
     playerRef.current?.setDuck?.(adaYangBicara);
-  }, [bicara, selfId, playerRef]);
+  }, [bicaraLokal, selfId, playerRef]);
 
   /* ── Obrolan ── */
   const kirimChat = useCallback((text) => {
@@ -245,8 +284,22 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       selfId: selfIdRef.current,
       sendRtc: (to, kind, data) => conn.current?.sendRtc(to, kind, data),
       onLevel: (id, aktif, rms) => {
-        setBicara((p) => (p[id] === aktif ? p : { ...p, [id]: aktif }));
-        if (id === selfIdRef.current) setLevelSaya(rms || 0);
+        setBicaraLokal((p) => (p[id] === aktif ? p : { ...p, [id]: aktif }));
+        // Dibulatkan dulu: nilai mentahnya berubah tiap 60 ms, dan menaruh
+        // itu di keadaan React berarti merender ulang daftar peserta belasan
+        // kali per detik. Kehalusan geraknya ditangani transisi CSS.
+        const t = aktif ? tingkatSuara(rms) : 0;
+        setTingkat((p) => (p[id] === t ? p : { ...p, [id]: t }));
+        if (id === selfIdRef.current) {
+          setLevelSaya(rms || 0);
+          // Suara sendiri diberitahukan ke server supaya penanda bicara juga
+          // terlihat oleh penonton yang tidak ikut kanal suara — mereka tidak
+          // menerima audio siapa pun, jadi tidak bisa mengukurnya sendiri.
+          if (bicaraSayaRef.current !== aktif) {
+            bicaraSayaRef.current = aktif;
+            conn.current?.sendSpeaking(aktif);
+          }
+        }
       },
       onQuality: (id, q) => setMutu((p) => ({ ...p, [id]: q })),
       onError: (m) => setNotice(m),
@@ -272,7 +325,11 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     setMicOn(false);
     setBisu(false);
     setDeafen(false);
-    setBicara({});
+    // Hanya ukuran sendiri yang dibuang — kabar dari server tetap berlaku,
+    // sebab orang lain di kanal suara masih bicara meski kita sudah keluar.
+    setBicaraLokal({});
+    setTingkat({});
+    bicaraSayaRef.current = false;
     setLevelSaya(0);
     setMutu({});
     conn.current?.sendVoice(false);
@@ -310,6 +367,10 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     voice.current?.matikanMic();
     setMicOn(false);
     setBisu(false);
+    // Server ikut mematikan penanda bicara saat mikrofon mati; penanda lokal
+    // disetel ulang supaya pengiriman berikutnya tidak dianggap "tidak
+    // berubah" dan ikut terbuang.
+    bicaraSayaRef.current = false;
     conn.current?.sendMic(false);
   }, []);
 
@@ -394,6 +455,7 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     deafen,
     toggleDeafen,
     bicara,
+    tingkat,
     volumes,
     setVolumePeer,
     toggleMic,

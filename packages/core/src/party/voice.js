@@ -20,6 +20,7 @@ import {
   createVad,
   rmsDari,
   jitterDelayMs,
+  keputusanSinyal,
   perkiraanLatensiMs,
   volumeToElementGain,
 } from './audio-tune.js';
@@ -63,11 +64,12 @@ const AUDIO_CONSTRAINTS = {
 };
 
 /**
- * Siapa yang menawarkan lebih dulu ditentukan dari perbandingan id, bukan
- * dari siapa yang lebih dulu tahu. Tanpa aturan tetap, dua sisi bisa
- * menawarkan bersamaan dan sambungannya saling menolak.
+ * Peran saat tawaran bertabrakan. Kedua sisi boleh menawar kapan pun perlu;
+ * yang sopan mengalah bila keduanya menawar bersamaan. Perannya wajib
+ * berlawanan di dua sisi, jadi ditentukan dari perbandingan id — satu-satunya
+ * nilai yang keduanya sama-sama tahu tanpa bertanya.
  */
-const akuYangMenawar = (idSaya, idLawan) => idSaya < idLawan;
+const akuYangSopan = (idSaya, idLawan) => idSaya > idLawan;
 
 /**
  * Perkecil penyangga jitter penerima.
@@ -105,6 +107,10 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   /** @type {Map<string, HTMLAudioElement>} */
   const suara = new Map();
   const analisis = new Map(); // id -> { an, data, vad }
+  // Keadaan tawar-menawar per lawan. Harus per sambungan, bukan satu untuk
+  // semua: tabrakan dengan satu orang tidak boleh membatalkan tawaran ke
+  // orang lain.
+  const nego = new Map(); // id -> { menawar, abaikan, sudahUlangIce }
   // Cuplikan statistik sebelumnya per lawan, untuk menghitung selisih.
   const statsLalu = new Map(); // id -> { delay, count }
   // Volume yang diminta per peserta, 0..2. Disimpan lepas dari elemen audio
@@ -131,9 +137,35 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     el._soorGain = gain; // dibaca ulang kalau nanti dipasangi GainNode
   };
 
+  /**
+   * Kirim tawaran ke satu lawan.
+   *
+   * `menawar` ditandai selama proses berjalan, bukan cuma dibaca dari
+   * signalingState: antara createOffer dan setLocalDescription keadaannya
+   * masih 'stable', jadi tabrakan di celah itu tak akan terlihat tanpa
+   * penanda ini.
+   */
+  const tawarkan = async (idLawan) => {
+    const pc = koneksi.get(idLawan);
+    const n = nego.get(idLawan);
+    if (!pc || !n) return;
+    try {
+      n.menawar = true;
+      const offer = await pc.createOffer();
+      offer.sdp = tuneOpusSdp(offer.sdp);
+      await pc.setLocalDescription(offer);
+      sendRtc(idLawan, 'offer', { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+    } catch {
+      /* sambungan sedang ditutup, atau keadaannya sudah berubah */
+    } finally {
+      n.menawar = false;
+    }
+  };
+
   const buatKoneksi = (idLawan) => {
     if (koneksi.has(idLawan)) return koneksi.get(idLawan);
     const pc = new RTCPeerConnection(RTC_CONFIG);
+    nego.set(idLawan, { menawar: false, abaikan: false, sudahUlangIce: false });
 
     pc.onicecandidate = (e) => {
       if (e.candidate) sendRtc(idLawan, 'ice', e.candidate);
@@ -156,23 +188,33 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       pasangMeter(idLawan, e.streams[0]);
     };
 
-    // Renegosiasi otomatis: transceiver baru saat bergabung (recvonly),
-    // atau arahnya berubah saat mikrofon dibuka/ditutup, keduanya memicu
-    // peristiwa ini. Hanya sisi yang "menawar" (id lebih kecil) yang
-    // bertindak — sisi lain menunggu tawaran datang lewat terima().
-    pc.onnegotiationneeded = () => {
-      if (pc.signalingState !== 'stable') return;
-      if (akuYangMenawar(selfId, idLawan)) api.tawarkan(idLawan);
-    };
+    // Renegosiasi otomatis: transceiver baru saat bergabung (recvonly), atau
+    // arahnya berubah saat mikrofon dibuka/ditutup, keduanya memicu peristiwa
+    // ini. KEDUA sisi menawar di sini — tabrakannya diselesaikan di terima().
+    pc.onnegotiationneeded = () => { tawarkan(idLawan); };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed') {
+      const keadaan = pc.connectionState;
+      if (keadaan === 'failed') {
+        const n = nego.get(idLawan);
+        // ICE bisa pulih tanpa membangun sambungan baru — jalur yang tadinya
+        // hilang sering kembali setelah kandidat dikumpulkan ulang. Dicoba
+        // sekali, dan hanya oleh sisi yang tidak sopan, supaya dua sisi tidak
+        // me-restart bersamaan lalu saling membatalkan.
+        if (n && !n.sudahUlangIce && !akuYangSopan(selfId, idLawan)) {
+          n.sudahUlangIce = true;
+          try { pc.restartIce(); return; } catch { /* peramban lama: lanjut menyerah */ }
+        }
         // Hampir selalu berarti NAT simetris tanpa TURN. Dikatakan, bukan
         // dibiarkan terlihat seperti lawan bicara yang diam saja.
         onError?.('Sambungan suara ke salah satu peserta gagal. Jaringanmu mungkin memblokirnya.');
         putus(idLawan);
-      } else if (pc.connectionState === 'closed') {
+      } else if (keadaan === 'closed') {
         putus(idLawan);
+      } else if (keadaan === 'connected') {
+        // Pulih: izinkan satu percobaan ICE lagi bila nanti gagal lagi.
+        const n = nego.get(idLawan);
+        if (n) n.sudahUlangIce = false;
       }
     };
 
@@ -287,6 +329,7 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     if (el) { el.srcObject = null; suara.delete(idLawan); }
     analisis.delete(idLawan);
     statsLalu.delete(idLawan);
+    nego.delete(idLawan);
     onLevel?.(idLawan, false, 0);
   };
 
@@ -380,30 +423,44 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     get sedangDeafen() { return deafen; },
     get punyaMic() { return !!lokal; },
 
-    async tawarkan(idLawan) {
-      const pc = buatKoneksi(idLawan);
-      const offer = await pc.createOffer();
-      offer.sdp = tuneOpusSdp(offer.sdp);
-      await pc.setLocalDescription(offer);
-      sendRtc(idLawan, 'offer', { type: offer.type, sdp: offer.sdp });
-    },
-
     async terima({ from, kind, data }) {
       if (mati || !from) return;
       const pc = buatKoneksi(from);
+      const n = nego.get(from);
       try {
-        if (kind === 'offer') {
+        if (kind === 'offer' || kind === 'answer') {
+          const putusan = keputusanSinyal({
+            tipe: kind,
+            sopan: akuYangSopan(selfId, from),
+            sedangMenawar: !!n?.menawar,
+            signalingState: pc.signalingState,
+          });
+          if (putusan.abaikan) {
+            // Tawaran lawan dibuang; tawaran sendiri yang diteruskan. Ditandai
+            // supaya kandidat ICE yang menyusul untuk tawaran itu tidak
+            // dianggap galat.
+            if (n) n.abaikan = true;
+            return;
+          }
+          if (n) n.abaikan = false;
+          if (putusan.rollback) await pc.setLocalDescription({ type: 'rollback' });
           await pc.setRemoteDescription(data);
-          const answer = await pc.createAnswer();
-          // Setelan Opus juga dipasang di jawaban: keduanya harus sepakat
-          // agar berlaku dua arah.
-          answer.sdp = tuneOpusSdp(answer.sdp);
-          await pc.setLocalDescription(answer);
-          sendRtc(from, 'answer', { type: answer.type, sdp: answer.sdp });
-        } else if (kind === 'answer') {
-          await pc.setRemoteDescription(data);
+          if (putusan.jawab) {
+            const answer = await pc.createAnswer();
+            // Setelan Opus juga dipasang di jawaban: keduanya harus sepakat
+            // agar berlaku dua arah.
+            answer.sdp = tuneOpusSdp(answer.sdp);
+            await pc.setLocalDescription(answer);
+            sendRtc(from, 'answer', { type: answer.type, sdp: answer.sdp });
+          }
         } else if (kind === 'ice') {
-          await pc.addIceCandidate(data);
+          try {
+            await pc.addIceCandidate(data);
+          } catch (e) {
+            // Kandidat milik tawaran yang sengaja diabaikan memang tidak bisa
+            // dipasang. Selain itu, biarkan tertangkap penangan di bawah.
+            if (!n?.abaikan) throw e;
+          }
         }
       } catch {
         // Sinyal yang datang tidak berurutan wajar terjadi; percobaan
