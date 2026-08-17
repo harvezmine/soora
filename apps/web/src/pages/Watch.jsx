@@ -38,6 +38,7 @@ import CommentSection from '../components/CommentSection';
 import { commentKey } from '@soora/core/comments';
 import WatchPartyBar from '../components/WatchPartyBar';
 import WatchPartyGate from '../components/WatchPartyGate';
+import WatchPartyPanel from '../components/WatchPartyPanel';
 import useWatchParty, { createRoom } from '../hooks/useWatchParty';
 
 export default function Watch() {
@@ -99,6 +100,7 @@ export default function Watch() {
   const [roomId, setRoomId] = useState(() => searchParams.get('room') || null);
   const [membuatRuang, setMembuatRuang] = useState(false);
   const [galatRuang, setGalatRuang] = useState(null);
+  const [panelRuang, setPanelRuang] = useState(false);
 
   // Anime HLS state
   const [sources, setSources] = useState([]);
@@ -153,10 +155,6 @@ export default function Watch() {
   // disamakan — bukan soal usaha, tapi aturan keamanan peramban.
   const pakaiEmbed = useSubIndo || useEmbedPlayer || !!currentSource?.isEmbed;
   const bisaNontonBareng = !!currentSource && !pakaiEmbed;
-  const alasanTidakBisa = pakaiEmbed
-    ? 'Judul ini diputar lewat pemutar pihak ketiga, yang tidak bisa disamakan antar-penonton.'
-    : 'Sumber langsung untuk judul ini belum tersedia.';
-
   const party = useWatchParty({ roomId, playerRef, enabled: !!roomId });
 
   const buatRuang = useCallback(async () => {
@@ -1170,26 +1168,13 @@ export default function Watch() {
             hostName={party.room?.hostName}
             title={party.room?.title}
             peers={party.peers?.count || 1}
+            people={party.peers?.people || []}
             onGabung={party.gabung}
           />
         )}
       </div>
 
       {/* ===== CONTENT BELOW PLAYER ===== */}
-      {/* Nonton bareng — tepat di bawah pemutar, sebelum judul */}
-      <WatchPartyBar
-        bisa={bisaNontonBareng}
-        alasanTidakBisa={alasanTidakBisa}
-        room={party.room}
-        role={party.role}
-        peers={party.peers}
-        status={party.status}
-        notice={galatRuang || party.notice}
-        membuat={membuatRuang}
-        onBuat={buatRuang}
-        onKeluar={keluarRuang}
-      />
-
       <div className="watch-content">
 
         {/* Player controls — fully automatic. Servers auto-failover silently on
@@ -1266,6 +1251,24 @@ export default function Watch() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* Nonton bareng — di bawah pemilihan kualitas.
+            Tidak dirender sama sekali untuk judul yang diputar lewat iframe
+            pihak ketiga: posisinya tidak bisa disamakan, dan memberi tahu
+            hal itu di setiap judul hanya jadi kebisingan. */}
+        {bisaNontonBareng && (
+          <WatchPartyBar
+            room={party.room}
+            role={party.role}
+            peers={party.peers}
+            status={party.status}
+            membuat={membuatRuang}
+            onBuat={buatRuang}
+            onBukaPanel={() => setPanelRuang((v) => !v)}
+            onKeluar={keluarRuang}
+            panelTerbuka={panelRuang}
+          />
         )}
 
         {/* Title & Navigation */}
@@ -1557,6 +1560,26 @@ export default function Watch() {
         {/* ===== KOMENTAR ===== */}
         <CommentSection key={commentContentKey} contentKey={commentContentKey} />
       </div>
+
+      {/* Panel ruang — mengambang di atas halaman, jadi di luar watch-content */}
+      {party.room && (
+        <WatchPartyPanel
+          terbuka={panelRuang}
+          onTutup={() => setPanelRuang(false)}
+          room={party.room}
+          role={party.role}
+          peers={party.peers}
+          chat={party.chat}
+          onKirimChat={party.kirimChat}
+          micOn={party.micOn}
+          bisu={party.bisu}
+          bicara={party.bicara}
+          onToggleMic={party.toggleMic}
+          onToggleBisu={party.toggleBisu}
+          selfId={party.selfId}
+          notice={galatRuang || party.notice}
+        />
+      )}
     </div>
   );
 }

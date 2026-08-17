@@ -16,6 +16,17 @@ export const TICKET_TTL_SEC = 30;
 
 export const MAX_PEERS = 20;
 
+/** Obrolan: panjang pesan dan berapa banyak riwayat yang disimpan. */
+export const MAX_CHAT_TEXT = 500;
+export const CHAT_HISTORY = 100;
+
+/**
+ * Suara memakai mesh WebRTC: tiap orang menyambung ke tiap orang lain.
+ * Jumlah sambungan tumbuh kuadratik (n*(n-1)/2), jadi batasnya jauh lebih
+ * kecil daripada batas penonton.
+ */
+export const MAX_VOICE = 8;
+
 /** Denyut keadaan dari tuan rumah, supaya yang baru masuk tidak menunggu. */
 export const STATE_HEARTBEAT_MS = 5_000;
 
@@ -130,6 +141,22 @@ export function clockOffset(t0: number, tS: number, t2: number): number {
 export function bestOffset(samples: Array<{ offset: number; rtt: number }>): number {
   if (!samples.length) return 0;
   return samples.reduce((a, b) => (b.rtt < a.rtt ? b : a)).offset;
+}
+
+/**
+ * Rapikan pesan obrolan. Karakter kendali dibuang, baris kosong beruntun
+ * dipadatkan. Dikembalikan null bila tidak ada isi yang tersisa — pemanggil
+ * cukup mengabaikannya, tidak perlu melempar.
+ */
+export function sanitizeChat(raw: unknown): string | null {
+  const text = String(raw ?? '')
+    .replace(/\r\n?/g, '\n')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (!text) return null;
+  return text.slice(0, MAX_CHAT_TEXT);
 }
 
 /** Keadaan dari tuan rumah dibersihkan sebelum disiarkan. */

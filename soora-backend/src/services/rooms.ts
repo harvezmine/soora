@@ -74,18 +74,23 @@ export async function endRoom(id: string): Promise<void> {
 // daftar proses. Jadi klien menukar JWT-nya dengan karcis berumur pendek
 // lewat HTTP biasa, lalu mengirim karcis itu di pesan pertama soket.
 
-export async function issueTicket(roomId: string, userId: string, name: string): Promise<string> {
+export async function issueTicket(
+  roomId: string,
+  userId: string,
+  name: string,
+  avatar: string
+): Promise<string> {
   const ticket = newTicket();
   await redis.set(
     tKey(ticket),
-    JSON.stringify({ roomId, userId, name }),
+    JSON.stringify({ roomId, userId, name, avatar }),
     'EX',
     TICKET_TTL_SEC
   );
   return ticket;
 }
 
-export interface TicketData { roomId: string; userId: string; name: string }
+export interface TicketData { roomId: string; userId: string; name: string; avatar: string }
 
 /** Sekali pakai: dihapus saat ditukar, jadi tidak bisa diputar ulang. */
 export async function consumeTicket(ticket: string): Promise<TicketData> {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  MAX_CHAT_TEXT,
   RoomError,
   DRIFT_IGNORE_SEC,
   DRIFT_SEEK_SEC,
@@ -12,6 +13,7 @@ import {
   clockOffset,
   bestOffset,
   sanitizeState,
+  sanitizeChat,
 } from './roomRules';
 
 describe('assertValidWatchPath', () => {
@@ -162,5 +164,37 @@ describe('sanitizeState', () => {
   it('playing selalu berupa boolean', () => {
     expect(sanitizeState({ playing: 'ya' }, 0).playing).toBe(true);
     expect(sanitizeState({ playing: 0 }, 0).playing).toBe(false);
+  });
+});
+
+describe('sanitizeChat', () => {
+  it('memangkas spasi di tepi', () => {
+    expect(sanitizeChat('  seru banget  ')).toBe('seru banget');
+  });
+
+  it('menyamakan CRLF dan memadatkan baris kosong beruntun', () => {
+    expect(sanitizeChat('atas\r\n\r\n\r\n\r\nbawah')).toBe('atas\n\nbawah');
+  });
+
+  it('membuang karakter kendali tapi menyisakan baris baru dan tab', () => {
+    expect(sanitizeChat('halo\u0000\u0007dunia')).toBe('halodunia');
+    expect(sanitizeChat('a\tb\nc')).toBe('a\tb\nc');
+  });
+
+  it('mengembalikan null saat tidak ada isi tersisa', () => {
+    expect(sanitizeChat('')).toBeNull();
+    expect(sanitizeChat('   ')).toBeNull();
+    expect(sanitizeChat('\u0000\u0001')).toBeNull();
+    expect(sanitizeChat(null)).toBeNull();
+    expect(sanitizeChat(undefined)).toBeNull();
+  });
+
+  it('memotong pesan kepanjangan, bukan menolaknya', () => {
+    const panjang = 'a'.repeat(MAX_CHAT_TEXT + 200);
+    expect(sanitizeChat(panjang)).toHaveLength(MAX_CHAT_TEXT);
+  });
+
+  it('teks disimpan apa adanya — pengamanan XSS ada di render, bukan di sini', () => {
+    expect(sanitizeChat('<script>alert(1)</script>')).toBe('<script>alert(1)</script>');
   });
 });

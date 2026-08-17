@@ -13974,91 +13974,386 @@ a:hover {
   border: 0;
 }
 
-/* Bilah nonton bareng di bawah pemutar */
+/* ===== NONTON BARENG: BILAH ===== */
+/* Duduk di bawah pemilihan kualitas. Ringkas — tugasnya cuma menunjukkan
+   siapa yang ikut dan membuka panel. */
+
+/* Ajakan membuat ruang: satu tombol lebar, mudah kena jempol */
+.wp-mulai {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 60px;
+  margin: 0.2rem 0 1.1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-glass);
+  color: var(--text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.wp-mulai:hover { border-color: var(--accent); background: var(--btn-glass); }
+.wp-mulai:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wp-mulai:disabled { opacity: 0.6; cursor: progress; }
+.wp-mulai-ikon {
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  flex: none;
+  border-radius: 12px;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
+}
+.wp-mulai-teks { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+.wp-mulai-judul { font-size: 0.92rem; font-weight: 650; color: var(--text-primary); }
+.wp-mulai-sub { font-size: 0.78rem; color: var(--text-muted); }
+.wp-mulai-cta {
+  flex: none;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+/* Bilah saat ruang aktif */
 .wp-bar {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  max-width: 1200px;
-  margin: 0.9rem auto 0;
-  padding: 0.85rem 1.1rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  gap: 0.85rem;
+  margin: 0.2rem 0 1.1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-radius: 14px;
   background: var(--bg-glass);
   color: var(--text-secondary);
 }
-.wp-bar > svg { flex: none; color: var(--text-muted); }
-.wp-bar-off { opacity: 0.75; }
-.wp-bar-live { border-color: rgba(var(--accent-rgb), 0.35); }
-.wp-info { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
-.wp-title { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
-.wp-sub { font-size: 0.8rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-.wp-actions { display: flex; align-items: center; gap: 0.5rem; flex: none; }
-.wp-btn {
-  min-height: 44px;
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--btn-glass-border);
-  background: var(--btn-glass);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 0.84rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition), border-color var(--transition);
-}
-.wp-btn:hover { background: var(--btn-glass-hover); border-color: var(--accent); }
-.wp-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.wp-btn-primary { border-color: var(--accent); }
-.wp-btn-quiet { border-color: transparent; background: none; color: var(--text-secondary); }
-.wp-btn-quiet:hover { background: var(--btn-glass); color: var(--text-primary); }
+.wp-bar-ended { border-color: var(--border); opacity: 0.85; }
+.wp-info { display: flex; flex-direction: column; gap: 0.05rem; flex: 1; min-width: 0; }
+.wp-title { font-size: 0.88rem; font-weight: 650; color: var(--text-primary); }
+.wp-sub { font-size: 0.76rem; color: var(--text-muted); }
 
-/* Titik keadaan sambungan — bentuk dan warna, bukan warna saja */
 .wp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-muted); }
-.wp-dot-live { background: var(--accent); }
-.wp-dot-reconnecting { background: var(--gold); }
-.wp-dot-ended { background: var(--text-muted); }
+.wp-dot-live { background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.2); }
+.wp-dot-connecting, .wp-dot-reconnecting { background: var(--gold); }
 
-/* Deretan peserta */
-.wp-peers { display: flex; align-items: center; flex: none; }
+/* Tumpukan avatar */
+.wp-peers {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
 .wp-peer {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  margin-left: -7px;
+  width: 28px; height: 28px;
+  margin-left: -8px;
   border-radius: 50%;
   border: 2px solid var(--bg-primary);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 0.7rem;
   font-weight: 700;
+  overflow: hidden;
 }
 .wp-peer:first-child { margin-left: 0; }
+.wp-peer img { width: 100%; height: 100%; object-fit: cover; }
 .wp-peer-more { background: var(--btn-glass); color: var(--text-secondary); font-size: 0.62rem; }
 
-.wp-bar-ended { border-color: var(--border); opacity: 0.8; }
+.wp-actions { display: flex; align-items: center; gap: 0.4rem; flex: none; }
+.wp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--btn-glass-border);
+  background: var(--btn-glass);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.wp-btn:hover { background: var(--btn-glass-hover); border-color: var(--accent); }
+.wp-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wp-btn-primary.aktif { border-color: var(--accent); color: var(--accent); }
+.wp-btn-quiet { border-color: transparent; background: none; color: var(--text-secondary); }
+.wp-btn-quiet:hover { background: var(--btn-glass); color: var(--text-primary); }
 
-@media (max-width: 720px) {
-  .wp-bar {
-    flex-wrap: wrap;
-    row-gap: 0.7rem;
-    margin-left: 1rem;
-    margin-right: 1rem;
-  }
-  /* Keterangan mengambil sisa baris pertama; tombol turun ke baris sendiri
-     supaya tidak terhimpit di layar sempit. */
-  .wp-info { flex: 1 1 60%; }
-  .wp-peers { order: 2; }
+@media (max-width: 760px) {
+  .wp-bar { flex-wrap: wrap; row-gap: 0.6rem; }
+  .wp-info { flex: 1 1 55%; }
   .wp-actions { order: 3; width: 100%; }
-  .wp-btn { flex: 1; }
+  .wp-btn { flex: 1; justify-content: center; }
+  .wp-mulai-sub { display: none; }
 }
-@media (max-width: 400px) {
-  .wp-bar { padding: 0.75rem 0.9rem; gap: 0.7rem; }
-  .wp-title { font-size: 0.85rem; }
-  .wp-sub { font-size: 0.75rem; }
+
+/* ===== NONTON BARENG: PANEL ===== */
+/* Dok kanan di layar lebar, lembar bawah di ponsel. Markup sama — hanya tata
+   letaknya berbeda, jadi tidak ada dua jalur kode yang bisa menyimpang.
+   Ponsel: lembar tidak menutupi seluruh layar supaya video tetap terlihat
+   sambil mengobrol. */
+.wpp {
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-hover);
+  color: var(--text-primary);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  overflow: hidden;
+  left: 0; right: 0; bottom: 0;
+  max-height: 68vh;
+  border-radius: 18px 18px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: wpp-naik 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
+@keyframes wpp-naik { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes wpp-masuk { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (min-width: 1024px) {
+  .wpp {
+    left: auto;
+    top: 84px;
+    right: 1.2rem;
+    bottom: 1.2rem;
+    width: 340px;
+    max-height: none;
+    border-radius: 16px;
+    animation: wpp-masuk 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) { .wpp { animation: none; } }
+
+.wpp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.wpp-head-id { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.wpp-head-title {
+  font-size: 0.92rem; font-weight: 650;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wpp-head-sub { font-size: 0.74rem; color: var(--text-muted); }
+.wpp-x {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; flex: none;
+  border: none; border-radius: 10px;
+  background: none; color: var(--text-secondary); cursor: pointer;
+}
+.wpp-x:hover { background: var(--btn-glass); color: var(--text-primary); }
+.wpp-x:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Tab hanya untuk ponsel */
+.wpp-tabs { display: flex; gap: 0.25rem; padding: 0.5rem 0.6rem 0; }
+.wpp-tab {
+  flex: 1;
+  min-height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit; font-size: 0.84rem; font-weight: 600;
+  cursor: pointer;
+}
+.wpp-tab.aktif { background: var(--btn-glass); color: var(--text-primary); }
+.wpp-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.wpp-tab-n {
+  margin-left: 0.3rem; padding: 0 0.35rem;
+  border-radius: 999px; background: var(--accent); color: #fff;
+  font-size: 0.68rem;
+}
+
+.wpp-body { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+/* Ponsel: satu tab kelihatan pada satu waktu */
+.wpp-body.tab-obrolan .wpp-orang { display: none; }
+.wpp-body.tab-orang .wpp-chat { display: none; }
+@media (min-width: 1024px) {
+  /* Layar lebar: keduanya tampil, tab disembunyikan */
+  .wpp-tabs { display: none; }
+  .wpp-body.tab-obrolan .wpp-orang,
+  .wpp-body.tab-orang .wpp-chat { display: flex; }
+  .wpp-orang { max-height: 34%; }
+}
+
+/* Daftar orang */
+.wpp-orang { display: flex; flex-direction: column; min-height: 0; padding: 0.6rem 0.6rem 0; }
+.wpp-h3 {
+  margin: 0 0 0.4rem; padding: 0 0.4rem;
+  font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.wpp-orang-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
+.wpp-orang-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.4rem;
+  border-radius: 10px;
+}
+.wpp-orang-item.is-bicara { background: rgba(var(--accent-rgb), 0.08); }
+.wpp-orang-nama {
+  flex: 1; min-width: 0;
+  font-size: 0.85rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wpp-lencana {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent);
+  font-size: 0.64rem; font-weight: 700;
+}
+
+/* Avatar */
+.wpp-av {
+  position: relative;
+  display: grid; place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.5);
+  transition: box-shadow 0.18s ease;
+}
+.wpp-av img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.wpp-av-md { width: 32px; height: 32px; font-size: 0.8rem; }
+.wpp-av-sm { width: 26px; height: 26px; font-size: 0.7rem; }
+.wpp-av-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
+/* Cincin menyala saat suaranya terdengar */
+.wpp-av.is-bicara { box-shadow: 0 0 0 2px var(--accent); }
+.wpp-av-mic {
+  position: absolute;
+  right: -2px; bottom: -2px;
+  display: grid; place-items: center;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Obrolan */
+.wpp-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.wpp-chat-list {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.6rem 0.8rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.wpp-kosong { margin: auto; font-size: 0.84rem; color: var(--text-muted); text-align: center; }
+.wpp-msg { display: flex; gap: 0.55rem; align-items: flex-start; }
+.wpp-msg-body { min-width: 0; flex: 1; }
+.wpp-msg-head { display: flex; align-items: baseline; gap: 0.4rem; }
+.wpp-msg-nama { font-size: 0.78rem; font-weight: 650; color: var(--text-primary); }
+.wpp-msg.milikku .wpp-msg-nama { color: var(--accent); }
+.wpp-msg-jam { font-size: 0.66rem; color: var(--text-muted); }
+.wpp-msg-teks {
+  margin: 0.1rem 0 0;
+  font-size: 0.85rem; line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wpp-kirim {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border-top: 1px solid var(--border);
+}
+.wpp-input {
+  flex: 1; min-width: 0;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  font-family: inherit;
+  /* 16px mencegah iOS memperbesar layar saat kolom disentuh */
+  font-size: 16px;
+}
+.wpp-input:focus { outline: none; border-color: var(--accent); }
+.wpp-input::placeholder { color: var(--text-muted); font-size: 0.86rem; }
+.wpp-kirim-btn {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; flex: none;
+  border: none; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.wpp-kirim-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.wpp-kirim-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+.wpp-notice {
+  margin: 0;
+  padding: 0.55rem 0.9rem;
+  border-top: 1px solid var(--border);
+  background: rgba(251, 191, 36, 0.08);
+  color: var(--gold);
+  font-size: 0.76rem;
+}
+
+/* Bilah suara */
+.wpp-suara {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-glass);
+}
+.wpp-mic {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  flex: 1;
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--btn-glass-border);
+  background: var(--btn-glass);
+  color: var(--text-primary);
+  font-family: inherit; font-size: 0.86rem; font-weight: 650;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.wpp-mic:hover { background: var(--btn-glass-hover); }
+.wpp-mic.nyala { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+.wpp-mic:focus-visible, .wpp-bisu:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wpp-bisu {
+  flex: none;
+  min-height: 46px;
+  padding: 0 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--btn-glass-border);
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer;
+}
+.wpp-bisu.aktif { border-color: var(--gold); color: var(--gold); }
+
 
 /* Gerbang gabung — menutupi pemutar sampai tamu menyentuhnya sekali */
 .wpg {

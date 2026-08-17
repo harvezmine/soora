@@ -6,6 +6,7 @@ import {
   playbackRateFor,
   projectPosition,
 } from '@soora/core/party';
+import { createVoice } from '@soora/core/party/voice';
 
 /** Sesering apa tamu memeriksa selisihnya terhadap tuan rumah. */
 const PERIKSA_TIAP_MS = 1000;
@@ -24,7 +25,12 @@ const NUDGE_MS = 3000;
 export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const [role, setRole] = useState(null);      // 'host' | 'guest' | null
   const [room, setRoom] = useState(null);
-  const [peers, setPeers] = useState({ count: 0, names: [] });
+  const [peers, setPeers] = useState({ count: 0, people: [] });
+  const [chat, setChat] = useState([]);
+  const [micOn, setMicOn] = useState(false);
+  const [bisu, setBisu] = useState(false);
+  /** id peserta yang sedang terdengar bicara */
+  const [bicara, setBicara] = useState({});
   // 'connecting' diturunkan dari adanya roomId, bukan disetel di dalam efek —
   // menyetel keadaan langsung di badan efek memicu render beruntun.
   const [phase, setPhase] = useState(null); // live | reconnecting | ended
@@ -37,6 +43,12 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const [sudahGabung, setSudahGabung] = useState(false);
 
   const conn = useRef(null);
+  const voice = useRef(null);
+  // Dibaca saat render untuk menandai "kamu", jadi disimpan sebagai keadaan.
+  // Salinan ref-nya dipakai di dalam callback yang tidak boleh ikut berubah
+  // identitas tiap kali keadaan ini berganti.
+  const [selfId, setSelfId] = useState(null);
+  const selfIdRef = useRef(null);
   const state = useRef(null);       // keadaan terakhir dari tuan rumah
   const nudgeTimer = useRef(null);
 
@@ -48,13 +60,24 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       welcome: (msg) => {
         setRole(msg.role);
         setRoom(msg.room);
-        setPeers(msg.peers || { count: 1, names: [] });
+        setPeers(msg.peers || { count: 1, people: [] });
+        setChat(msg.chat || []);
+        selfIdRef.current = msg.selfId || null;
+        setSelfId(msg.selfId || null);
         state.current = msg.state;
         setPhase('live');
         setNotice(null);
       },
       state: (msg) => { state.current = msg; },
-      peers: (msg) => setPeers(msg),
+      peers: (msg) => {
+        setPeers(msg);
+        // Mesh suara mengikuti daftar peserta: yang baru menyalakan mikrofon
+        // disambung, yang mematikannya diputus.
+        voice.current?.selaraskan((msg.people || []).filter((o) => o.voice).map((o) => o.id));
+      },
+      chat: (m) => setChat((prev) => [...prev.slice(-99), m]),
+      rtc: (m) => voice.current?.terima(m),
+      peerLeft: (id) => voice.current?.putus(id),
       hostAway: () => setNotice('Tuan rumah terputus. Menunggu ia kembali…'),
       reconnecting: () => { setPhase('reconnecting'); setNotice('Sambungan terputus. Mencoba menyambung ulang…'); },
       ended: (reason) => { setPhase('ended'); setNotice(reason || 'Ruang sudah berakhir'); },
@@ -64,7 +87,19 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
 
     // Membersihkan di sini, bukan di badan efek: keadaan ruang lama tidak
     // boleh tertinggal saat pindah ruang atau keluar.
-    return () => { c.close(); conn.current = null; setPhase(null); setNotice(null); };
+    return () => {
+      voice.current?.tutup();
+      voice.current = null;
+      c.close();
+      conn.current = null;
+      setPhase(null);
+      setNotice(null);
+      setChat([]);
+      setMicOn(false);
+      setBicara({});
+      setSelfId(null);
+      selfIdRef.current = null;
+    };
   }, [roomId, enabled]);
 
   /* ── Tamu mengikuti tuan rumah ── */
@@ -146,10 +181,66 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     }
   }, [playerRef]);
 
+  /* ── Obrolan ── */
+  const kirimChat = useCallback((text) => {
+    const isi = String(text || '').trim();
+    if (!isi) return;
+    conn.current?.sendChat(isi);
+  }, []);
+
+  /* ── Mikrofon ── */
+  const nyalakanMic = useCallback(async () => {
+    if (!conn.current || !selfIdRef.current) return;
+    if (!voice.current) {
+      voice.current = createVoice({
+        selfId: selfIdRef.current,
+        sendRtc: (to, kind, data) => conn.current?.sendRtc(to, kind, data),
+        onLevel: (id, aktif) => setBicara((p) => (p[id] === aktif ? p : { ...p, [id]: aktif })),
+        onError: (m) => setNotice(m),
+      });
+    }
+    try {
+      await voice.current.nyalakan();
+      setMicOn(true);
+      setBisu(false);
+      conn.current.sendVoice(true);
+    } catch {
+      // Izin ditolak atau tidak ada mikrofon. Dikatakan, bukan dibiarkan
+      // terlihat seperti tombol rusak.
+      setNotice('Tidak bisa memakai mikrofon. Periksa izin mikrofon di peramban.');
+    }
+  }, []);
+
+  const matikanMic = useCallback(() => {
+    voice.current?.matikan();
+    setMicOn(false);
+    setBisu(false);
+    conn.current?.sendVoice(false);
+  }, []);
+
+  const toggleMic = useCallback(() => {
+    if (micOn) matikanMic(); else nyalakanMic();
+  }, [micOn, matikanMic, nyalakanMic]);
+
+  const toggleBisu = useCallback(() => {
+    setBisu((b) => {
+      voice.current?.setBisu(!b);
+      return !b;
+    });
+  }, []);
+
   return {
     role,
     room,
     peers,
+    chat,
+    kirimChat,
+    micOn,
+    bisu,
+    bicara,
+    toggleMic,
+    toggleBisu,
+    selfId,
     status,
     notice,
     sudahGabung,

@@ -5,9 +5,12 @@ import * as rooms from './services/rooms';
 import {
   PlayerState,
   MAX_PEERS,
+  MAX_VOICE,
+  CHAT_HISTORY,
   HOST_GRACE_MS,
   canControl,
   sanitizeState,
+  sanitizeChat,
 } from './services/roomRules';
 import { notifyError } from './services/telegram';
 
@@ -26,7 +29,19 @@ interface Peer {
   socket: WebSocket;
   userId: string;
   name: string;
+  avatar: string;
+  /** true saat mikrofonnya menyala — dipakai untuk menyusun mesh suara */
+  voice: boolean;
   alive: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  name: string;
+  avatar: string;
+  text: string;
+  at: number;
 }
 
 interface LiveRoom {
@@ -34,6 +49,9 @@ interface LiveRoom {
   hostId: string;
   state: PlayerState;
   peers: Set<Peer>;
+  /** Riwayat obrolan, hanya di memori: obrolan menempel pada ruang dan ikut
+   *  mati bersamanya — beda dari komentar yang menempel di judul. */
+  chat: ChatMessage[];
   /** berjalan saat tuan rumah terputus; ruang ditutup bila ia tak kembali */
   graceTimer?: NodeJS.Timeout;
 }
@@ -58,14 +76,33 @@ const broadcast = (room: LiveRoom, type: string, data: Record<string, unknown> =
 };
 
 const peerList = (room: LiveRoom) => {
-  const nama: string[] = [];
+  const orang: Array<{ id: string; name: string; avatar: string; host: boolean; voice: boolean }> = [];
   const terlihat = new Set<string>();
   for (const p of room.peers) {
     if (terlihat.has(p.userId)) continue;
     terlihat.add(p.userId);
-    nama.push(p.name);
+    orang.push({
+      id: p.userId,
+      name: p.name,
+      avatar: p.avatar,
+      host: p.userId === room.hostId,
+      voice: p.voice,
+    });
   }
-  return { count: terlihat.size, names: nama.slice(0, MAX_PEERS) };
+  // Tuan rumah selalu di depan; sisanya urut masuk.
+  orang.sort((a, b) => Number(b.host) - Number(a.host));
+  return { count: terlihat.size, people: orang.slice(0, MAX_PEERS) };
+};
+
+const voiceCount = (room: LiveRoom) => {
+  const terlihat = new Set<string>();
+  for (const p of room.peers) if (p.voice) terlihat.add(p.userId);
+  return terlihat.size;
+};
+
+const cariPeer = (room: LiveRoom, userId: string) => {
+  for (const p of room.peers) if (p.userId === userId) return p;
+  return null;
 };
 
 const tutupRuang = (room: LiveRoom, reason: string) => {
@@ -136,6 +173,7 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
             // Ruang baru dianggap dijeda di awal sampai tuan rumah berkata lain.
             state: { playing: false, position: 0, at: Date.now() },
             peers: new Set<Peer>(),
+            chat: [],
           };
           live.set(rec.id, room);
 
@@ -153,7 +191,14 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
             }
           }
 
-          peer = { socket, userId: data.userId, name: data.name, alive: true };
+          peer = {
+            socket,
+            userId: data.userId,
+            name: data.name,
+            avatar: data.avatar || '',
+            voice: false,
+            alive: true,
+          };
           room.peers.add(peer);
           clearTimeout(helloTimer);
 
@@ -166,10 +211,14 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
           const isHost = canControl(rec, data.userId);
           send(socket, 'welcome', {
             role: isHost ? 'host' : 'guest',
+            // Klien perlu tahu dirinya siapa untuk menyusun mesh suara.
+            selfId: data.userId,
             room: { id: rec.id, title: rec.title, watchPath: rec.watchPath, hostName: rec.hostName },
             state: room.state,
             serverTime: Date.now(),
             peers: peerList(room),
+            chat: room.chat.slice(-CHAT_HISTORY),
+            maxVoice: MAX_VOICE,
           });
           broadcast(room, 'peers', peerList(room), peer);
           rooms.touchRoom(rec.id).catch(() => {});
@@ -199,6 +248,51 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
         return;
       }
 
+      // ── Obrolan ──
+      // Menempel pada ruang dan ikut mati bersamanya. Berbeda dari komentar,
+      // yang menempel di judul dan permanen.
+      if (msg.type === 'chat') {
+        const text = sanitizeChat(msg.text);
+        if (!text) return;
+        const pesan: ChatMessage = {
+          id: `m_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
+          userId: peer.userId,
+          name: peer.name,
+          avatar: peer.avatar,
+          text,
+          at: Date.now(),
+        };
+        room.chat.push(pesan);
+        if (room.chat.length > CHAT_HISTORY) room.chat.splice(0, room.chat.length - CHAT_HISTORY);
+        broadcast(room, 'chat', { message: pesan });
+        rooms.touchRoom(room.id).catch(() => {});
+        return;
+      }
+
+      // ── Mikrofon menyala / mati ──
+      if (msg.type === 'voice') {
+        const mau = !!msg.on;
+        if (mau && !peer.voice && voiceCount(room) >= MAX_VOICE) {
+          send(socket, 'error', { message: `Suara penuh (maksimal ${MAX_VOICE} orang)` });
+          return;
+        }
+        peer.voice = mau;
+        broadcast(room, 'peers', peerList(room));
+        return;
+      }
+
+      // ── Sinyal WebRTC ──
+      // Server hanya meneruskan amplop ke tujuannya; isinya tidak dibaca.
+      // Suara mengalir langsung antar-peramban, tidak melewati server.
+      if (msg.type === 'rtc') {
+        const tujuan = String(msg.to || '');
+        if (!tujuan || tujuan === peer.userId) return;
+        const lawan = cariPeer(room, tujuan);
+        if (!lawan) return;
+        send(lawan.socket, 'rtc', { from: peer.userId, kind: msg.kind, data: msg.data });
+        return;
+      }
+
       if (msg.type === 'bye') {
         try { socket.close(1000, 'bye'); } catch { /* noop */ }
       }
@@ -219,6 +313,9 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
         if (r.graceTimer) clearTimeout(r.graceTimer);
         r.graceTimer = setTimeout(() => tutupRuang(r, 'Tuan rumah meninggalkan ruang'), HOST_GRACE_MS);
       } else {
+        // Beri tahu agar sambungan suara ke orang ini ditutup, bukan
+        // dibiarkan menggantung.
+        broadcast(r, 'peer-left', { id: peer.userId });
         broadcast(r, 'peers', peerList(r));
       }
 

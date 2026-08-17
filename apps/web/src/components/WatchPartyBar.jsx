@@ -3,38 +3,26 @@ import { inviteLink } from '@soora/core/party';
 
 const inisial = (nama) => (nama || '?').trim().charAt(0).toUpperCase();
 
-const IkonOrang = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" aria-hidden="true">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const IkonInfo = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" aria-hidden="true">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 8v4M12 16h.01" />
-  </svg>
-);
-
 /**
- * Bilah nonton bareng di bawah pemutar.
+ * Bilah ruang, duduk di bawah pemilihan kualitas.
  *
- * Empat keadaan: bisa dibuat, tidak bisa untuk judul ini, sedang berjalan,
- * dan sudah berakhir.
+ * Sengaja ringkas: tugasnya cuma menunjukkan siapa yang ikut dan membuka
+ * panel. Obrolan, daftar orang, dan mikrofon ada di panel.
+ *
+ * Judul yang tidak bisa dinonton bareng tidak memunculkan apa pun — bukan
+ * pemberitahuan, bukan tombol mati. Fitur yang tidak berlaku sebaiknya
+ * tidak terlihat sama sekali.
  */
 export default function WatchPartyBar({
-  bisa,
-  alasanTidakBisa,
   room,
   role,
   peers,
   status,
-  notice,
   membuat,
   onBuat,
+  onBukaPanel,
   onKeluar,
+  panelTerbuka,
 }) {
   const [tersalin, setTersalin] = useState(false);
 
@@ -46,91 +34,84 @@ export default function WatchPartyBar({
       setTersalin(true);
       setTimeout(() => setTersalin(false), 2500);
     } catch {
-      // Peramban tanpa izin papan klip — tampilkan supaya bisa disalin manual.
       window.prompt('Salin tautan ini:', tautan);
     }
   };
 
-  /* ── Sedang berjalan ── */
-  if (room) {
-    const berakhir = status === 'ended';
-    const nama = (peers?.names || []).slice(0, 4);
-    const sisa = Math.max(0, (peers?.count || 0) - nama.length);
-
-    // Tautan ruang dibuka di judul yang diputar lewat embed: ruangnya hidup,
-    // tapi posisinya tidak akan pernah sama. Lebih baik dikatakan.
-    const takBisaSinkron = !bisa;
-
+  /* ── Belum ada ruang ── */
+  if (!room) {
     return (
-      <div className={`wp-bar wp-bar-live ${berakhir ? 'wp-bar-ended' : ''}`}>
-        <span className={`wp-dot wp-dot-${status}`} aria-hidden="true" />
-
-        <div className="wp-info">
-          <span className="wp-title">
-            {berakhir
-              ? 'Ruang sudah berakhir'
-              : role === 'host'
-                ? 'Ruangmu aktif'
-                : `Nonton bareng ${room.hostName}`}
-          </span>
-          <span className="wp-sub">
-            {notice
-              || (takBisaSinkron
-                ? 'Judul ini diputar lewat pemutar pihak ketiga — posisinya tidak bisa disamakan.'
-                : role === 'guest'
-                  ? 'Putar dan jeda dikendalikan tuan rumah'
-                  : 'Bagikan tautannya untuk mengajak teman')}
-          </span>
-        </div>
-
-        {!berakhir && nama.length > 0 && (
-          <div className="wp-peers" title={`${peers.count} orang di ruang ini`}>
-            {nama.map((n, i) => (
-              <span className="wp-peer" key={`${n}-${i}`} aria-hidden="true">{inisial(n)}</span>
-            ))}
-            {sisa > 0 && <span className="wp-peer wp-peer-more" aria-hidden="true">+{sisa}</span>}
-            <span className="sr-only">{peers.count} orang di ruang ini</span>
-          </div>
-        )}
-
-        <div className="wp-actions">
-          {!berakhir && (
-            <button className="wp-btn" onClick={salin}>
-              {tersalin ? 'Tersalin' : 'Salin tautan'}
-            </button>
-          )}
-          <button className="wp-btn wp-btn-quiet" onClick={onKeluar}>
-            {berakhir ? 'Tutup' : role === 'host' ? 'Akhiri' : 'Keluar'}
-          </button>
-        </div>
-      </div>
+      <button className="wp-mulai" onClick={onBuat} disabled={membuat}>
+        <span className="wp-mulai-ikon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" width="18" height="18">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </span>
+        <span className="wp-mulai-teks">
+          <span className="wp-mulai-judul">{membuat ? 'Menyiapkan ruang…' : 'Nonton bareng'}</span>
+          <span className="wp-mulai-sub">Ajak teman, ngobrol, dan bisa pakai mic</span>
+        </span>
+        <span className="wp-mulai-cta" aria-hidden="true">Buat ruang</span>
+      </button>
     );
   }
 
-  /* ── Tidak bisa untuk judul ini ── */
-  if (!bisa) {
-    return (
-      <div className="wp-bar wp-bar-off">
-        <IkonInfo />
-        <div className="wp-info">
-          <span className="wp-title">Nonton bareng belum bisa di judul ini</span>
-          <span className="wp-sub">{alasanTidakBisa}</span>
-        </div>
-      </div>
-    );
-  }
+  const berakhir = status === 'ended';
+  const orang = peers?.people || [];
+  const tampil = orang.slice(0, 5);
+  const sisa = Math.max(0, (peers?.count || 0) - tampil.length);
 
-  /* ── Ajakan membuat ── */
   return (
-    <div className="wp-bar">
-      <IkonOrang />
+    <div className={`wp-bar ${berakhir ? 'wp-bar-ended' : ''}`}>
+      <span className={`wp-dot wp-dot-${status}`} aria-hidden="true" />
+
       <div className="wp-info">
-        <span className="wp-title">Nonton bareng</span>
-        <span className="wp-sub">Bagikan tautan, kendali putar tetap di tanganmu</span>
+        <span className="wp-title">
+          {berakhir ? 'Ruang sudah berakhir' : role === 'host' ? 'Ruangmu aktif' : `Ruang ${room.hostName}`}
+        </span>
+        <span className="wp-sub">
+          {berakhir
+            ? 'Buat ruang baru untuk mengajak lagi'
+            : role === 'guest'
+              ? 'Putar dan jeda dikendalikan tuan rumah'
+              : 'Kendali putar ada di tanganmu'}
+        </span>
       </div>
+
+      {!berakhir && tampil.length > 0 && (
+        <button className="wp-peers" onClick={onBukaPanel} aria-label={`${peers.count} orang di ruang ini`}>
+          {tampil.map((o) => (
+            <span className="wp-peer" key={o.id} title={o.name}>
+              {o.avatar
+                ? <img src={o.avatar} alt="" referrerPolicy="no-referrer" />
+                : inisial(o.name)}
+            </span>
+          ))}
+          {sisa > 0 && <span className="wp-peer wp-peer-more">+{sisa}</span>}
+        </button>
+      )}
+
       <div className="wp-actions">
-        <button className="wp-btn wp-btn-primary" onClick={onBuat} disabled={membuat}>
-          {membuat ? 'Membuat…' : 'Buat ruang'}
+        {!berakhir && (
+          <>
+            <button
+              className={`wp-btn wp-btn-primary ${panelTerbuka ? 'aktif' : ''}`}
+              onClick={onBukaPanel}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Obrolan
+            </button>
+            <button className="wp-btn" onClick={salin}>
+              {tersalin ? 'Tersalin' : 'Undang'}
+            </button>
+          </>
+        )}
+        <button className="wp-btn wp-btn-quiet" onClick={onKeluar}>
+          {berakhir ? 'Tutup' : role === 'host' ? 'Akhiri' : 'Keluar'}
         </button>
       </div>
     </div>

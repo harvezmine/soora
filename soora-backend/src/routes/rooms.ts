@@ -65,7 +65,7 @@ router.post('/:id/ticket', requireAuth, async (req: Request, res: Response) => {
     const user = await getUserById(uid(req));
     if (!user) return res.status(401).json({ error: 'Sesi tidak valid' });
     const pub = publicUser(user);
-    const ticket = await rooms.issueTicket(room.id, pub.id, pub.name);
+    const ticket = await rooms.issueTicket(room.id, pub.id, pub.name, pub.avatar);
     res.json({ ticket });
   } catch (err: any) { fail(req, res, err, 'rooms:ticket'); }
 });

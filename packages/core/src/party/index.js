@@ -180,6 +180,9 @@ export function connectRoom(roomId, on = {}) {
       }
       if (msg.type === 'state') { on.state?.(msg); return; }
       if (msg.type === 'peers') { on.peers?.(msg); return; }
+      if (msg.type === 'chat') { on.chat?.(msg.message); return; }
+      if (msg.type === 'rtc') { on.rtc?.(msg); return; }
+      if (msg.type === 'peer-left') { on.peerLeft?.(msg.id); return; }
       if (msg.type === 'host-away') { on.hostAway?.(msg); return; }
       if (msg.type === 'ended') { ditutup = true; on.ended?.(msg.reason); return; }
       if (msg.type === 'error') { on.error?.(msg.message); return; }
@@ -204,6 +207,10 @@ export function connectRoom(roomId, on = {}) {
     serverNow,
     getOffset: () => offset,
     sendState: (playing, position) => kirim('state', { playing, position }),
+    sendChat: (text) => kirim('chat', { text }),
+    sendVoice: (on_) => kirim('voice', { on: on_ }),
+    /** Amplop sinyal WebRTC; isinya tidak dibaca server. */
+    sendRtc: (to, kind, data) => kirim('rtc', { to, kind, data }),
     close: () => {
       ditutup = true;
       clearInterval(pingTimer);
