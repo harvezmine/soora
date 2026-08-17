@@ -174,4 +174,12 @@ router.post('/comments/reports/dismiss', requireAdmin, async (req: Request, res:
   } catch (err: any) { reportRouteError(req, err, 'admin/comment-dismiss'); res.status(500).json({ error: 'failed' }); }
 });
 
+// POST /admin/perbaiki-avatar — paksa akun & komentar lama pakai avatar Soora
+router.post('/perbaiki-avatar', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const hasil = await comments.perbaikiAvatarLama();
+    res.json({ ok: true, ...hasil });
+  } catch (err: any) { reportRouteError(req, err, 'admin/perbaiki-avatar'); res.status(500).json({ error: 'failed' }); }
+});
+
 export default router;

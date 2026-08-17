@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import SplashIntro from '../components/SplashIntro';
 import { useEffect, useRef } from 'react';
 import { ACCENTS, alpha } from '../theme';
+import { IconAndroid, IconChevronRight } from '../components/icons';
 
 export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClick = null }) {
   const navigate = useNavigate();
@@ -235,18 +236,20 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
           ))}
         </div>
 
-        {/* Kartu unduh sejajar dengan tiga kartu bagian di atas, bukan pil
-            kecil yang menempel di footer. Selalu tampil termasuk di desktop:
-            orang sering menemukan situsnya di laptop lalu memasang di ponsel. */}
-        <Link to="/download" className="landing-app-cta">
-          <span className="landing-app-cta-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
-              <rect x="6" y="2" width="12" height="20" rx="3" />
-              <line x1="10" y1="18.5" x2="14" y2="18.5" />
-            </svg>
+        {/* Badge gaya store, mobile-only lewat CSS: di desktop APK-nya tidak
+            terpasang di perangkat yang sedang dipakai, jadi kartunya cuma
+            noise di layar besar. */}
+        <Link to="/download" className="landing-android-badge">
+          <span className="landing-android-badge-icon" aria-hidden="true">
+            <IconAndroid size={26} />
           </span>
-          <span className="landing-app-cta-text">Download Soora Mobile</span>
-          <span className="landing-app-cta-arrow" aria-hidden="true">→</span>
+          <span className="landing-android-badge-text">
+            <span className="landing-android-badge-eyebrow">Unduh untuk</span>
+            <span className="landing-android-badge-brand">Android</span>
+          </span>
+          <span className="landing-android-badge-arrow" aria-hidden="true">
+            <IconChevronRight size={18} />
+          </span>
         </Link>
 
         <footer className="landing-footer">

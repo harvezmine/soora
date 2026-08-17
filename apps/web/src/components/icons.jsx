@@ -269,3 +269,16 @@ export const IconSignalLow = (p) => (
     <path d="M7 20v-2" strokeOpacity="0.35" />
   </Garis>
 );
+
+/* Kepala robot Android — dipakai badge unduh APK, bukan lambang perusahaan. */
+export const IconAndroid = ({ size = 16 }) => (
+  <Svg size={size} fill="currentColor">
+    <path d="M17.6 9.48 19.44 6.3a.63.63 0 0 0-1.09-.63l-1.87 3.24a10.4 10.4 0 0 0-8.94 0L5.67 5.67A.63.63 0 1 0 4.58 6.3l1.83 3.18C3.3 11.25 1.28 14.44 1 18h22c-.28-3.56-2.3-6.75-5.4-8.52ZM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5Zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5Z" />
+  </Svg>
+);
+
+export const IconChevronRight = (p) => (
+  <Garis {...p}>
+    <path d="M9 5l7 7-7 7" />
+  </Garis>
+);

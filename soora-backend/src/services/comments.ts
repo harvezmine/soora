@@ -1,4 +1,5 @@
-import { redis } from './store';
+import { redis, listAllUsers, saveUser } from './store';
+import { avatarSusulan, avatarPemberianSistem } from './avatars';
 import {
   MAX_TEXT,
   CommentError,
@@ -243,4 +244,51 @@ export async function listReports(limit = 100): Promise<Array<Report & { comment
 
 export async function dismissReport(member: string): Promise<void> {
   await redis.zrem(REPORTS_KEY, member);
+}
+
+// ── Migrasi avatar lama ──
+
+/**
+ * Paksa akun lama yang masih avatar inisial pakai karakter Soora, lalu
+ * timpa avatar yang sudah disalin ke komentar lama.
+ *
+ * Komentar menyimpan salinan avatar saat ditulis (lihat komentar di
+ * `Comment`), jadi memperbaiki akunnya saja tidak cukup — komentar lama
+ * tetap menampilkan huruf inisial selamanya kalau tidak ikut ditulis ulang
+ * di sini. Sekali jalan, dipanggil lewat POST /admin/perbaiki-avatar.
+ */
+export async function perbaikiAvatarLama(): Promise<{ akun: number; komentar: number }> {
+  const users = await listAllUsers();
+  const avatarTerkini = new Map<string, string>();
+  let akun = 0;
+  for (const u of users) {
+    const baru = avatarSusulan(u);
+    if (baru) { u.avatar = baru; await saveUser(u); akun++; }
+    avatarTerkini.set(u.id, u.avatar);
+  }
+
+  let komentar = 0;
+  let cursor = '0';
+  do {
+    const [next, keys] = await redis.scan(cursor, 'MATCH', 'comment:*', 'COUNT', 200);
+    cursor = next;
+    if (!keys.length) continue;
+    const raws = await redis.mget(keys);
+    const pipe = redis.pipeline();
+    let ada = false;
+    raws.forEach((raw, i) => {
+      if (!raw) return;
+      const c = JSON.parse(raw) as Comment;
+      if (!avatarPemberianSistem(c.avatar)) return;
+      const baru = avatarTerkini.get(c.userId);
+      if (!baru || avatarPemberianSistem(baru)) return;
+      c.avatar = baru;
+      pipe.set(keys[i], JSON.stringify(c));
+      komentar++;
+      ada = true;
+    });
+    if (ada) await pipe.exec();
+  } while (cursor !== '0');
+
+  return { akun, komentar };
 }
