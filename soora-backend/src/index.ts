@@ -1,3 +1,4 @@
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -19,6 +20,8 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import adminRoutes from './routes/admin';
 import commentRoutes from './routes/comments';
+import roomRoutes from './routes/rooms';
+import { attachWatchParty } from './ws';
 
 const app = express();
 
@@ -79,6 +82,11 @@ app.use(['/auth', '/user', '/admin'], (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, private, max-age=0');
   next();
 });
+// Ruang nonton bareng bersifat per-pengguna dan berumur pendek.
+app.use('/rooms', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, private, max-age=0');
+  next();
+});
 // Komentar boleh dibaca tamu, tapi tetap tidak boleh disinggahi cache
 // bersama: isinya berubah tiap kali ada yang menulis, dan balasan POST
 // bersifat per-pengguna.
@@ -90,6 +98,7 @@ app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
 app.use('/comments', commentRoutes);
+app.use('/rooms', roomRoutes);
 app.use('/anime', animeRoutes);
 app.use('/movies', movieRoutes);
 app.use('/manga', mangaRoutes);
@@ -210,8 +219,15 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // ========== START ==========
-app.listen(config.port, '0.0.0.0', () => {
+// WebSocket menumpang server HTTP yang sama, jadi app.listen diganti server
+// eksplisit — nonton bareng butuh peristiwa 'upgrade' yang tidak tersedia
+// pada nilai balik app.listen sebelum server dibuat sendiri.
+const server = http.createServer(app);
+attachWatchParty(server);
+
+server.listen(config.port, '0.0.0.0', () => {
   console.log(`🚀 Soora Backend running on http://0.0.0.0:${config.port}`);
+  console.log(`   Nonton bareng: ws://0.0.0.0:${config.port}/ws`);
   console.log(`   Consumet API: ${config.consumetUrl}`);
   console.log(`   TMDB Key: ${config.tmdbKey ? '✓ configured' : '✗ missing'}`);
   console.log(`   CORS: ${config.corsOrigin}`);

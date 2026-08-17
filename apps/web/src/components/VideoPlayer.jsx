@@ -6,7 +6,18 @@ import Hls from 'hls.js';
  * Custom overlay: play/pause, seek, volume, brightness, resolution, PiP, fullscreen
  */
 const VideoPlayer = forwardRef(function VideoPlayer(
-  { src, subtitles = [], referer = '', initialTime = 0, onError, onLevelsLoaded, onLevelSwitched, onMinimize },
+  {
+    src, subtitles = [], referer = '', initialTime = 0,
+    onError, onLevelsLoaded, onLevelSwitched, onMinimize,
+    // Nonton bareng: tamu boleh menonton tapi tidak mengendalikan.
+    // Kendali disembunyikan, bukan sekadar diabaikan, supaya tidak
+    // terasa rusak saat ditekan.
+    readOnly = false,
+    // Dipanggil saat pengguna sendiri yang menggerakkan pemutar, supaya
+    // tuan rumah bisa menyiarkannya. Tidak dipanggil untuk perubahan yang
+    // datang dari ruang — kalau tidak, keduanya akan saling memantul.
+    onUserPlay, onUserPause, onUserSeek,
+  },
   ref
 ) {
   const containerRef = useRef(null);
@@ -19,6 +30,9 @@ const VideoPlayer = forwardRef(function VideoPlayer(
   const networkRetries = useRef(0); // track HLS network error retries
   const clickTimer = useRef(null); // debounce click vs double-click
   const isTouchDevice = useRef(false); // detect touch vs mouse
+  // true selama perubahan yang datang dari ruang nonton bareng sedang
+  // diterapkan, supaya tidak disiarkan balik dan memantul tanpa henti.
+  const dariRuang = useRef(false);
 
   const [hlsLevels, setHlsLevels] = useState([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
@@ -90,6 +104,30 @@ const VideoPlayer = forwardRef(function VideoPlayer(
   useImperativeHandle(ref, () => ({
     getVideo: () => videoRef.current,
     getHls: () => hlsRef.current,
+    // ── Kendali jarak jauh (nonton bareng) ──
+    // Ditandai dulu supaya penangan 'play'/'pause'/'seeked' tahu perubahan
+    // ini datang dari ruang, bukan dari jari pengguna, dan tidak menyiarkannya
+    // balik.
+    remotePlay: async () => {
+      dariRuang.current = true;
+      try { await videoRef.current?.play(); } catch { /* butuh sentuhan pengguna */ }
+      setTimeout(() => { dariRuang.current = false; }, 300);
+    },
+    remotePause: () => {
+      dariRuang.current = true;
+      videoRef.current?.pause();
+      setTimeout(() => { dariRuang.current = false; }, 300);
+    },
+    remoteSeek: (t) => {
+      if (!videoRef.current || !Number.isFinite(t)) return;
+      dariRuang.current = true;
+      videoRef.current.currentTime = Math.max(0, t);
+      setTimeout(() => { dariRuang.current = false; }, 300);
+    },
+    setRate: (r) => {
+      if (videoRef.current && Number.isFinite(r)) videoRef.current.playbackRate = r;
+    },
+    isPlaying: () => !!videoRef.current && !videoRef.current.paused,
     getCurrentTime: () => videoRef.current?.currentTime || 0,
     // NaN sebelum metadata termuat — dinormalkan ke 0 supaya pemanggil
     // tidak perlu memeriksanya sendiri.
@@ -256,8 +294,11 @@ const VideoPlayer = forwardRef(function VideoPlayer(
     const video = videoRef.current;
     if (!video) return;
 
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
+    // Perubahan yang datang dari ruang nonton bareng tidak dilaporkan balik —
+    // kalau tidak, tuan rumah dan tamu akan saling memantulkan keadaan.
+    const onPlay = () => { setPlaying(true); if (!dariRuang.current) onUserPlay?.(video.currentTime); };
+    const onPause = () => { setPlaying(false); if (!dariRuang.current) onUserPause?.(video.currentTime); };
+    const onSeeked = () => { if (!dariRuang.current) onUserSeek?.(video.currentTime, !video.paused); };
     const onTime = () => {
       if (!seeking) setCurrentTime(video.currentTime);
       setDuration(video.duration || 0);
@@ -269,16 +310,18 @@ const VideoPlayer = forwardRef(function VideoPlayer(
 
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
+    video.addEventListener('seeked', onSeeked);
     video.addEventListener('timeupdate', onTime);
     video.addEventListener('ended', onEnd);
 
     return () => {
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
+      video.removeEventListener('seeked', onSeeked);
       video.removeEventListener('timeupdate', onTime);
       video.removeEventListener('ended', onEnd);
     };
-  }, [seeking]);
+  }, [seeking, onUserPlay, onUserPause, onUserSeek]);
 
   // ===== FULLSCREEN LISTENER =====
   useEffect(() => {
@@ -328,6 +371,9 @@ const VideoPlayer = forwardRef(function VideoPlayer(
       if (!video) return;
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      // Tamu: volume, layar penuh, dan teks tetap boleh; yang menggerakkan
+      // posisi tidak.
+      if (readOnly && [' ', 'k', 'K', 'ArrowLeft', 'ArrowRight', 'j', 'J', 'l', 'L'].includes(e.key)) return;
 
       switch (e.key) {
         case ' ':
@@ -369,12 +415,15 @@ const VideoPlayer = forwardRef(function VideoPlayer(
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [resetHideTimer]);
+  }, [resetHideTimer, readOnly]);
 
   // ===== CONTROL ACTIONS =====
   const togglePlay = () => {
     const video = videoRef.current;
-    if (!video) return;
+    // Tamu di ruang nonton bareng tidak memegang kendali. Dikunci di sini,
+    // bukan cuma disembunyikan, supaya pintasan papan tik dan ketukan layar
+    // ikut tertahan.
+    if (!video || readOnly) return;
     video.paused ? video.play() : video.pause();
     resetHideTimer();
   };
@@ -540,6 +589,7 @@ const VideoPlayer = forwardRef(function VideoPlayer(
 
   const skip = (sec) => {
     const video = videoRef.current;
+    if (readOnly) return;
     if (video) video.currentTime = Math.max(0, Math.min(video.currentTime + sec, video.duration));
     resetHideTimer();
   };
@@ -570,7 +620,7 @@ const VideoPlayer = forwardRef(function VideoPlayer(
     <div
       ref={containerRef}
       id={playerIdRef.current}
-      className={`nf-player ${showControls ? 'show-controls' : ''} ${isFullscreen ? 'nf-fullscreen' : ''}`}
+      className={`nf-player ${showControls ? 'show-controls' : ''} ${isFullscreen ? 'nf-fullscreen' : ''} ${readOnly ? 'nf-readonly' : ''}`}
       onMouseMove={resetHideTimer}
       onMouseLeave={() => { if (playing) setShowControls(false); }}
       onTouchStart={() => { isTouchDevice.current = true; }}

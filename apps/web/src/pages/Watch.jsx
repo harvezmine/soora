@@ -36,6 +36,8 @@ import SkeletonWatch from '../components/SkeletonWatch';
 import { saveProgress } from '../utils/progress';
 import CommentSection from '../components/CommentSection';
 import { commentKey } from '@soora/core/comments';
+import WatchPartyBar from '../components/WatchPartyBar';
+import useWatchParty, { createRoom } from '../hooks/useWatchParty';
 
 export default function Watch() {
   const [searchParams] = useSearchParams();
@@ -89,6 +91,14 @@ export default function Watch() {
     return null;
   })();
 
+  // ── Nonton bareng ──
+  // Id ruang datang dari tautan undangan (?room=...). Tuan rumah juga
+  // memakainya setelah membuat ruang, supaya kedua sisi menempuh jalur
+  // yang sama.
+  const [roomId, setRoomId] = useState(() => searchParams.get('room') || null);
+  const [membuatRuang, setMembuatRuang] = useState(false);
+  const [galatRuang, setGalatRuang] = useState(null);
+
   // Anime HLS state
   const [sources, setSources] = useState([]);
   const [subtitles, setSubtitles] = useState([]);
@@ -135,6 +145,44 @@ export default function Watch() {
 
   // Effective TMDB ID — from URL param or resolved from Goku enrichment
   const effectiveTmdbId = tmdbId || resolvedTmdbId;
+
+  // Nonton bareng hanya mungkin pada pemutar HLS milik Soora sendiri.
+  // Empat jalur lainnya adalah iframe lintas-asal: peramban melarang halaman
+  // induk menyentuh isinya, jadi putar/jeda di dalamnya tidak bisa
+  // disamakan — bukan soal usaha, tapi aturan keamanan peramban.
+  const pakaiEmbed = useSubIndo || useEmbedPlayer || !!currentSource?.isEmbed;
+  const bisaNontonBareng = !!currentSource && !pakaiEmbed;
+  const alasanTidakBisa = pakaiEmbed
+    ? 'Judul ini diputar lewat pemutar pihak ketiga, yang tidak bisa disamakan antar-penonton.'
+    : 'Sumber langsung untuk judul ini belum tersedia.';
+
+  const party = useWatchParty({ roomId, playerRef, enabled: !!roomId });
+
+  const buatRuang = useCallback(async () => {
+    if (!commentContentKey) return;
+    setMembuatRuang(true);
+    setGalatRuang(null);
+    try {
+      const room = await createRoom({
+        contentKey: commentContentKey,
+        watchPath: `${location.pathname}${location.search}`,
+        title,
+      });
+      setRoomId(room.id);
+    } catch (err) {
+      setGalatRuang(err.message);
+    } finally {
+      setMembuatRuang(false);
+    }
+  }, [commentContentKey, location.pathname, location.search, title]);
+
+  const keluarRuang = useCallback(() => {
+    setRoomId(null);
+    // Buang ?room= supaya menyegarkan halaman tidak menyeret kembali ke ruang.
+    const q = new URLSearchParams(location.search);
+    q.delete('room');
+    navigate(`${location.pathname}${q.toString() ? `?${q}` : ''}`, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   // Normalize TMDB results for <Card>
   const normRec = (r) => ({
@@ -1040,6 +1088,10 @@ export default function Watch() {
               subtitles={subtitles}
               referer={referer}
               initialTime={resumeTime.current}
+              readOnly={party.isGuest}
+              onUserPlay={party.onUserPlay}
+              onUserPause={party.onUserPause}
+              onUserSeek={party.onUserSeek}
               onError={handlePlayerError}
               onMinimize={isAnime ? handleMinimize : isMovie ? handleMinimizeMovie : undefined}
               onLevelsLoaded={(levels) => {
@@ -1115,6 +1167,20 @@ export default function Watch() {
       </div>
 
       {/* ===== CONTENT BELOW PLAYER ===== */}
+      {/* Nonton bareng — tepat di bawah pemutar, sebelum judul */}
+      <WatchPartyBar
+        bisa={bisaNontonBareng}
+        alasanTidakBisa={alasanTidakBisa}
+        room={party.room}
+        role={party.role}
+        peers={party.peers}
+        status={party.status}
+        notice={galatRuang || party.notice}
+        membuat={membuatRuang}
+        onBuat={buatRuang}
+        onKeluar={keluarRuang}
+      />
+
       <div className="watch-content">
 
         {/* Player controls — fully automatic. Servers auto-failover silently on
