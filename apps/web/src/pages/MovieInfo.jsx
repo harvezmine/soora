@@ -20,7 +20,7 @@ const isGokuId = (id) => id && (id.includes('watch-') || id.includes('/'));
 /* ===== Skeleton Loader for MovieInfo ===== */
 function MovieInfoSkeleton() {
   return (
-    <div className="info-page">
+    <div className="info-page sooraflix-page">
       <div className="info-backdrop loaded">
         <div className="skel-shimmer" style={{ width: '100%', height: '100%' }} />
       </div>
@@ -305,7 +305,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   });
 
   return (
-    <div className="info-page">
+    <div className="info-page sooraflix-page">
       {/* Cinematic backdrop */}
       <div className={`info-backdrop ${backdropLoaded || !backdropSrc ? 'loaded' : ''}`}>
         {backdropSrc && (

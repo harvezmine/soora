@@ -137,7 +137,10 @@ export default function CardPopup({ item, type, style: posStyle, onMouseEnter, o
 
   return (
     <div
-      className={`card-popup ${position === 'above' ? 'popup-above' : 'popup-below'}`}
+      // Popup dirender lewat portal di document.body, jadi ia berada di luar
+      // .sooraflix-page dan tidak ikut mewarisi penimpaan aksennya. Vertikal
+      // ditempelkan sendiri di sini.
+      className={`card-popup ${position === 'above' ? 'popup-above' : 'popup-below'} ${type === 'movie' ? 'cardpop-sooraflix' : ''}`}
       style={inlineStyle}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
