@@ -821,10 +821,12 @@ export default function Watch() {
     const save = () => {
       const t = playerRef.current?.getCurrentTime?.() || 0;
       // Durasi dipakai untuk bar progres di baris "Lanjutkan". Pemutar HLS
-      // tahu durasi aslinya; pemutar embed tidak, jadi runtime TMDB (menit)
-      // dipakai sebagai perkiraan.
+      // tahu durasi aslinya; pemutar embed tidak, jadi metadata judul dipakai
+      // sebagai perkiraan: runtime TMDB untuk film, durasi episode untuk anime
+      // (nilainya berupa teks seperti "24 min", jadi angkanya diambil).
       const dPlayer = playerRef.current?.getDuration?.() || 0;
-      const dMeta = (movieDetails?.runtime || 0) * 60;
+      const menitAnime = parseInt(String(animeInfo?.duration || '').replace(/\D+/g, ''), 10) || 0;
+      const dMeta = ((movieDetails?.runtime || 0) || menitAnime) * 60;
       const duration = Math.floor(dPlayer || dMeta || 0);
       saveProgress({ ...entry, time: Math.floor(t), ...(duration > 0 ? { duration } : {}) });
     };
