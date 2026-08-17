@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import MiniPlayer from './components/MiniPlayer';
 import { MiniPlayerProvider } from './context/MiniPlayerContext';
@@ -8,24 +8,8 @@ import { LegacyAnimeRedirect, LegacyMovieRedirect, LegacyMangaRedirect } from '.
 import { usePWAMobileOptimizations } from './hooks/usePWAMobile';
 import RequireAuth from './components/RequireAuth';
 import useHeartbeat from './hooks/useHeartbeat';
+import { lastVertical, rememberVertical, jalurProfil } from './verticals';
 import './App.css';
-
-// Vertikal terakhir yang dikunjungi, dipakai oleh halaman netral seperti
-// /profile. sessionStorage: cukup bertahan selama tab dibuka, dan tidak
-// membekukan pilihan lama saat pengguna kembali berhari-hari kemudian.
-const VERTICAL_KEY = 'soora_last_vertical';
-const VERTICALS_VALID = ['sooranime', 'sooraflix', 'sooramics'];
-
-function lastVertical() {
-  try {
-    const v = sessionStorage.getItem(VERTICAL_KEY);
-    return VERTICALS_VALID.includes(v) ? v : 'sooranime';
-  } catch { return 'sooranime'; }
-}
-
-function rememberVertical(v) {
-  try { sessionStorage.setItem(VERTICAL_KEY, v); } catch { /* mode privat */ }
-}
 
 /* ── Route-level code splitting: each page loads its own JS chunk on demand ── */
 const Login = lazy(() => import('./pages/Login'));
@@ -46,6 +30,11 @@ const MyList = lazy(() => import('./pages/MyList'));
 const SooramicsPlus = lazy(() => import('./pages/SooramicsPlus'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Profile = lazy(() => import('./pages/Profile'));
+
+/* Alamat /profile lama mengalihkan ke vertikal terakhir yang dikunjungi. */
+function ProfileRedirect() {
+  return <Navigate to={jalurProfil(lastVertical())} replace />;
+}
 
 /* Minimal route-transition fallback (no spinner — skeleton in each page handles UX) */
 function RouteFallback() {
@@ -71,10 +60,8 @@ function AppLayout() {
   const isMovieMyList = location.pathname === '/movies/mylist';
   const isMangaMyList = location.pathname === '/manga/mylist';
 
-  // Halaman netral (mis. /profile) tidak menyebut vertikal apa pun di
-  // jalurnya. Tanpa penanganan khusus ia jatuh ke 'sooranime', sehingga
-  // membuka profil dari sooraflix terasa seperti terlempar ke aplikasi lain.
-  // Jadi vertikal terakhir yang dikunjungi diingat dan dipakai di sana.
+  // Profil kini punya alamat sendiri per vertikal, jadi hanya alamat lama
+  // /profile yang masih netral — dan ia cuma mengalihkan.
   const NEUTRAL_PATHS = ['/profile'];
   const isNeutral = NEUTRAL_PATHS.includes(location.pathname);
   const pathSection = isMangaSection || isMangaMyList
@@ -109,14 +96,16 @@ function AppLayout() {
         <Route path="/33" element={<SooramicsPlus />} />
         {/* hidden admin monitoring */}
         <Route path="/adminkicawkicaw" element={<Admin />} />
-        {/* user profile */}
-        <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+        {/* Profil per vertikal. Alamat lama mengalihkan ke vertikal terakhir
+            supaya tautan yang sudah tersebar tidak mati. */}
+        <Route path="/profile" element={<ProfileRedirect />} />
 
         {/* sooranime routes */}
         <Route path="/anime" element={<Home />} />
         <Route path="/anime/search" element={<Search searchType="anime" />} />
         <Route path="/anime/info" element={<LegacyAnimeRedirect />} />
         <Route path="/anime/mylist" element={<MyList section="anime" />} />
+        <Route path="/anime/profile" element={<RequireAuth><Profile section="anime" /></RequireAuth>} />
         <Route path="/anime/:id" element={<AnimeInfo />} />
         <Route path="/watch/anime" element={<RequireAuth><Watch /></RequireAuth>} />
 
@@ -125,6 +114,7 @@ function AppLayout() {
         <Route path="/movies/search" element={<Search searchType="movie" />} />
         <Route path="/movies/info" element={<LegacyMovieRedirect />} />
         <Route path="/movies/mylist" element={<MyList section="movie" />} />
+        <Route path="/movies/profile" element={<RequireAuth><Profile section="movie" /></RequireAuth>} />
         <Route path="/movie/*" element={<MovieInfo mediaType="movie" />} />
         <Route path="/series/*" element={<MovieInfo mediaType="tv" />} />
         <Route path="/movies/*" element={<MovieInfo />} />
@@ -135,6 +125,7 @@ function AppLayout() {
         <Route path="/manga/search" element={<Search searchType="manga" />} />
         <Route path="/manga/info" element={<LegacyMangaRedirect />} />
         <Route path="/manga/mylist" element={<MyList section="manga" />} />
+        <Route path="/manga/profile" element={<RequireAuth><Profile section="manga" /></RequireAuth>} />
         <Route path="/manga/downloads" element={<MangaDownloads />} />
         <Route path="/manga/read" element={<RequireAuth><MangaReader /></RequireAuth>} />
         <Route path="/manga/*" element={<MangaInfo />} />

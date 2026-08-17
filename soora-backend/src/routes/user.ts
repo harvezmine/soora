@@ -90,6 +90,8 @@ router.post('/avatar', async (req, res) => {
     const user = await store.getUserById(uid(req));
     if (!user) return res.status(401).json({ error: 'Sesi tidak valid' });
     user.avatar = url;
+    // Sekali dipilih sendiri, tidak pernah lagi ditimpa pemberian otomatis.
+    user.avatarDipilih = true;
     await store.saveUser(user);
     res.json({ user: store.publicUser(user) });
   } catch (e: any) {
@@ -120,6 +122,7 @@ router.post(
       if (!user) return res.status(401).json({ error: 'Sesi tidak valid' });
 
       user.avatar = await avatars.simpanUnggahan(uid(req), buf);
+      user.avatarDipilih = true;
       await store.saveUser(user);
       res.json({ user: store.publicUser(user) });
     } catch (e: any) {

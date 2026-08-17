@@ -5,30 +5,57 @@ import { getMyList } from '../utils/mylist';
 import { getProgressList, removeProgress } from '../utils/progress';
 import ContinueRow from '../components/ContinueRow';
 import AvatarPicker from '../components/AvatarPicker';
+import { jalurProfil } from '../verticals';
 
-/* Tujuan My List. Ikonnya membedakan barisnya tanpa perlu warna. */
-const PUSTAKA = [
-  {
-    key: 'anime',
-    label: 'Anime',
-    path: '/anime/mylist',
-    icon: <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
+/**
+ * Tiap vertikal punya profilnya sendiri.
+ *
+ * Isinya dibatasi pada bagian itu saja: membuka profil dari sooraflix lalu
+ * disuguhi daftar manga membuat ketiganya terasa satu tumpukan, bukan tiga
+ * tempat yang berbeda.
+ */
+const BAGIAN = {
+  anime: {
+    kunci: 'anime',
+    nama: 'sooranime',
+    kelas: '',
+    listLabel: 'My List Anime',
+    listPath: '/anime/mylist',
+    lanjutLabel: 'Lanjutkan Anime',
+    beranda: '/anime',
+    ikon: <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
   },
-  {
-    key: 'movie',
-    label: 'Film & Series',
-    path: '/movies/mylist',
-    icon: <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="m10 8 5 3-5 3z" /></>,
+  movie: {
+    kunci: 'movie',
+    nama: 'sooraflix',
+    kelas: 'sooraflix-page',
+    listLabel: 'My List Film',
+    listPath: '/movies/mylist',
+    lanjutLabel: 'Lanjutkan Nonton',
+    beranda: '/movies',
+    ikon: <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="m10 8 5 3-5 3z" /></>,
   },
-  {
-    key: 'manga',
-    label: 'Manga',
-    path: '/manga/mylist',
-    icon: <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />,
+  manga: {
+    kunci: 'manga',
+    nama: 'sooramics',
+    kelas: 'sooramics-page',
+    listLabel: 'My List Manga',
+    listPath: '/manga/mylist',
+    lanjutLabel: 'Lanjutkan Baca',
+    beranda: '/manga',
+    ikon: <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />,
   },
-];
+};
 
-export default function Profile() {
+/** Vertikal lain, untuk berpindah tanpa lewat beranda. */
+const LAIN = {
+  anime: ['sooraflix', 'sooramics'],
+  movie: ['sooranime', 'sooramics'],
+  manga: ['sooranime', 'sooraflix'],
+};
+
+export default function Profile({ section = 'anime' }) {
+  const bagian = BAGIAN[section] || BAGIAN.anime;
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -36,37 +63,31 @@ export default function Profile() {
   const [pilihAvatar, setPilihAvatar] = useState(false);
 
   const counts = useMemo(() => {
-    const list = getMyList();
-    const prog = getProgressList();
-    const by = (arr, key, val) => arr.filter((i) => i[key] === val).length;
-    return {
-      anime: by(list, 'listType', 'anime'),
-      movie: by(list, 'listType', 'movie'),
-      manga: by(list, 'listType', 'manga'),
-      listTotal: list.length,
-      progTotal: prog.length,
-    };
+    const list = getMyList().filter((i) =>
+      bagian.kunci === 'manga'
+        ? i.listType === 'manga' || i.listType === 'komikplus'
+        : i.listType === bagian.kunci
+    );
+    return { list: list.length, prog: getProgressList(bagian.kunci).length };
     // refreshKey sengaja jadi pemicu: penyimpanannya di luar React, jadi
     // tidak ada nilai lain yang berubah saat riwayat dihapus.
-  }, [refreshKey]);
+  }, [refreshKey, bagian.kunci]);
 
   if (!user) return null;
 
   const initials = (user.name || '?')
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase();
+    .split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
   const hapusRiwayat = () => {
-    getProgressList().forEach((p) => removeProgress(p.section, p.id));
+    // Hanya riwayat bagian ini. Menghapus semuanya dari satu profil vertikal
+    // akan mengejutkan — orang menghapus apa yang sedang ia lihat.
+    getProgressList(bagian.kunci).forEach((p) => removeProgress(p.section, p.id));
     setConfirm(false);
     setRefreshKey((k) => k + 1);
   };
 
   return (
-    <div className="profile-page">
+    <div className={`profile-page ${bagian.kelas}`}>
       <header className="prof-head">
         <button
           className="prof-avatar-btn"
@@ -84,15 +105,16 @@ export default function Profile() {
           </span>
         </button>
         <div className="prof-id">
+          <span className="prof-vertikal">{bagian.nama}</span>
           <h1 className="prof-name">{user.name}</h1>
           <p className="prof-email">{user.email}</p>
           {/* Angka nol tidak ditulis — memamerkan "0 di My List" hanya
               menegaskan kekosongan tanpa memberi informasi apa pun. */}
-          {(counts.listTotal > 0 || counts.progTotal > 0) && (
+          {(counts.list > 0 || counts.prog > 0) && (
             <p className="prof-meta">
-              {counts.listTotal > 0 && <span><b>{counts.listTotal}</b> di My List</span>}
-              {counts.listTotal > 0 && counts.progTotal > 0 && <span className="prof-meta-sep" aria-hidden="true" />}
-              {counts.progTotal > 0 && <span><b>{counts.progTotal}</b> sedang ditonton</span>}
+              {counts.list > 0 && <span><b>{counts.list}</b> di My List</span>}
+              {counts.list > 0 && counts.prog > 0 && <span className="prof-meta-sep" aria-hidden="true" />}
+              {counts.prog > 0 && <span><b>{counts.prog}</b> sedang berjalan</span>}
             </p>
           )}
         </div>
@@ -106,44 +128,58 @@ export default function Profile() {
         />
       )}
 
-      {/* Isi utama halaman ini: apa yang sedang ditonton. Tiap ContinueRow
-          mengembalikan null saat bagiannya kosong. */}
+      {/* Hanya bagian ini. ContinueRow mengembalikan null saat kosong. */}
       <div className="prof-history">
-        <ContinueRow section="movie" title="Lanjutkan Nonton" />
-        <ContinueRow section="anime" title="Lanjutkan Anime" />
-        <ContinueRow section="manga" title="Lanjutkan Baca" />
+        <ContinueRow section={bagian.kunci} title={bagian.lanjutLabel} />
       </div>
 
-      <nav className="prof-block" aria-label="My List">
-        <h2 className="prof-block-title">My List</h2>
-        {PUSTAKA.map((p) => (
-          <button className="prof-row" key={p.key} onClick={() => navigate(p.path)}>
-            <svg className="prof-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
-              {p.icon}
-            </svg>
-            <span className="prof-row-label">{p.label}</span>
-            <span className="prof-row-count">{counts[p.key] || ''}</span>
-            <svg className="prof-row-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        ))}
+      <nav className="prof-block" aria-label="Pustaka">
+        <h2 className="prof-block-title">Pustaka</h2>
+        <button className="prof-row" onClick={() => navigate(bagian.listPath)}>
+          <svg className="prof-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
+            {bagian.ikon}
+          </svg>
+          <span className="prof-row-label">{bagian.listLabel}</span>
+          <span className="prof-row-count">{counts.list || ''}</span>
+          <svg className="prof-row-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </nav>
+
+      {/* Pindah vertikal langsung dari sini; tanpa ini orang harus kembali ke
+          beranda dulu hanya untuk melihat profil sebelahnya. */}
+      <nav className="prof-block" aria-label="Profil lain">
+        <h2 className="prof-block-title">Profil lain</h2>
+        <div className="prof-lain">
+          {(LAIN[bagian.kunci] || []).map((vertikal) => (
+            <button
+              key={vertikal}
+              className={`prof-lain-btn v-${vertikal}`}
+              onClick={() => navigate(jalurProfil(vertikal))}
+            >
+              <span className="prof-lain-titik" aria-hidden="true" />
+              {vertikal}
+            </button>
+          ))}
+        </div>
       </nav>
 
       <section className="prof-block" aria-label="Akun">
         <h2 className="prof-block-title">Akun</h2>
-        <button className="prof-row" onClick={() => { logout(); navigate('/anime'); }}>
+        <button className="prof-row" onClick={() => { logout(); navigate(bagian.beranda); }}>
           <svg className="prof-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
           </svg>
           <span className="prof-row-label">Keluar</span>
         </button>
 
-        {counts.progTotal > 0 && (
+        {counts.prog > 0 && (
           confirm ? (
             <div className="prof-confirm">
               <p className="prof-confirm-text">
-                Hapus {counts.progTotal} riwayat tontonan? Tidak bisa dibatalkan.
+                Hapus {counts.prog} riwayat {bagian.nama}? Tidak bisa dibatalkan.
+                Bagian lain tidak ikut terhapus.
               </p>
               <div className="prof-confirm-actions">
                 <button className="prof-confirm-cancel" onClick={() => setConfirm(false)}>Batal</button>
@@ -155,8 +191,8 @@ export default function Profile() {
               <svg className="prof-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
                 <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
               </svg>
-              <span className="prof-row-label">Hapus riwayat tontonan</span>
-              <span className="prof-row-count">{counts.progTotal}</span>
+              <span className="prof-row-label">Hapus riwayat {bagian.nama}</span>
+              <span className="prof-row-count">{counts.prog}</span>
             </button>
           )
         )}

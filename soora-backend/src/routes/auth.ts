@@ -103,12 +103,21 @@ router.post('/google', async (req: Request, res: Response) => {
         name: p.name || p.email.split('@')[0],
         avatar: p.picture || avatarFor(p.name || p.email),
         googleSub: p.sub,
+        // Foto Google dianggap pilihan sendiri; pendaftar tanpa foto tetap
+        // mendapat karakter Soora acak.
+        avatarDipilih: !!p.picture,
         createdAt: Date.now(),
       };
       await saveUser(user);
     } else if (!user.googleSub) {
       user.googleSub = p.sub;
-      if (p.picture) user.avatar = p.picture;
+      // Foto Google adalah wajah asli orangnya. Dipasang hanya bila ia belum
+      // pernah memilih sendiri di Soora, supaya pilihan yang sudah dibuat
+      // tidak tertimpa saat menautkan akun.
+      if (p.picture && !user.avatarDipilih) {
+        user.avatar = p.picture;
+        user.avatarDipilih = true;
+      }
       await saveUser(user);
     }
     if (user.banned) return res.status(403).json({ error: 'Akun ini diblokir' });
@@ -123,6 +132,16 @@ router.post('/google', async (req: Request, res: Response) => {
 router.get('/me', requireAuth, async (req: Request, res: Response) => {
   const user = await getUserById((req as any).userId);
   if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+
+  // Akun lama yang masih memakai avatar inisial diberi karakter Soora di
+  // sini, bukan lewat skrip migrasi sekali jalan: bebannya menyebar, dan
+  // akun yang tidak pernah kembali tidak perlu diproses sama sekali.
+  const susulan = avatars.avatarSusulan(user);
+  if (susulan) {
+    user.avatar = susulan;
+    await saveUser(user);
+  }
+
   res.json({ user: publicUser(user) });
 });
 

@@ -27,6 +27,14 @@ export interface UserRecord {
   tokenVersion?: number; // bump to invalidate all existing JWTs (terminate session)
   banned?: boolean;
   bannedAt?: number;
+  /**
+   * true setelah pengguna sendiri memilih atau mengunggah fotonya.
+   *
+   * Tanpa penanda ini tidak ada cara membedakan avatar yang dipilih orangnya
+   * dari avatar yang diberikan sistem — dan pemberian otomatis berikutnya
+   * akan menimpa pilihan yang sudah dibuat.
+   */
+  avatarDipilih?: boolean;
 }
 
 const uKey = (id: string) => `user:${id}`;

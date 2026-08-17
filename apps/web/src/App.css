@@ -175,6 +175,25 @@ a:hover {
 /* Aksen ditimpa di tingkat halaman, bukan per aturan. Semua turunan yang
    memakai --accent (tombol putar kartu, cincin fokus, sorotan) langsung ikut
    merah, dan aturan ungu baru tidak bisa bocor ke sini lagi. */
+/* Tiap vertikal menimpa aksennya di tingkat halaman, bukan per aturan.
+   Tanpa ini semuanya memakai ungu sooranime, dan pembeda antar-vertikal
+   hanya terlihat di beberapa tempat yang kebetulan diatur khusus. */
+.sooramics-page,
+.browse-sooramics,
+.mylist-sooramics {
+  --accent: #00d4aa;
+  --accent-rgb: 0, 212, 170;
+  --accent-hover: #2eecc4;
+  --accent-glow: rgba(0, 212, 170, 0.28);
+  --accent-glow-strong: rgba(0, 212, 170, 0.45);
+}
+.sooramicsplus-page {
+  --accent: #f43f5e;
+  --accent-rgb: 244, 63, 94;
+  --accent-hover: #fb7185;
+  --accent-glow: rgba(244, 63, 94, 0.28);
+  --accent-glow-strong: rgba(244, 63, 94, 0.45);
+}
 .sooraflix-page,
 .browse-sooraflix,
 .mylist-sooraflix,
@@ -14974,3 +14993,46 @@ a:hover {
   .avp-pratinjau { width: 108px; height: 108px; }
   .avp-unggah-aksi { flex-direction: column-reverse; }
 }
+
+/* ===== PROFIL PER VERTIKAL ===== */
+/* Nama vertikal di atas nama orang: penanda tempat, bukan hiasan — dari
+   sini saja sudah jelas ini profil yang mana. */
+.prof-vertikal {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Pindah ke profil vertikal lain */
+.prof-lain { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.prof-lain-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 46px;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+.prof-lain-btn:hover { color: var(--text-primary); }
+.prof-lain-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Titik berwarna memakai warna vertikal tujuan, bukan warna halaman ini —
+   itulah petunjuk ke mana tombolnya membawa. */
+.prof-lain-titik { width: 9px; height: 9px; flex: none; border-radius: 50%; }
+.prof-lain-btn.v-sooranime .prof-lain-titik { background: #7c5cfc; }
+.prof-lain-btn.v-sooraflix .prof-lain-titik { background: var(--flix); }
+.prof-lain-btn.v-sooramics .prof-lain-titik { background: #00d4aa; }
+.prof-lain-btn.v-sooranime:hover { border-color: #7c5cfc; }
+.prof-lain-btn.v-sooraflix:hover { border-color: var(--flix); }
+.prof-lain-btn.v-sooramics:hover { border-color: #00d4aa; }

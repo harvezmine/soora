@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getMyList } from '../utils/mylist';
 import { useAuth } from '../context/AuthContext';
+import { jalurProfil } from '../verticals';
 
 export default function Navbar({ section = 'sooranime' }) {
   const navigate = useNavigate();
@@ -166,7 +167,7 @@ export default function Navbar({ section = 'sooranime' }) {
                     <div className="nav-profile-head-email">{user.email}</div>
                   </div>
                 </div>
-                <button onClick={() => handleNav('/profile')}>
+                <button onClick={() => handleNav(jalurProfil(section))}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                   Profil
                 </button>

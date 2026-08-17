@@ -124,7 +124,7 @@ export default function MyList({ section = 'anime' }) {
   const isRecentlyAdded = (ts) => ts && (Date.now() - ts) < 24 * 60 * 60 * 1000;
 
   return (
-    <div className={`ml2-page ${section === 'movie' ? 'mylist-sooraflix' : ''}`} style={{ '--ml2-accent': config.accent }}>
+    <div className={`ml2-page ${section === 'movie' ? 'mylist-sooraflix' : section === 'manga' ? 'mylist-sooramics' : ''}`} style={{ '--ml2-accent': config.accent }}>
       {/* Hero header */}
       <div className="ml2-hero">
         <div className="ml2-hero-glow" style={{ background: `radial-gradient(ellipse at 50% 0%, color-mix(in srgb, ${config.accent} 15%, transparent) 0%, transparent 70%)` }} />

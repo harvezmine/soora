@@ -166,3 +166,29 @@ export function unggahanMilik(url: string, userId: string): boolean {
     return false;
   }
 }
+
+/**
+ * Apakah avatar ini pemberian sistem yang belum pernah disentuh pemiliknya.
+ *
+ * Avatar inisial dari dicebear adalah penanda "belum pernah memilih": ia
+ * hanya pernah dipasang otomatis, tidak pernah bisa dipilih dari antarmuka.
+ *
+ * Foto dari Google sengaja tidak dihitung. Ia memang tidak dipilih di dalam
+ * Soora, tapi ia wajah asli orangnya — menggantinya dengan gambar hewan acak
+ * adalah kehilangan data yang akan mengejutkan.
+ */
+export function avatarPemberianSistem(url: string): boolean {
+  const u = String(url || '');
+  return !u || u.includes('api.dicebear.com');
+}
+
+/**
+ * Berikan avatar bawaan kepada pengguna yang belum pernah memilih sendiri.
+ * Mengembalikan URL baru bila memang diganti, atau null bila dibiarkan.
+ */
+export function avatarSusulan(user: { avatar: string; avatarDipilih?: boolean; name: string }): string | null {
+  if (user.avatarDipilih) return null;
+  if (!avatarPemberianSistem(user.avatar)) return null;
+  if (!jumlahAvatar()) return null;
+  return avatarAcak(user.name);
+}
