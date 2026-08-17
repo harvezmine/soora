@@ -18,6 +18,7 @@ import appRoutes from './routes/app';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import adminRoutes from './routes/admin';
+import commentRoutes from './routes/comments';
 
 const app = express();
 
@@ -26,7 +27,10 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(compression());
 app.use(cors({
   origin: config.corsOrigin === '*' ? '*' : config.corsOrigin.split(','),
-  methods: ['GET', 'POST', 'OPTIONS'],
+  // DELETE dipakai /user/mylist/:type/:id dan /user/progress/:key. Tanpa
+  // tercantum di sini, preflight peramban menolaknya dan penghapusan dari
+  // web diam-diam gagal.
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
@@ -75,9 +79,17 @@ app.use(['/auth', '/user', '/admin'], (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, private, max-age=0');
   next();
 });
+// Komentar boleh dibaca tamu, tapi tetap tidak boleh disinggahi cache
+// bersama: isinya berubah tiap kali ada yang menulis, dan balasan POST
+// bersifat per-pengguna.
+app.use('/comments', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  next();
+});
 app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
 app.use('/admin', adminRoutes);
+app.use('/comments', commentRoutes);
 app.use('/anime', animeRoutes);
 app.use('/movies', movieRoutes);
 app.use('/manga', mangaRoutes);

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as store from '../services/store';
+import * as comments from '../services/comments';
 import { reportRouteError } from '../services/telegram';
 
 const router = Router();
@@ -142,6 +143,35 @@ router.delete('/user/:id', requireAdmin, async (req: Request, res: Response) => 
     if (!ok) return res.status(404).json({ error: 'User tidak ditemukan' });
     res.json({ ok: true });
   } catch (err: any) { reportRouteError(req, err, 'admin/delete'); res.status(500).json({ error: 'failed' }); }
+});
+
+// ── Moderasi komentar ──
+
+// GET /admin/comments/reports — antrean laporan, terbaru dulu
+router.get('/comments/reports', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    res.json({ items: await comments.listReports(100) });
+  } catch (err: any) { reportRouteError(req, err, 'admin/comment-reports'); res.json({ items: [] }); }
+});
+
+// POST /admin/comments/:id/delete — hapus komentar siapa pun
+router.post('/comments/:id/delete', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await comments.deleteComment(String(req.params.id), 'admin', true);
+    res.json({ ok: true });
+  } catch (err: any) {
+    if (err instanceof comments.CommentError) return res.status(err.status).json({ error: err.message });
+    reportRouteError(req, err, 'admin/comment-delete');
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
+// POST /admin/comments/reports/dismiss {member} — tandai laporan selesai
+router.post('/comments/reports/dismiss', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await comments.dismissReport(String(req.body?.member || ''));
+    res.json({ ok: true });
+  } catch (err: any) { reportRouteError(req, err, 'admin/comment-dismiss'); res.status(500).json({ error: 'failed' }); }
 });
 
 export default router;

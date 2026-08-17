@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.js",
     "./api": "./src/api/index.js",
+    "./comments": "./src/comments/index.js",
     "./komikplus": "./src/komikplus/index.js",
     "./user": "./src/user/index.js",
     "./runtime": "./src/runtime.js",

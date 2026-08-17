@@ -34,6 +34,8 @@ import {
 import Card from '../components/Card';
 import SkeletonWatch from '../components/SkeletonWatch';
 import { saveProgress } from '../utils/progress';
+import CommentSection from '../components/CommentSection';
+import { commentKey } from '@soora/core/comments';
 
 export default function Watch() {
   const [searchParams] = useSearchParams();
@@ -69,6 +71,23 @@ export default function Watch() {
   const animeId = searchParams.get('animeId');
   const subIndoParam = searchParams.get('sub') === '1' || searchParams.get('subIndo') === '1'; // Sub Indo flow
   const samehadakuId = searchParams.get('aid') || searchParams.get('samehadakuId') || null; // anime id (sub source)
+
+  // Kunci komentar — menempel di judul, jadi musim & episode sengaja tidak
+  // ikut: percakapan terkumpul di satu tempat. Movie dan TV dipisah karena
+  // id TMDB keduanya berada di ruang penomoran yang berbeda.
+  // Karakter di luar daftar aman dibuang; backend menolak kunci aneh.
+  const commentContentKey = (() => {
+    const bersih = (v) => String(v || '').replace(/[^A-Za-z0-9._~:/-]/g, '');
+    if (isAnime) {
+      const id = bersih(animeId || samehadakuId);
+      return id ? commentKey('anime', id) : null;
+    }
+    const bagian = mediaType === 'tv' ? 'tv' : 'movie';
+    if (tmdbId) return commentKey(bagian, bersih(tmdbId));
+    if (gokuId) return commentKey(bagian, `goku:${bersih(gokuId)}`);
+    if (lk21Id) return commentKey(bagian, `lk21:${bersih(lk21Id)}`);
+    return null;
+  })();
 
   // Anime HLS state
   const [sources, setSources] = useState([]);
@@ -1451,6 +1470,9 @@ export default function Watch() {
             </div>
           </div>
         )}
+
+        {/* ===== KOMENTAR ===== */}
+        <CommentSection key={commentContentKey} contentKey={commentContentKey} />
       </div>
     </div>
   );
