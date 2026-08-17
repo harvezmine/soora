@@ -30,8 +30,18 @@ interface Peer {
   userId: string;
   name: string;
   avatar: string;
-  /** true saat mikrofonnya menyala — dipakai untuk menyusun mesh suara */
+  /**
+   * true setelah bergabung ke kanal suara — bukan berarti mikrofonnya
+   * menyala. Bergabung berarti mendengarkan; mesh dibentuk dari sini, dan
+   * batas MAX_VOICE dihitung dari sini juga, sebab mendengarkan pun tetap
+   * memakai satu sambungan mesh.
+   */
   voice: boolean;
+  /** true saat benar-benar mengirim suara. Murni informatif — tidak
+   *  memengaruhi mesh maupun batas MAX_VOICE. */
+  micOn: boolean;
+  /** true saat semua suara masuk dibisukan sendiri. Murni informatif. */
+  deafened: boolean;
   alive: boolean;
 }
 
@@ -76,7 +86,10 @@ const broadcast = (room: LiveRoom, type: string, data: Record<string, unknown> =
 };
 
 const peerList = (room: LiveRoom) => {
-  const orang: Array<{ id: string; name: string; avatar: string; host: boolean; voice: boolean }> = [];
+  const orang: Array<{
+    id: string; name: string; avatar: string; host: boolean;
+    voice: boolean; micOn: boolean; deafened: boolean;
+  }> = [];
   const terlihat = new Set<string>();
   for (const p of room.peers) {
     if (terlihat.has(p.userId)) continue;
@@ -87,6 +100,8 @@ const peerList = (room: LiveRoom) => {
       avatar: p.avatar,
       host: p.userId === room.hostId,
       voice: p.voice,
+      micOn: p.voice && p.micOn,
+      deafened: p.voice && p.deafened,
     });
   }
   // Tuan rumah selalu di depan; sisanya urut masuk.
@@ -197,6 +212,8 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
             name: data.name,
             avatar: data.avatar || '',
             voice: false,
+            micOn: false,
+            deafened: false,
             alive: true,
           };
           room.peers.add(peer);
@@ -269,7 +286,10 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
         return;
       }
 
-      // ── Mikrofon menyala / mati ──
+      // ── Bergabung / keluar kanal suara ──
+      // "voice" berarti mendengarkan — mikrofon punya pesan sendiri di
+      // bawah. Bergabung untuk mendengar saja tetap memakai satu sambungan
+      // mesh, jadi tetap dihitung ke MAX_VOICE.
       if (msg.type === 'voice') {
         const mau = !!msg.on;
         if (mau && !peer.voice && voiceCount(room) >= MAX_VOICE) {
@@ -277,6 +297,30 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
           return;
         }
         peer.voice = mau;
+        // Keluar kanal berarti mikrofon dan bisu-semua ikut tidak relevan —
+        // dibersihkan supaya tidak ada status hantu saat ia bergabung lagi.
+        if (!mau) { peer.micOn = false; peer.deafened = false; }
+        broadcast(room, 'peers', peerList(room));
+        return;
+      }
+
+      // ── Mikrofon menyala / mati ──
+      // Murni informatif untuk peserta lain (ikon di daftar orang). Tidak
+      // mengubah mesh maupun batas MAX_VOICE — itu sudah diatur oleh pesan
+      // "voice" di atas.
+      if (msg.type === 'mic') {
+        if (!peer.voice) return; // mikrofon tak berarti di luar kanal suara
+        peer.micOn = !!msg.on;
+        broadcast(room, 'peers', peerList(room));
+        return;
+      }
+
+      // ── Bisukan semua suara masuk (deafen) ──
+      // Murni informatif untuk peserta lain — server tidak menegakkan apa
+      // pun dari sini; peredamannya terjadi di peramban pendengarnya sendiri.
+      if (msg.type === 'deafen') {
+        if (!peer.voice) return;
+        peer.deafened = !!msg.on;
         broadcast(room, 'peers', peerList(room));
         return;
       }

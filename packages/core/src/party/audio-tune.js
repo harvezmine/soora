@@ -162,3 +162,30 @@ export function nilaiLatensi(ms) {
   if (ms <= 250) return 'cukup';
   return 'lambat';
 }
+
+/**
+ * Volume per peserta.
+ *
+ * 0 berarti diam total, 1 adalah suara asli, sampai 2 (200%) untuk peserta
+ * yang mikrofonnya pelan. Di atas 100% Web Audio API dipakai untuk
+ * memperkuat — HTMLMediaElement.volume sendiri dibatasi peramban ke 0..1.
+ */
+export const VOLUME_MIN = 0;
+export const VOLUME_DEFAULT = 1;
+export const VOLUME_MAX = 2;
+
+export function clampVolume(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return VOLUME_DEFAULT;
+  return Math.min(VOLUME_MAX, Math.max(VOLUME_MIN, n));
+}
+
+/**
+ * Pecah volume 0..2 jadi bagian yang dipahami dua lapisan peramban:
+ * `element` (0..1) untuk HTMLMediaElement.volume, dan `gain` (>=1) untuk
+ * GainNode Web Audio yang menguatkan di atas 100%.
+ */
+export function volumeToElementGain(v) {
+  const c = clampVolume(v);
+  return c <= 1 ? { element: c, gain: 1 } : { element: 1, gain: c };
+}

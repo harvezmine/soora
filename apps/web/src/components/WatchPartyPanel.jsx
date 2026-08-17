@@ -1,10 +1,40 @@
 import { useState, useRef, useEffect } from 'react';
 import { nilaiLatensi } from '@soora/core/party/audio-tune';
+import {
+  IconMicOn, IconMicOff, IconHeadsetOn, IconHeadsetOff, IconPhoneOff, IconGear,
+} from './icons';
 
 const inisial = (nama) => (nama || '?').trim().charAt(0).toUpperCase();
 
 const jam = (ts) =>
   new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Lencana status suara di avatar. Prioritasnya bentuk, bukan cuma warna:
+ * dibisukan-semua > mikrofon menyala > sekadar bergabung mendengarkan.
+ */
+function LencanaSuara({ orang }) {
+  if (!orang.voice) return null;
+  if (orang.deafened) {
+    return (
+      <span className="wpp-av-badge deafen" aria-label="Membisukan semua suara">
+        <IconHeadsetOff size={10} />
+      </span>
+    );
+  }
+  if (orang.micOn) {
+    return (
+      <span className="wpp-av-badge mic" aria-label="Mikrofon menyala">
+        <IconMicOn size={10} />
+      </span>
+    );
+  }
+  return (
+    <span className="wpp-av-badge dengar" aria-label="Bergabung, mendengarkan">
+      <IconHeadsetOn size={10} />
+    </span>
+  );
+}
 
 function Avatar({ orang, bicara, ukuran = 'md' }) {
   return (
@@ -12,24 +42,21 @@ function Avatar({ orang, bicara, ukuran = 'md' }) {
       {orang.avatar
         ? <img src={orang.avatar} alt="" referrerPolicy="no-referrer" />
         : <span className="wpp-av-fallback">{inisial(orang.name)}</span>}
-      {orang.voice && (
-        <span className="wpp-av-mic" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10">
-            <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z" />
-            <path d="M19 11a7 7 0 0 1-14 0H3a9 9 0 0 0 8 8.94V23h2v-3.06A9 9 0 0 0 21 11z" />
-          </svg>
-        </span>
-      )}
+      <LencanaSuara orang={orang} />
     </span>
   );
 }
 
 /**
- * Panel ruang: siapa yang ikut, obrolan, dan mikrofon.
+ * Panel ruang: siapa yang ikut, obrolan, dan suara.
  *
  * Di layar lebar ia berdiri sebagai dok di kanan; di ponsel jadi lembar yang
  * naik dari bawah. Keduanya memakai markup yang sama — bedanya hanya tata
  * letak, jadi tidak ada dua jalur kode yang bisa saling menyimpang.
+ *
+ * Suara punya dua langkah: bergabung ke kanal (mendengarkan, otomatis) dan
+ * menyalakan mikrofon (berbicara). Tombol mic/deafen baru muncul setelah
+ * bergabung — sebelum itu satu-satunya aksi adalah "Gabung Suara".
  */
 export default function WatchPartyPanel({
   terbuka,
@@ -39,11 +66,18 @@ export default function WatchPartyPanel({
   peers,
   chat,
   onKirimChat,
+  voiceJoined,
+  onGabungSuara,
+  onKeluarSuara,
   micOn,
   bisu,
-  bicara,
+  deafen,
   onToggleMic,
+  onToggleDeafen,
   onToggleBisu,
+  bicara,
+  volumes = {},
+  onSetVolume,
   selfId,
   notice,
   levelSaya = 0,
@@ -140,20 +174,47 @@ export default function WatchPartyPanel({
         <section className="wpp-orang" aria-label="Peserta">
           <h3 className="wpp-h3">Di ruang ini — {peers?.count || 0}</h3>
           <ul className="wpp-orang-list">
-            {orang.map((o) => (
-              <li className={`wpp-orang-item ${bicara?.[o.id] ? 'is-bicara' : ''}`} key={o.id}>
-                <Avatar orang={o} bicara={bicara?.[o.id]} />
-                <span className="wpp-orang-nama">
-                  {o.name}{o.id === selfId ? ' (kamu)' : ''}
-                </span>
-                {mutu[o.id]?.lossPct > 3 && (
-                  <span className="wpp-mutu" title={`${mutu[o.id].lossPct}% paket hilang${mutu[o.id].rtt != null ? ` · ${mutu[o.id].rtt} ms` : ''}`}>
-                    Sinyal lemah
-                  </span>
-                )}
-                {o.host && <span className="wpp-lencana">Tuan rumah</span>}
-              </li>
-            ))}
+            {orang.map((o) => {
+              const bisaVolume = o.id !== selfId && o.voice;
+              return (
+                <li className={`wpp-orang-item ${bicara?.[o.id] ? 'is-bicara' : ''}`} key={o.id}>
+                  <div className="wpp-orang-baris">
+                    <Avatar orang={o} bicara={bicara?.[o.id]} />
+                    <span className="wpp-orang-nama">
+                      {o.name}{o.id === selfId ? ' (kamu)' : ''}
+                    </span>
+                    {mutu[o.id]?.lossPct > 3 && (
+                      <span
+                        className="wpp-mutu"
+                        title={`${mutu[o.id].lossPct}% paket hilang${mutu[o.id].rtt != null ? ` · ${mutu[o.id].rtt} ms` : ''}`}
+                      >
+                        Sinyal lemah
+                      </span>
+                    )}
+                    {o.host && <span className="wpp-lencana">Tuan rumah</span>}
+                  </div>
+                  {/* Volume orang ini saja — tidak berlaku untuk diri sendiri,
+                      dan hanya berarti bila ia sedang di kanal suara. */}
+                  {bisaVolume && (
+                    <div className="wpp-vol">
+                      <input
+                        type="range"
+                        className="wpp-vol-slider"
+                        min={0}
+                        max={2}
+                        step={0.05}
+                        value={volumes[o.id] ?? 1}
+                        onChange={(e) => onSetVolume?.(o.id, parseFloat(e.target.value))}
+                        aria-label={`Volume ${o.name}`}
+                      />
+                      <span className="wpp-vol-nilai">
+                        {Math.round((volumes[o.id] ?? 1) * 100)}%
+                      </span>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
 
@@ -202,100 +263,115 @@ export default function WatchPartyPanel({
 
       {/* ── Bilah suara ── */}
       <footer className="wpp-suara">
-        <div className="wpp-suara-baris">
-          <button
-            className={`wpp-mic ${micOn ? 'nyala' : ''} ${micOn && bisu ? 'bisu' : ''}`}
-            onClick={onToggleMic}
-            aria-pressed={micOn}
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
-              {micOn && !bisu ? (
-                <>
-                  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z" />
-                  <path d="M19 11a7 7 0 0 1-14 0H3a9 9 0 0 0 8 8.94V23h2v-3.06A9 9 0 0 0 21 11z" />
-                </>
-              ) : (
-                <path d="M15 10.6V5a3 3 0 0 0-5.9-.7zM4.3 3 3 4.3l6 6V11a3 3 0 0 0 4.6 2.5l1.5 1.5A5 5 0 0 1 7 11H5a7 7 0 0 0 6 6.9V21h2v-3.1a7 7 0 0 0 3-1.2l4 4 1.3-1.3z" />
-              )}
-            </svg>
-            {!micOn ? 'Nyalakan mic' : bisu ? (ptt ? 'Tahan spasi' : 'Bisu') : 'Mic nyala'}
+        {!voiceJoined ? (
+          <button className="wpp-gabung-suara" onClick={onGabungSuara}>
+            <span className="wpp-gabung-suara-ikon"><IconHeadsetOn size={19} /></span>
+            <span className="wpp-gabung-suara-teks">
+              <span className="wpp-gabung-suara-judul">Gabung Suara</span>
+              <span className="wpp-gabung-suara-sub">Langsung dengar semua orang di ruang ini</span>
+            </span>
           </button>
-
-          {micOn && !ptt && (
-            <button className={`wpp-bisu ${bisu ? 'aktif' : ''}`} onClick={onToggleBisu} aria-pressed={bisu}>
-              {bisu ? 'Bersuara' : 'Bisukan'}
-            </button>
-          )}
-
-          {micOn && (
-            <button
-              className={`wpp-gear ${setelanSuara ? 'aktif' : ''}`}
-              onClick={() => setSetelanSuara((v) => !v)}
-              aria-label="Setelan suara"
-              aria-expanded={setelanSuara}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="17" height="17">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Penunjuk tenaga suara sendiri — cara paling cepat memastikan
-            mikrofonnya memang menangkap sesuatu. */}
-        {micOn && (
-          <div className="wpp-level" aria-hidden="true">
-            <span className="wpp-level-isi" style={{ width: `${Math.min(100, Math.round(levelSaya * 320))}%` }} />
-          </div>
-        )}
-
-        {micOn && setelanSuara && (
-          <div className="wpp-setelan">
-            <label className="wpp-setelan-baris">
-              <span>Mikrofon</span>
-              <select
-                className="wpp-select"
-                value={perangkat || ''}
-                onChange={(e) => onGantiMikrofon?.(e.target.value)}
+        ) : (
+          <>
+            <div className="wpp-suara-baris">
+              <button
+                className={`wpp-bulat ${micOn && !bisu ? 'nyala' : ''} ${micOn && bisu ? 'bisu' : ''}`}
+                // Mikrofon yang belum pernah dibuka: tekan untuk membukanya.
+                // Sudah terbuka: tekan hanya membisukan/membunyikan lagi —
+                // perangkatnya tetap dipegang, tak perlu minta izin ulang
+                // tiap kali menekan tombol ini.
+                onClick={micOn ? onToggleBisu : onToggleMic}
+                aria-pressed={micOn && !bisu}
+                aria-label={micOn ? (bisu ? 'Mikrofon dibisukan — nyalakan lagi' : 'Matikan mikrofon') : 'Nyalakan mikrofon'}
+                title={micOn ? (bisu ? 'Mikrofon dibisukan' : 'Mikrofon menyala') : 'Nyalakan mikrofon'}
               >
-                {perangkat == null && <option value="">Bawaan sistem</option>}
-                {mikrofon.map((m) => <option value={m.id} key={m.id}>{m.label}</option>)}
-              </select>
-            </label>
-            {Object.entries(mutu).filter(([, q]) => q?.latencyMs != null).length > 0 && (
-              <div className="wpp-ukur">
-                <span className="wpp-ukur-judul">Latensi terukur</span>
-                {Object.entries(mutu)
-                  .filter(([, q]) => q?.latencyMs != null)
-                  .map(([id, q]) => {
-                    const nama = (peers?.people || []).find((o) => o.id === id)?.name || 'Peserta';
-                    return (
-                      <div className="wpp-ukur-baris" key={id}>
-                        <span className="wpp-ukur-nama">{nama}</span>
-                        <span className={`wpp-ukur-nilai n-${nilaiLatensi(q.latencyMs)}`}>
-                          {q.latencyMs} ms
-                        </span>
-                        <span className="wpp-ukur-rinci">
-                          {q.rtt != null ? `jaringan ${q.rtt} ms` : 'jaringan —'}
-                          {q.jitterMs != null ? ` · antrean ${q.jitterMs} ms` : ''}
-                        </span>
-                      </div>
-                    );
-                  })}
+                {micOn && !bisu ? <IconMicOn size={19} /> : <IconMicOff size={19} />}
+              </button>
+
+              <button
+                className={`wpp-bulat ${deafen ? 'aktif-merah' : ''}`}
+                onClick={onToggleDeafen}
+                aria-pressed={deafen}
+                aria-label={deafen ? 'Batalkan bisukan semua suara' : 'Bisukan semua suara masuk'}
+                title={deafen ? 'Sedang membisukan semua suara' : 'Bisukan semua suara'}
+              >
+                {deafen ? <IconHeadsetOff size={19} /> : <IconHeadsetOn size={19} />}
+              </button>
+
+              <button
+                className={`wpp-bulat ${setelanSuara ? 'aktif' : ''}`}
+                onClick={() => setSetelanSuara((v) => !v)}
+                aria-label="Setelan suara"
+                aria-expanded={setelanSuara}
+                title="Setelan suara"
+              >
+                <IconGear size={17} />
+              </button>
+
+              <button className="wpp-keluar-suara" onClick={onKeluarSuara}>
+                <IconPhoneOff size={16} />
+                <span className="wpp-keluar-suara-label">Keluar</span>
+              </button>
+            </div>
+
+            {/* Penunjuk tenaga suara sendiri — cara paling cepat memastikan
+                mikrofonnya memang menangkap sesuatu. */}
+            {micOn && !bisu && (
+              <div className="wpp-level" aria-hidden="true">
+                <span className="wpp-level-isi" style={{ width: `${Math.min(100, Math.round(levelSaya * 320))}%` }} />
               </div>
             )}
 
-            <label className="wpp-setelan-baris">
-              <span>Tekan spasi untuk bicara</span>
-              <input
-                type="checkbox"
-                className="wpp-switch"
-                checked={ptt}
-                onChange={(e) => onSetPtt?.(e.target.checked)}
-              />
-            </label>
-          </div>
+            {setelanSuara && (
+              <div className="wpp-setelan">
+                <label className="wpp-setelan-baris">
+                  <span>Mikrofon</span>
+                  <select
+                    className="wpp-select"
+                    value={perangkat || ''}
+                    onChange={(e) => onGantiMikrofon?.(e.target.value)}
+                    disabled={!micOn}
+                  >
+                    {perangkat == null && <option value="">Bawaan sistem</option>}
+                    {mikrofon.map((m) => <option value={m.id} key={m.id}>{m.label}</option>)}
+                  </select>
+                </label>
+
+                {Object.entries(mutu).filter(([, q]) => q?.latencyMs != null).length > 0 && (
+                  <div className="wpp-ukur">
+                    <span className="wpp-ukur-judul">Latensi terukur</span>
+                    {Object.entries(mutu)
+                      .filter(([, q]) => q?.latencyMs != null)
+                      .map(([id, q]) => {
+                        const nama = (peers?.people || []).find((o) => o.id === id)?.name || 'Peserta';
+                        return (
+                          <div className="wpp-ukur-baris" key={id}>
+                            <span className="wpp-ukur-nama">{nama}</span>
+                            <span className={`wpp-ukur-nilai n-${nilaiLatensi(q.latencyMs)}`}>
+                              {q.latencyMs} ms
+                            </span>
+                            <span className="wpp-ukur-rinci">
+                              {q.rtt != null ? `jaringan ${q.rtt} ms` : 'jaringan —'}
+                              {q.jitterMs != null ? ` · antrean ${q.jitterMs} ms` : ''}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                <label className="wpp-setelan-baris">
+                  <span>Tekan spasi untuk bicara</span>
+                  <input
+                    type="checkbox"
+                    className="wpp-switch"
+                    checked={ptt}
+                    onChange={(e) => onSetPtt?.(e.target.checked)}
+                  />
+                </label>
+              </div>
+            )}
+          </>
         )}
       </footer>
     </aside>

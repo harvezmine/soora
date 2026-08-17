@@ -14283,15 +14283,50 @@ a:hover {
 }
 .wpp-orang-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
 .wpp-orang-item {
-  display: flex; align-items: center; gap: 0.6rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
   padding: 0.4rem;
   border-radius: 10px;
 }
 .wpp-orang-item.is-bicara { background: rgba(var(--accent-rgb), 0.08); }
+.wpp-orang-baris { display: flex; align-items: center; gap: 0.6rem; }
 .wpp-orang-nama {
   flex: 1; min-width: 0;
   font-size: 0.85rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Volume orang ini saja — di bawah baris nama, sejajar dengan avatarnya */
+.wpp-vol {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding-left: calc(32px + 0.6rem); /* sejajar dengan nama, bukan avatar */
+}
+.wpp-vol-slider {
+  flex: 1;
+  -webkit-appearance: none; appearance: none;
+  height: 30px; /* area sentuh nyaman di ponsel, jalurnya tetap tipis lewat track */
+  background: none;
+  cursor: pointer;
+}
+.wpp-vol-slider::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 999px; background: var(--btn-glass);
+}
+.wpp-vol-slider::-moz-range-track {
+  height: 4px; border-radius: 999px; background: var(--btn-glass);
+}
+.wpp-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px; margin-top: -6px;
+  border-radius: 50%; background: var(--accent);
+  border: 2px solid var(--bg-secondary);
+}
+.wpp-vol-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border: 2px solid var(--bg-secondary);
+  border-radius: 50%; background: var(--accent);
+}
+.wpp-vol-slider:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wpp-vol-nilai {
+  flex: none; width: 2.6rem; text-align: right;
+  font-size: 0.72rem; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 .wpp-lencana {
   flex: none;
@@ -14324,16 +14359,20 @@ a:hover {
 .wpp-av-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
 /* Cincin menyala saat suaranya terdengar */
 .wpp-av.is-bicara { box-shadow: 0 0 0 2px var(--accent); }
-.wpp-av-mic {
+/* Lencana status suara — bentuknya beda per keadaan, bukan cuma warnanya,
+   supaya tetap terbaca oleh yang sulit membedakan warna. */
+.wpp-av-badge {
   position: absolute;
   right: -2px; bottom: -2px;
   display: grid; place-items: center;
   width: 14px; height: 14px;
   border-radius: 50%;
   border: 2px solid var(--bg-secondary);
-  background: var(--accent);
   color: #fff;
 }
+.wpp-av-badge.mic { background: var(--accent); }
+.wpp-av-badge.dengar { background: var(--text-muted); }
+.wpp-av-badge.deafen { background: var(--flix); }
 
 /* Obrolan */
 .wpp-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -14398,40 +14437,85 @@ a:hover {
   font-size: 0.76rem;
 }
 
-/* Bilah suara */
+/* Bilah suara — bertingkat: tombol, penunjuk level, lalu setelan */
 .wpp-suara {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.6rem 0.7rem;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem;
+  padding: 0.7rem;
   border-top: 1px solid var(--border);
   background: var(--bg-glass);
 }
-.wpp-mic {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  flex: 1;
-  min-height: 46px;
-  border-radius: 12px;
+
+/* Ajakan bergabung — satu-satunya aksi sebelum tergabung ke kanal suara.
+   Lebar penuh, teks penjelas di bawah judul: ini bukan tombol yang
+   maknanya sudah jelas dari ikon saja. */
+.wpp-gabung-suara {
+  display: flex; align-items: center; gap: 0.7rem;
+  width: 100%;
+  min-height: 58px;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--btn-glass);
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.wpp-gabung-suara:hover { border-color: var(--accent); background: var(--btn-glass-hover); }
+.wpp-gabung-suara:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wpp-gabung-suara-ikon {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; flex: none;
+  border-radius: 11px;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
+}
+.wpp-gabung-suara-teks { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.wpp-gabung-suara-judul { font-size: 0.9rem; font-weight: 650; }
+.wpp-gabung-suara-sub { font-size: 0.76rem; color: var(--text-muted); }
+
+.wpp-suara-baris { display: flex; align-items: center; gap: 0.5rem; }
+
+/* Mic, deafen, dan gear: tombol bulat ikon-saja — baris kendali khas
+   aplikasi suara, cukup dikenal tanpa perlu label teks. */
+.wpp-bulat {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; flex: none;
+  border-radius: 50%;
   border: 1px solid var(--btn-glass-border);
   background: var(--btn-glass);
   color: var(--text-primary);
-  font-family: inherit; font-size: 0.86rem; font-weight: 650;
   cursor: pointer;
-  transition: background var(--transition), border-color var(--transition);
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
 }
-.wpp-mic:hover { background: var(--btn-glass-hover); }
-.wpp-mic.nyala { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
-.wpp-mic:focus-visible, .wpp-bisu:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wpp-bisu {
-  flex: none;
+.wpp-bulat:hover { background: var(--btn-glass-hover); }
+.wpp-bulat:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Mikrofon menyala: aksen. Dibisukan (mic tetap terbuka, tak mengirim):
+   emas — beda warna dari deafen supaya dua keadaan "diam" ini tak tertukar. */
+.wpp-bulat.nyala { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+.wpp-bulat.bisu { border-color: var(--gold); color: var(--gold); background: rgba(251, 191, 36, 0.1); }
+/* Deafen: merah — tindakan yang paling mengganggu bila lupa dimatikan,
+   jadi warnanya sengaja paling mencolok. */
+.wpp-bulat.aktif-merah { border-color: var(--flix); color: var(--flix-text); background: var(--flix-glow); }
+.wpp-bulat.aktif { color: var(--text-primary); background: var(--btn-glass-hover); }
+
+.wpp-keluar-suara {
+  display: inline-flex; align-items: center; gap: 0.4rem;
   min-height: 46px;
+  margin-left: auto;
   padding: 0 0.9rem;
+  border: none;
   border-radius: 12px;
-  border: 1px solid var(--btn-glass-border);
   background: none;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-family: inherit; font-size: 0.82rem; font-weight: 600;
   cursor: pointer;
+  transition: color var(--transition), background var(--transition);
 }
-.wpp-bisu.aktif { border-color: var(--gold); color: var(--gold); }
+.wpp-keluar-suara:hover { color: var(--flix-text); background: var(--flix-glow); }
+.wpp-keluar-suara:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wpp-keluar-suara-label { white-space: nowrap; }
 
 /* Penanda sambungan suara buruk — dikatakan, bukan dibiarkan terlihat
    seperti orang yang diam saja */
@@ -14446,26 +14530,13 @@ a:hover {
   cursor: help;
 }
 
-/* Bilah suara jadi bertingkat: baris tombol, penunjuk level, lalu setelan */
-.wpp-suara { flex-direction: column; align-items: stretch; gap: 0.5rem; }
-.wpp-suara-baris { display: flex; align-items: center; gap: 0.5rem; }
-
-.wpp-mic.bisu { border-color: var(--gold); color: var(--gold); background: rgba(251, 191, 36, 0.08); }
-
-.wpp-gear {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  flex: none;
-  border-radius: 12px;
-  border: 1px solid var(--btn-glass-border);
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
+/* Ponsel sempit: kendali suara tetap muat tanpa membuang ruang jempol */
+@media (max-width: 380px) {
+  .wpp-bulat { width: 42px; height: 42px; }
+  .wpp-keluar-suara { padding: 0 0.6rem; }
+  .wpp-keluar-suara-label { display: none; }
+  .wpp-gabung-suara-sub { display: none; }
 }
-.wpp-gear:hover, .wpp-gear.aktif { color: var(--text-primary); background: var(--btn-glass); }
-.wpp-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Penunjuk tenaga suara sendiri: cara tercepat memastikan mikrofon memang
    menangkap sesuatu, sebelum menyalahkan jaringan */

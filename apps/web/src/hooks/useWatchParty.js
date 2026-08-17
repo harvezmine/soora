@@ -15,28 +15,50 @@ const PERIKSA_TIAP_MS = 1000;
 const NUDGE_MS = 3000;
 
 /**
+ * Volume per lawan bicara disimpan lokal, lepas dari sesi apa pun: kalau
+ * seseorang selalu pelan, aturannya sebaiknya ikut tiap kali bertemu lagi.
+ */
+const KUNCI_VOLUME = 'soora_voice_volumes';
+const bacaVolumeTersimpan = () => {
+  try { return JSON.parse(localStorage.getItem(KUNCI_VOLUME)) || {}; } catch { return {}; }
+};
+const simpanVolumeTersimpan = (peta) => {
+  try { localStorage.setItem(KUNCI_VOLUME, JSON.stringify(peta)); } catch { /* mode privat */ }
+};
+
+/**
  * Nonton bareng untuk halaman tonton.
  *
  * Tuan rumah menyiarkan tiap kali ia menggerakkan pemutar; tamu mengikuti,
  * dengan koreksi yang besarnya menyesuaikan selisih. Kait ini tidak
  * mengendalikan pemutar secara langsung — ia memanggil `playerRef`, sehingga
  * satu-satunya yang tahu cara memutar tetap VideoPlayer.
+ *
+ * Suara punya dua langkah yang sengaja terpisah: bergabung ke kanal (mulai
+ * mendengarkan semua orang, otomatis) dan menyalakan mikrofon (mulai
+ * berbicara). Bergabung tanpa membuka mikrofon adalah keadaan yang sah dan
+ * biasa — sama seperti Discord.
  */
 export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const [role, setRole] = useState(null);      // 'host' | 'guest' | null
   const [room, setRoom] = useState(null);
   const [peers, setPeers] = useState({ count: 0, people: [] });
   const [chat, setChat] = useState([]);
+
+  const [voiceJoined, setVoiceJoined] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [bisu, setBisu] = useState(false);
+  const [deafen, setDeafen] = useState(false);
   /** id peserta yang sedang terdengar bicara */
   const [bicara, setBicara] = useState({});
   /** tenaga suara mikrofon sendiri, 0..1 — untuk penunjuk level saat menguji */
   const [levelSaya, setLevelSaya] = useState(0);
-  /** mutu sambungan per lawan: { rtt, lossPct } */
+  /** mutu sambungan per lawan: { rtt, jitterMs, latencyMs, lossPct } */
   const [mutu, setMutu] = useState({});
   const [mikrofon, setMikrofon] = useState([]);
   const [perangkat, setPerangkat] = useState(null);
+  /** volume per lawan, 0..2 — dimuat dari penyimpanan lokal saat awal */
+  const [volumes, setVolumes] = useState(() => bacaVolumeTersimpan());
   /** tekan-untuk-bicara: mikrofon terbuka hanya selama tombol ditahan */
   const [ptt, setPtt] = useState(false);
   // 'connecting' diturunkan dari adanya roomId, bukan disetel di dalam efek —
@@ -59,6 +81,12 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const selfIdRef = useRef(null);
   const state = useRef(null);       // keadaan terakhir dari tuan rumah
   const nudgeTimer = useRef(null);
+  // Volume tersimpan dibaca oleh pastikanVoice tanpa perlu ikut daftar
+  // dependensi — berubah tiap slider digeser, dan itu tidak boleh membuat
+  // instans suara dibuat ulang. Disinkronkan lewat efek, bukan ditulis
+  // langsung saat render — menulis ref di badan render dilarang React.
+  const volumesRef = useRef(volumes);
+  useEffect(() => { volumesRef.current = volumes; }, [volumes]);
 
   /* ── Sambungan ── */
   useEffect(() => {
@@ -79,8 +107,9 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       state: (msg) => { state.current = msg; },
       peers: (msg) => {
         setPeers(msg);
-        // Mesh suara mengikuti daftar peserta: yang baru menyalakan mikrofon
-        // disambung, yang mematikannya diputus.
+        // Mesh suara mengikuti daftar peserta: yang baru bergabung disambung
+        // untuk didengarkan, yang keluar diputus. Ini terjadi terlepas dari
+        // status mikrofon siapa pun.
         voice.current?.selaraskan((msg.people || []).filter((o) => o.voice).map((o) => o.id));
       },
       chat: (m) => setChat((prev) => [...prev.slice(-99), m]),
@@ -103,7 +132,10 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       setPhase(null);
       setNotice(null);
       setChat([]);
+      setVoiceJoined(false);
       setMicOn(false);
+      setBisu(false);
+      setDeafen(false);
       setBicara({});
       setSelfId(null);
       selfIdRef.current = null;
@@ -206,28 +238,63 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     conn.current?.sendChat(isi);
   }, []);
 
+  /** Instans suara, dibuat sekali saat bergabung dan dipakai ulang. */
+  const pastikanVoice = useCallback(() => {
+    if (voice.current || !selfIdRef.current) return voice.current;
+    voice.current = createVoice({
+      selfId: selfIdRef.current,
+      sendRtc: (to, kind, data) => conn.current?.sendRtc(to, kind, data),
+      onLevel: (id, aktif, rms) => {
+        setBicara((p) => (p[id] === aktif ? p : { ...p, [id]: aktif }));
+        if (id === selfIdRef.current) setLevelSaya(rms || 0);
+      },
+      onQuality: (id, q) => setMutu((p) => ({ ...p, [id]: q })),
+      onError: (m) => setNotice(m),
+    });
+    // Volume yang sudah tersimpan langsung berlaku untuk lawan yang sudah
+    // ada, dan volume baru dari peramban lain menyusul lewat setVolumePeer.
+    for (const [id, v] of Object.entries(volumesRef.current)) voice.current.setVolume(id, v);
+    return voice.current;
+  }, []);
+
+  /* ── Kanal suara: bergabung berarti mendengarkan, otomatis, tanpa mikrofon ── */
+  const gabungSuara = useCallback(() => {
+    if (!conn.current || !selfIdRef.current) return;
+    pastikanVoice();
+    setVoiceJoined(true);
+    conn.current.sendVoice(true);
+  }, [pastikanVoice]);
+
+  const keluarSuara = useCallback(() => {
+    voice.current?.tutup();
+    voice.current = null;
+    setVoiceJoined(false);
+    setMicOn(false);
+    setBisu(false);
+    setDeafen(false);
+    setBicara({});
+    setLevelSaya(0);
+    setMutu({});
+    conn.current?.sendVoice(false);
+  }, []);
+
   /* ── Mikrofon ── */
   const nyalakanMic = useCallback(async () => {
-    if (!conn.current || !selfIdRef.current) return;
-    if (!voice.current) {
-      voice.current = createVoice({
-        selfId: selfIdRef.current,
-        sendRtc: (to, kind, data) => conn.current?.sendRtc(to, kind, data),
-        onLevel: (id, aktif, rms) => {
-          setBicara((p) => (p[id] === aktif ? p : { ...p, [id]: aktif }));
-          if (id === selfIdRef.current) setLevelSaya(rms || 0);
-        },
-        onQuality: (id, q) => setMutu((p) => ({ ...p, [id]: q })),
-        onError: (m) => setNotice(m),
-      });
-    }
+    // Mikrofon butuh kanal suara. Menyalakannya sebelum bergabung akan
+    // membuka mikrofon tanpa ada yang mendengarkan — jadi bergabung dulu.
+    if (!voiceJoined) { pastikanVoice(); setVoiceJoined(true); conn.current?.sendVoice(true); }
+    const v = pastikanVoice();
+    if (!v) return;
     try {
-      await voice.current.nyalakan();
+      await v.nyalakanMic();
       setMicOn(true);
       // Tekan-untuk-bicara berarti mulai dalam keadaan diam.
-      voice.current.setBisu(ptt);
+      v.setBisu(ptt);
       setBisu(ptt);
-      conn.current.sendVoice(true);
+      // Menyalakan mikrofon sambil deafen tidak masuk akal — tidak bisa
+      // dengar balasan sendiri. Ikuti kebiasaan Discord: batalkan deafen.
+      if (v.sedangDeafen) { v.setDeafen(false); setDeafen(false); conn.current?.sendDeafen(false); }
+      conn.current?.sendMic(true);
       // Label perangkat baru terbaca setelah izin diberikan, jadi daftarnya
       // diambil di sini, bukan sebelumnya.
       daftarMikrofon().then(setMikrofon);
@@ -236,13 +303,14 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       // terlihat seperti tombol rusak.
       setNotice('Tidak bisa memakai mikrofon. Periksa izin mikrofon di peramban.');
     }
-  }, [ptt]);
+  }, [voiceJoined, pastikanVoice, ptt]);
 
   const matikanMic = useCallback(() => {
-    voice.current?.matikan();
+    // Sengaja TIDAK menutup kanal — mendengarkan tetap berjalan.
+    voice.current?.matikanMic();
     setMicOn(false);
     setBisu(false);
-    conn.current?.sendVoice(false);
+    conn.current?.sendMic(false);
   }, []);
 
   const toggleMic = useCallback(() => {
@@ -250,11 +318,25 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   }, [micOn, matikanMic, nyalakanMic]);
 
   const toggleBisu = useCallback(() => {
+    if (!micOn) return; // tidak ada yang dibisukan tanpa mikrofon menyala
     setBisu((b) => {
       voice.current?.setBisu(!b);
       return !b;
     });
-  }, []);
+  }, [micOn]);
+
+  /* ── Bisukan semua suara masuk ── */
+  const toggleDeafen = useCallback(() => {
+    if (!voiceJoined) return;
+    const v = voice.current;
+    const nilai = !deafen;
+    v?.setDeafen(nilai);
+    setDeafen(nilai);
+    // Deafen bisa memaksa mikrofon bisu di dalam voice.js — baca baliknya
+    // supaya tombol Bisukan di layar tidak berbohong.
+    if (v) setBisu(v.sedangBisu);
+    conn.current?.sendDeafen(nilai);
+  }, [deafen, voiceJoined]);
 
   /* Tekan-untuk-bicara. Saat menyala, mikrofon tertutup sampai ditahan. */
   const setModePtt = useCallback((nyala) => {
@@ -266,10 +348,10 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   }, []);
 
   const tahanBicara = useCallback((tahan) => {
-    if (!ptt || !voice.current?.punyaMic) return;
+    if (!ptt || !voice.current?.punyaMic || deafen) return;
     voice.current.setBisu(!tahan);
     setBisu(!tahan);
-  }, [ptt]);
+  }, [ptt, deafen]);
 
   const gantiMikrofon = useCallback(async (deviceId) => {
     try {
@@ -278,6 +360,16 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     } catch {
       setNotice('Tidak bisa berpindah ke mikrofon itu.');
     }
+  }, []);
+
+  /* ── Volume per peserta ── */
+  const setVolumePeer = useCallback((id, v) => {
+    voice.current?.setVolume(id, v);
+    setVolumes((prev) => {
+      const next = { ...prev, [id]: v };
+      simpanVolumeTersimpan(next);
+      return next;
+    });
   }, []);
 
   return {
@@ -294,9 +386,16 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     setModePtt,
     tahanBicara,
     kirimChat,
+    voiceJoined,
+    gabungSuara,
+    keluarSuara,
     micOn,
     bisu,
+    deafen,
+    toggleDeafen,
     bicara,
+    volumes,
+    setVolumePeer,
     toggleMic,
     toggleBisu,
     selfId,

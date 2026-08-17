@@ -1,9 +1,17 @@
 // Suara ruang: mesh WebRTC.
 //
-// Tiap peserta bersuara menyambung langsung ke tiap peserta bersuara lainnya.
-// Suaranya tidak melewati server sama sekali — server hanya meneruskan amplop
-// sinyal. Jumlah sambungan tumbuh kuadratik, jadi jumlah orang di suara
-// dibatasi jauh lebih kecil daripada jumlah penonton.
+// Tiap peserta yang bergabung ke kanal suara menyambung langsung ke tiap
+// peserta lain yang juga bergabung — server hanya meneruskan amplop sinyal,
+// suaranya sendiri tidak pernah melewatinya. Jumlah sambungan tumbuh
+// kuadratik, jadi jumlah orang di kanal suara dibatasi jauh lebih kecil
+// daripada jumlah penonton.
+//
+// Bergabung ke kanal itu terpisah dari menyalakan mikrofon: bergabung berarti
+// mendengarkan, dan itu terjadi otomatis tanpa perlu membuka mikrofon sendiri
+// dulu. Tiap sambungan dibawa lewat satu transceiver audio yang arahnya
+// diubah di tempat — recvonly selama mendengarkan saja, sendrecv begitu
+// mikrofon dibuka — jadi menyalakan/mematikan mikrofon tidak pernah memutus
+// sambungan yang sudah ada.
 //
 // Tanpa TURN, jaringan dengan NAT simetris tidak akan tersambung. Itu batas
 // yang disadari: menyediakan TURN berarti menjalankan server relai sendiri.
@@ -13,6 +21,7 @@ import {
   rmsDari,
   jitterDelayMs,
   perkiraanLatensiMs,
+  volumeToElementGain,
 } from './audio-tune.js';
 
 const RTC_CONFIG = {
@@ -86,6 +95,10 @@ async function setelPengirim(sender) {
   } catch { /* sebagian peramban menolak sebagian bidang */ }
 }
 
+/** Transceiver audio pada sebuah sambungan — selalu tepat satu per desain kita. */
+const transceiverAudio = (pc) =>
+  pc.getTransceivers().find((t) => t.receiver.track?.kind === 'audio') || null;
+
 export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   /** @type {Map<string, RTCPeerConnection>} */
   const koneksi = new Map();
@@ -94,12 +107,29 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   const analisis = new Map(); // id -> { an, data, vad }
   // Cuplikan statistik sebelumnya per lawan, untuk menghitung selisih.
   const statsLalu = new Map(); // id -> { delay, count }
+  // Volume yang diminta per peserta, 0..2. Disimpan lepas dari elemen audio
+  // supaya tetap berlaku begitu sambungan dibuat ulang (mis. setelah
+  // terputus lalu menyambung lagi).
+  const volumeDiminta = new Map(); // id -> number
+
   let lokal = null;
   let audioCtx = null;
   let meterTimer = null;
   let statsTimer = null;
   let mati = false;
   let bisu = false;
+  let deafen = false;
+  // Status mikrofon sebelum dipaksa bisu oleh deafen, supaya bisa
+  // dikembalikan persis begitu deafen dimatikan.
+  let bisuSebelumDeafen = false;
+
+  /** Terapkan volume tersimpan (bila ada) ke sebuah elemen audio yang baru dibuat. */
+  const terapkanVolume = (id, el) => {
+    const v = volumeDiminta.get(id);
+    const { element, gain } = volumeToElementGain(v ?? 1);
+    el.volume = element;
+    el._soorGain = gain; // dibaca ulang kalau nanti dipasangi GainNode
+  };
 
   const buatKoneksi = (idLawan) => {
     if (koneksi.has(idLawan)) return koneksi.get(idLawan);
@@ -115,11 +145,24 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       if (!el) {
         el = new Audio();
         el.autoplay = true;
+        // Elemen baru yang dibuat saat sedang deafen harus ikut bisu sejak
+        // awal — bukan berbunyi sesaat lalu baru dibisukan.
+        el.muted = deafen;
+        terapkanVolume(idLawan, el);
         suara.set(idLawan, el);
       }
       el.srcObject = e.streams[0];
-      el.play().catch(() => { /* butuh gerak pengguna; tombol mic sudah itu */ });
+      el.play().catch(() => { /* butuh gerak pengguna; tombol Gabung Suara sudah itu */ });
       pasangMeter(idLawan, e.streams[0]);
+    };
+
+    // Renegosiasi otomatis: transceiver baru saat bergabung (recvonly),
+    // atau arahnya berubah saat mikrofon dibuka/ditutup, keduanya memicu
+    // peristiwa ini. Hanya sisi yang "menawar" (id lebih kecil) yang
+    // bertindak — sisi lain menunggu tawaran datang lewat terima().
+    pc.onnegotiationneeded = () => {
+      if (pc.signalingState !== 'stable') return;
+      if (akuYangMenawar(selfId, idLawan)) api.tawarkan(idLawan);
     };
 
     pc.onconnectionstatechange = () => {
@@ -133,11 +176,36 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       }
     };
 
+    // Arah transceiver mencerminkan niat sendiri saat sambungan dibuat:
+    // sendrecv bila mikrofon sudah menyala, recvonly bila baru mendengarkan.
+    // Peramban lawan menghitung arah gabungannya sendiri — satu sisi boleh
+    // sendrecv sementara sisi lain recvonly, dan suara tetap mengalir satu
+    // arah dengan benar; ini alur normal WebRTC, sama seperti panggilan
+    // video saat salah satu pihak mematikan kameranya.
     if (lokal) {
-      for (const t of lokal.getTracks()) setelPengirim(pc.addTrack(t, lokal));
+      setelPengirim(pc.addTrack(lokal.getAudioTracks()[0], lokal));
+    } else {
+      pc.addTransceiver('audio', { direction: 'recvonly' });
     }
     koneksi.set(idLawan, pc);
     return pc;
+  };
+
+  /** Pasang atau ganti trek kirim pada satu sambungan, ubah arahnya jadi sendrecv. */
+  const pasangTrekKirim = async (pc, track) => {
+    const trans = transceiverAudio(pc);
+    if (!trans) { setelPengirim(pc.addTrack(track, lokal)); return; }
+    if (trans.direction !== 'sendrecv') trans.direction = 'sendrecv';
+    await trans.sender.replaceTrack(track);
+    setelPengirim(trans.sender);
+  };
+
+  /** Lepas trek kirim, kembalikan arah ke recvonly — sambungan tetap hidup. */
+  const lepasTrekKirim = (pc) => {
+    const trans = transceiverAudio(pc);
+    if (!trans) return;
+    trans.sender.replaceTrack(null).catch(() => {});
+    if (trans.direction !== 'recvonly') trans.direction = 'recvonly';
   };
 
   const pasangMeter = (id, stream) => {
@@ -223,17 +291,34 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   };
 
   const api = {
-    async nyalakan() {
-      if (lokal) return lokal;
-      lokal = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: false });
+    /**
+     * Nyalakan mikrofon. Tidak menyentuh sambungan yang sudah ada selain
+     * mengizinkannya mengirim — mendengarkan tetap berjalan tanpa ini.
+     */
+    async nyalakanMic() {
+      if (!lokal) {
+        lokal = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: false });
+      }
       bisu = false;
       pasangMeter(selfId, lokal);
       mulaiStats();
-      for (const [id, pc] of koneksi) {
-        for (const t of lokal.getTracks()) setelPengirim(pc.addTrack(t, lokal));
-        if (akuYangMenawar(selfId, id)) api.tawarkan(id);
-      }
+      const track = lokal.getAudioTracks()[0];
+      for (const pc of koneksi.values()) await pasangTrekKirim(pc, track);
       return lokal;
+    },
+
+    /**
+     * Matikan mikrofon sepenuhnya — perangkat dilepas. Sambungan TIDAK
+     * diputus: mendengarkan tetap berjalan seperti sebelum mikrofon
+     * dinyalakan.
+     */
+    matikanMic() {
+      lokal?.getTracks().forEach((t) => t.stop());
+      lokal = null;
+      bisu = false;
+      for (const pc of koneksi.values()) lepasTrekKirim(pc);
+      analisis.delete(selfId);
+      onLevel?.(selfId, false, 0);
     },
 
     /** Ganti perangkat masukan tanpa memutus sambungan yang sudah ada. */
@@ -243,11 +328,9 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
         video: false,
       });
       const trekBaru = baru.getAudioTracks()[0];
-      // replaceTrack menukar sumbernya di tempat — tidak perlu menawar ulang,
-      // jadi suara tidak terputus saat berganti mikrofon.
       for (const pc of koneksi.values()) {
-        const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
-        if (sender) await sender.replaceTrack(trekBaru);
+        const trans = transceiverAudio(pc);
+        if (trans) await trans.sender.replaceTrack(trekBaru);
       }
       lokal?.getTracks().forEach((t) => t.stop());
       lokal = baru;
@@ -257,15 +340,6 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       return lokal;
     },
 
-    matikan() {
-      lokal?.getTracks().forEach((t) => t.stop());
-      lokal = null;
-      bisu = false;
-      analisis.delete(selfId);
-      onLevel?.(selfId, false, 0);
-      for (const id of [...koneksi.keys()]) putus(id);
-    },
-
     /** Diam sementara tanpa memutus sambungan — dasar untuk tekan-untuk-bicara. */
     setBisu(nilai) {
       bisu = !!nilai;
@@ -273,7 +347,37 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       if (bisu) onLevel?.(selfId, false, 0);
     },
 
+    /**
+     * Bisukan semua suara masuk. Ikut memaksa mikrofon sendiri bisu — kalau
+     * tidak bisa mendengar balasan, bicara sendirian jadi aneh — dan status
+     * mikrofon sebelumnya dikembalikan begitu deafen dimatikan.
+     */
+    setDeafen(nilai) {
+      const mau = !!nilai;
+      if (mau === deafen) return;
+      deafen = mau;
+      for (const el of suara.values()) el.muted = deafen;
+      if (deafen) {
+        bisuSebelumDeafen = bisu;
+        api.setBisu(true);
+      } else {
+        api.setBisu(bisuSebelumDeafen);
+      }
+    },
+
+    /**
+     * Volume satu peserta, 0..2. Berlaku langsung bila sambungannya sudah
+     * ada, dan tersimpan untuk diterapkan ke sambungan berikutnya.
+     */
+    setVolume(idLawan, v) {
+      volumeDiminta.set(idLawan, v);
+      const el = suara.get(idLawan);
+      if (el) terapkanVolume(idLawan, el);
+    },
+    getVolume(idLawan) { return volumeDiminta.get(idLawan) ?? 1; },
+
     get sedangBisu() { return bisu; },
+    get sedangDeafen() { return deafen; },
     get punyaMic() { return !!lokal; },
 
     async tawarkan(idLawan) {
@@ -307,24 +411,26 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       }
     },
 
-    selaraskan(idBersuara) {
-      const perlu = new Set(idBersuara.filter((id) => id !== selfId));
+    /**
+     * Samakan mesh dengan roster "bergabung kanal suara" terbaru — bukan
+     * roster mikrofon. Selalu membentuk sambungan untuk mendengarkan,
+     * terlepas dari status mikrofon sendiri.
+     */
+    selaraskan(idBergabung) {
+      const perlu = new Set(idBergabung.filter((id) => id !== selfId));
       for (const id of koneksi.keys()) if (!perlu.has(id)) putus(id);
-      if (!lokal) return;
-      for (const id of perlu) {
-        if (koneksi.has(id)) continue;
-        if (akuYangMenawar(selfId, id)) api.tawarkan(id);
-        else buatKoneksi(id);
-      }
+      for (const id of perlu) if (!koneksi.has(id)) buatKoneksi(id);
     },
 
     putus,
 
+    /** Keluar kanal suara sepenuhnya: mikrofon dimatikan, semua sambungan ditutup. */
     tutup() {
       mati = true;
       clearInterval(meterTimer); meterTimer = null;
       clearInterval(statsTimer); statsTimer = null;
-      api.matikan();
+      api.matikanMic();
+      for (const id of [...koneksi.keys()]) putus(id);
       audioCtx?.close().catch(() => {});
       audioCtx = null;
     },

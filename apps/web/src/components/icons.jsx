@@ -204,3 +204,68 @@ export const IconHewan = ({ nama, size = 22 }) => {
   const Ikon = daftar[nama] || IconCat;
   return <Ikon size={size} />;
 };
+
+/* ── Suara nonton bareng ──
+   Dua bentuk mikrofon (nyala/mati) dan dua bentuk headset (mendengar/
+   dibisukan) — pembeda keadaan lewat bentuk, bukan cuma warna, supaya tetap
+   terbaca oleh yang sulit membedakan warna. */
+
+export const IconMicOn = (p) => (
+  <Garis {...p}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 10.5a7 7 0 0 0 14 0" />
+    <path d="M12 17.5V22M8.5 22h7" />
+  </Garis>
+);
+
+export const IconMicOff = (p) => (
+  <Garis {...p}>
+    <path d="M9 9v3.5a3 3 0 0 0 4.5 2.6M15 6.5V5a3 3 0 0 0-5.9-.7" />
+    <path d="M5 10.5a7 7 0 0 0 9.9 6.4" />
+    <path d="M19 10.5a7 7 0 0 1-1.2 3.9" />
+    <path d="M12 17.5V22M8.5 22h7" />
+    <path d="M3 3l18 18" />
+  </Garis>
+);
+
+export const IconHeadsetOn = (p) => (
+  <Garis {...p}>
+    <path d="M4 13v-1a8 8 0 0 1 16 0v1" />
+    <rect x="2.5" y="13" width="4" height="6" rx="1.5" />
+    <rect x="17.5" y="13" width="4" height="6" rx="1.5" />
+    <path d="M20 19v.5a3 3 0 0 1-3 3h-3" />
+  </Garis>
+);
+
+export const IconHeadsetOff = (p) => (
+  <Garis {...p}>
+    <path d="M4 13v-1a8 8 0 0 1 13.6-5.7M20 12v-1a8 8 0 0 0-.4-2.5" />
+    <rect x="2.5" y="13" width="4" height="6" rx="1.5" />
+    <rect x="17.5" y="13" width="4" height="6" rx="1.5" />
+    <path d="M2 2l20 20" />
+  </Garis>
+);
+
+export const IconPhoneOff = (p) => (
+  <Garis {...p}>
+    <path d="M11 5.5C15 5 18 7.5 19 11" />
+    <path d="M11 9.3c1.7-.3 3 .8 3.4 2.4" />
+    <path d="m3 3 18 18" />
+    <path d="M9.2 9.2C7.5 10.6 6.8 12.3 8 14c.9 1.3 2.7 2.9 4.4 4 1.3.8 2.6-.4 3.4-1.5.3-.4.9-.5 1.3-.2l3 2.1c.4.3.5.9.1 1.3-1 1.1-2.6 2.2-4.4 1.9C11.6 21 6 16.6 3 12.4c-1-1.5-.6-3.3.6-4.6" />
+  </Garis>
+);
+
+export const IconVolume = (p) => (
+  <Garis {...p}>
+    <path d="M4 9v6h4l5 4V5L8 9z" />
+    <path d="M16.5 8.5a5 5 0 0 1 0 7" />
+  </Garis>
+);
+
+export const IconSignalLow = (p) => (
+  <Garis {...p}>
+    <path d="M2 20h2M22 20V4" />
+    <path d="M17 20V9M12 20v-5" strokeOpacity="0.35" />
+    <path d="M7 20v-2" strokeOpacity="0.35" />
+  </Garis>
+);

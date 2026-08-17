@@ -8,6 +8,9 @@ import {
   nilaiLatensi,
   LATENSI_TETAP_MS,
   OPUS_DEFAULT,
+  clampVolume,
+  volumeToElementGain,
+  VOLUME_DEFAULT,
 } from './audio-tune.js';
 
 const SDP_DENGAN_FMTP = [
@@ -188,5 +191,34 @@ describe('nilaiLatensi', () => {
   });
   it('null tetap null — belum terukur bukan berarti lambat', () => {
     expect(nilaiLatensi(null)).toBeNull();
+  });
+});
+
+describe('clampVolume', () => {
+  it('membatasi ke rentang 0..2', () => {
+    expect(clampVolume(-5)).toBe(0);
+    expect(clampVolume(0)).toBe(0);
+    expect(clampVolume(1)).toBe(1);
+    expect(clampVolume(2)).toBe(2);
+    expect(clampVolume(9)).toBe(2);
+  });
+  it('nilai tidak masuk akal jatuh ke bawaan (100%)', () => {
+    expect(clampVolume(NaN)).toBe(VOLUME_DEFAULT);
+    expect(clampVolume(undefined)).toBe(VOLUME_DEFAULT);
+    expect(clampVolume('sepuluh')).toBe(VOLUME_DEFAULT);
+  });
+});
+
+describe('volumeToElementGain', () => {
+  it('di bawah 100%, elemen ikut nilainya dan penguat tidak aktif', () => {
+    expect(volumeToElementGain(0.4)).toEqual({ element: 0.4, gain: 1 });
+    expect(volumeToElementGain(0)).toEqual({ element: 0, gain: 1 });
+  });
+  it('tepat 100%, keduanya normal', () => {
+    expect(volumeToElementGain(1)).toEqual({ element: 1, gain: 1 });
+  });
+  it('di atas 100%, elemen penuh dan penguat yang menaikkan — elemen sendiri dibatasi peramban ke 0..1', () => {
+    expect(volumeToElementGain(1.5)).toEqual({ element: 1, gain: 1.5 });
+    expect(volumeToElementGain(2)).toEqual({ element: 1, gain: 2 });
   });
 });

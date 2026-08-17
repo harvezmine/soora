@@ -209,6 +209,8 @@ export function connectRoom(roomId, on = {}) {
     sendState: (playing, position) => kirim('state', { playing, position }),
     sendChat: (text) => kirim('chat', { text }),
     sendVoice: (on_) => kirim('voice', { on: on_ }),
+    sendMic: (on_) => kirim('mic', { on: on_ }),
+    sendDeafen: (on_) => kirim('deafen', { on: on_ }),
     /** Amplop sinyal WebRTC; isinya tidak dibaca server. */
     sendRtc: (to, kind, data) => kirim('rtc', { to, kind, data }),
     close: () => {
