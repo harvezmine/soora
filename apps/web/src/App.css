@@ -14065,9 +14065,15 @@ a:hover {
   position: absolute;
   inset: 0;
   z-index: 20;
-  display: grid;
-  place-items: center;
-  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Pemutar 16:9 pada lebar 375px hanya setinggi ~211px. Isi yang lebih
+     tinggi harus bisa digulir, bukan terpotong — dan memusatkan isi pada
+     wadah yang menggulir akan memotong bagian atasnya, jadi dipakai
+     margin auto pada kartunya. */
+  overflow: auto;
+  padding: 1.25rem;
   background: rgba(6, 6, 14, 0.82);
   backdrop-filter: blur(10px) saturate(1.2);
   -webkit-backdrop-filter: blur(10px) saturate(1.2);
@@ -14078,6 +14084,7 @@ a:hover {
   align-items: center;
   gap: 0.5rem;
   max-width: 30rem;
+  margin: auto;
   text-align: center;
 }
 .wpg-eyebrow {
@@ -14131,7 +14138,15 @@ a:hover {
 @media (prefers-reduced-motion: reduce) {
   .wpg-btn, .wpg-btn:hover, .wpg-btn:active { transform: none; transition: background 0.01ms; }
 }
+/* Layar sempit berarti pemutar pendek. Judul dan tombol yang harus terbaca;
+   keterangan pelengkap disembunyikan supaya keduanya muat. */
+@media (max-width: 640px) {
+  .wpg { padding: 0.9rem; }
+  .wpg-card { gap: 0.35rem; }
+  .wpg-eyebrow { font-size: 0.62rem; }
+  .wpg-sub, .wpg-note { display: none; }
+  .wpg-btn { margin-top: 0.5rem; min-height: 44px; padding: 0.6rem 1.3rem; font-size: 0.88rem; }
+}
 @media (max-width: 480px) {
-  .wpg { padding: 1rem; }
   .wpg-btn { width: 100%; }
 }
