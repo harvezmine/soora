@@ -14433,6 +14433,69 @@ a:hover {
 @media (prefers-reduced-motion: reduce) {
   .wpg-btn, .wpg-btn:hover, .wpg-btn:active { transform: none; transition: background 0.01ms; }
 }
+/* Avatar tuan rumah di gerbang undangan — wajah dulu, baru kalimat */
+.wpg-host { display: grid; place-items: center; margin-bottom: 0.35rem; }
+.wpg-host-av {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.wpg-host-av img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+/* Cincin berdenyut pelan: undangan yang menunggu dijawab, bukan hiasan */
+.wpg-host-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0.55;
+  animation: wpg-denyut 2.4s ease-in-out infinite;
+}
+@keyframes wpg-denyut {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.07); opacity: 0.18; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wpg-host-ring { animation: none; }
+}
+
+/* Siapa saja yang sudah di dalam */
+.wpg-orang { display: flex; align-items: center; justify-content: center; margin-top: 0.2rem; }
+.wpg-orang-av {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  overflow: hidden;
+}
+.wpg-orang-av:first-child { margin-left: 0; }
+.wpg-orang-av img { width: 100%; height: 100%; object-fit: cover; }
+.wpg-orang-more { background: var(--btn-glass); color: var(--text-secondary); font-size: 0.62rem; }
+
+@media (max-width: 640px) {
+  /* Pemutar pendek di ponsel: avatar mengecil supaya judul dan tombol muat */
+  .wpg-host-av { width: 46px; height: 46px; font-size: 1.15rem; }
+  .wpg-orang { display: none; }
+}
+
 /* Layar sempit berarti pemutar pendek. Judul dan tombol yang harus terbaca;
    keterangan pelengkap disembunyikan supaya keduanya muat. */
 @media (max-width: 640px) {
