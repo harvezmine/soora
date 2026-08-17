@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from './auth';
 import * as store from '../services/store';
+import * as avatars from '../services/avatars';
 import { reportRouteError } from '../services/telegram';
 
 const router = Router();
@@ -66,6 +67,34 @@ router.get('/prefs', async (req, res) => {
 router.post('/prefs', async (req, res) => {
   try { await store.setPrefs(uid(req), req.body || {}); res.json({ ok: true }); }
   catch (e: any) { reportRouteError(req, e, 'user/prefs:post'); res.status(500).json({ error: 'failed' }); }
+});
+
+// ── Avatar ──
+
+// GET /user/avatars — pilihan avatar bawaan yang tersedia
+router.get('/avatars', async (_req, res) => {
+  res.json({ items: avatars.daftarAvatar() });
+});
+
+// POST /user/avatar {url} — ganti avatar ke salah satu bawaan
+router.post('/avatar', async (req, res) => {
+  try {
+    const url = String(req.body?.url || '');
+    // Hanya avatar bawaan yang diterima. Tanpa pemeriksaan ini kolom avatar
+    // jadi tempat menitipkan URL apa pun, dan URL itu ikut tampil di kolom
+    // komentar orang lain.
+    if (!avatars.avatarSah(url)) {
+      return res.status(400).json({ error: 'Avatar tidak dikenal' });
+    }
+    const user = await store.getUserById(uid(req));
+    if (!user) return res.status(401).json({ error: 'Sesi tidak valid' });
+    user.avatar = url;
+    await store.saveUser(user);
+    res.json({ user: store.publicUser(user) });
+  } catch (e: any) {
+    reportRouteError(req, e, 'user/avatar');
+    res.status(500).json({ error: 'Gagal mengganti avatar' });
+  }
 });
 
 export default router;

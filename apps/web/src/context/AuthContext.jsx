@@ -82,8 +82,15 @@ export function AuthProvider({ children }) {
   // Authed helper for user-data calls (progress/history/mylist/prefs)
   const apiAuthed = useCallback((path, opts = {}) => authFetch(path, { ...opts, token }), [token]);
 
+  /** Perbarui profil di tempat — mis. setelah avatar diganti. Tanpa ini,
+   *  avatar baru baru muncul setelah halaman dimuat ulang. */
+  const updateUser = useCallback((usr) => {
+    setUser(usr);
+    localStorage.setItem(USER_KEY, JSON.stringify(usr));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, loginGoogle, logout, apiAuthed }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginGoogle, logout, apiAuthed, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

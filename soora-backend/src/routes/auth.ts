@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config';
 import { getUserByEmail, getUserById, saveUser, publicUser, UserRecord } from '../services/store';
+import * as avatars from '../services/avatars';
 import { reportRouteError } from '../services/telegram';
 
 const router = Router();
@@ -11,8 +12,9 @@ const googleClient = new OAuth2Client(config.googleClientId);
 
 const sign = (id: string, tv = 0) => jwt.sign({ id, tv }, config.jwtSecret, { expiresIn: '60d' });
 const newId = () => `u_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-const avatarFor = (name: string) =>
-  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=7c5cfc`;
+// Pendaftar baru mendapat satu avatar bawaan Soora secara acak. Selama
+// gambarnya belum tersedia, ia jatuh ke avatar inisial.
+const avatarFor = (name: string) => avatars.avatarAcak(name);
 
 // ── JWT middleware (attaches req.userId) ──
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {

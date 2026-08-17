@@ -34,5 +34,10 @@ export const apiSetProgress = (entry) => call('/user/progress', { method: 'POST'
 export const apiDeleteProgress = (key) =>
   call(`/user/progress/${encodeURIComponent(key)}`, { method: 'DELETE' });
 
+// ── Avatar ──
+export const apiGetAvatars = () => call('/user/avatars').then((d) => d?.items || []);
+export const apiSetAvatar = (url) =>
+  call('/user/avatar', { method: 'POST', body: { url } }).then((d) => d?.user || null);
+
 // ── History ──
 export const apiAddHistory = (entry) => call('/user/history', { method: 'POST', body: entry });

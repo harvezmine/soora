@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getMyList } from '../utils/mylist';
 import { getProgressList, removeProgress } from '../utils/progress';
 import ContinueRow from '../components/ContinueRow';
+import { apiGetAvatars, apiSetAvatar } from '@soora/core/user';
 
 /* Tujuan My List. Ikonnya membedakan barisnya tanpa perlu warna. */
 const PUSTAKA = [
@@ -28,10 +29,30 @@ const PUSTAKA = [
 ];
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirm, setConfirm] = useState(false);
+  const [pilihAvatar, setPilihAvatar] = useState(false);
+  const [avatarTersedia, setAvatarTersedia] = useState([]);
+  const [gantiAvatar, setGantiAvatar] = useState(null); // url yang sedang dikirim
+
+  // Daftar avatar diambil saat pemilihnya dibuka, bukan saat halaman dimuat —
+  // sebagian besar kunjungan ke profil tidak menyentuhnya sama sekali.
+  useEffect(() => {
+    if (!pilihAvatar || avatarTersedia.length) return;
+    apiGetAvatars().then(setAvatarTersedia).catch(() => setAvatarTersedia([]));
+  }, [pilihAvatar, avatarTersedia.length]);
+
+  const pakaiAvatar = useCallback(async (url) => {
+    setGantiAvatar(url);
+    try {
+      const baru = await apiSetAvatar(url);
+      if (baru) { updateUser(baru); setPilihAvatar(false); }
+    } finally {
+      setGantiAvatar(null);
+    }
+  }, [updateUser]);
 
   const counts = useMemo(() => {
     const list = getMyList();
@@ -66,9 +87,21 @@ export default function Profile() {
   return (
     <div className="profile-page">
       <header className="prof-head">
-        {user.avatar
-          ? <img className="prof-avatar" src={user.avatar} alt="" referrerPolicy="no-referrer" />
-          : <div className="prof-avatar prof-avatar-fallback" aria-hidden="true">{initials}</div>}
+        <button
+          className="prof-avatar-btn"
+          onClick={() => setPilihAvatar((v) => !v)}
+          aria-label="Ganti foto profil"
+          aria-expanded={pilihAvatar}
+        >
+          {user.avatar
+            ? <img className="prof-avatar" src={user.avatar} alt="" referrerPolicy="no-referrer" />
+            : <div className="prof-avatar prof-avatar-fallback" aria-hidden="true">{initials}</div>}
+          <span className="prof-avatar-edit" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+              <path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+            </svg>
+          </span>
+        </button>
         <div className="prof-id">
           <h1 className="prof-name">{user.name}</h1>
           <p className="prof-email">{user.email}</p>
@@ -83,6 +116,31 @@ export default function Profile() {
           )}
         </div>
       </header>
+
+      {pilihAvatar && (
+        <div className="prof-avatars">
+          {avatarTersedia.length === 0 ? (
+            <p className="prof-avatars-kosong">Belum ada foto profil bawaan.</p>
+          ) : (
+            <>
+              <h2 className="prof-block-title">Pilih foto profil</h2>
+              <div className="prof-avatars-grid">
+                {avatarTersedia.map((url) => (
+                  <button
+                    key={url}
+                    className={`prof-avatar-opsi ${user.avatar === url ? 'terpilih' : ''}`}
+                    onClick={() => pakaiAvatar(url)}
+                    disabled={!!gantiAvatar}
+                    aria-pressed={user.avatar === url}
+                  >
+                    <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Isi utama halaman ini: apa yang sedang ditonton. Tiap ContinueRow
           mengembalikan null saat bagiannya kosong. */}
