@@ -161,7 +161,7 @@ export default function WatchPartyPanel({
         <section className="wpp-chat" aria-label="Obrolan">
           <div className="wpp-chat-list" ref={daftarRef}>
             {chat.length === 0 ? (
-              <p className="wpp-kosong">Belum ada obrolan. Sapa dulu 👋</p>
+              <p className="wpp-kosong">Belum ada obrolan di ruang ini.</p>
             ) : (
               chat.map((m) => (
                 <div className={`wpp-msg ${m.userId === selfId ? 'milikku' : ''}`} key={m.id}>

@@ -325,7 +325,7 @@ export default function CommentSection({ contentKey }) {
         {loading ? (
           <CommentSkeleton />
         ) : items.length === 0 ? (
-          <p className="cmt-empty">Belum ada yang bahas ini. Mulai obrolannya 👋</p>
+          <p className="cmt-empty">Belum ada yang membahas ini. Jadi yang pertama.</p>
         ) : (
           items.map((c) => (
             <CommentItem
