@@ -117,3 +117,48 @@ export function rmsDari(data) {
   }
   return Math.sqrt(jumlah / data.length);
 }
+
+/**
+ * Latensi penyangga jitter dari dua cuplikan statistik WebRTC.
+ *
+ * `jitterBufferDelay` bersifat kumulatif sejak sambungan dibuka — dibagi
+ * langsung dengan totalnya hanya memberi rata-rata seumur sesi, yang makin
+ * lama makin tidak mencerminkan keadaan sekarang. Selisih antara dua cuplikan
+ * memberi nilai yang sedang berlaku.
+ *
+ * Kembalian null berarti belum cukup data, bukan nol milidetik — keduanya
+ * jangan disamakan saat ditampilkan.
+ */
+export function jitterDelayMs(sebelum, sesudah) {
+  if (!sesudah) return null;
+  const dDelay = (sesudah.delay ?? 0) - (sebelum?.delay ?? 0);
+  const dCount = (sesudah.count ?? 0) - (sebelum?.count ?? 0);
+  if (dCount > 0) return Math.round((dDelay / dCount) * 1000);
+  // Belum ada paket baru sejak cuplikan lalu — pakai rata-rata seumur sesi
+  // sebagai perkiraan kasar, selama memang ada isinya.
+  if ((sesudah.count ?? 0) > 0) return Math.round((sesudah.delay / sesudah.count) * 1000);
+  return null;
+}
+
+/**
+ * Perkiraan latensi mulut-ke-telinga.
+ *
+ * Yang bisa diukur hanya perjalanan jaringan dan antrean penyangga. Waktu
+ * tangkap, enkode, dan dekode tidak terlihat dari statistik WebRTC, jadi
+ * ditambahkan sebagai tetapan — diakui sebagai perkiraan, bukan hasil ukur.
+ */
+export const LATENSI_TETAP_MS = 35;
+
+export function perkiraanLatensiMs({ rttMs, jitterMs }) {
+  if (rttMs == null && jitterMs == null) return null;
+  const setengahJalan = rttMs != null ? rttMs / 2 : 0;
+  return Math.round(setengahJalan + (jitterMs ?? 0) + LATENSI_TETAP_MS);
+}
+
+/** Penilaian yang bisa dibaca manusia, bukan angka telanjang. */
+export function nilaiLatensi(ms) {
+  if (ms == null) return null;
+  if (ms <= 120) return 'bagus';
+  if (ms <= 250) return 'cukup';
+  return 'lambat';
+}

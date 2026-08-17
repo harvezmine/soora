@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { nilaiLatensi } from '@soora/core/party/audio-tune';
 
 const inisial = (nama) => (nama || '?').trim().charAt(0).toUpperCase();
 
@@ -262,6 +263,29 @@ export default function WatchPartyPanel({
                 {mikrofon.map((m) => <option value={m.id} key={m.id}>{m.label}</option>)}
               </select>
             </label>
+            {Object.entries(mutu).filter(([, q]) => q?.latencyMs != null).length > 0 && (
+              <div className="wpp-ukur">
+                <span className="wpp-ukur-judul">Latensi terukur</span>
+                {Object.entries(mutu)
+                  .filter(([, q]) => q?.latencyMs != null)
+                  .map(([id, q]) => {
+                    const nama = (peers?.people || []).find((o) => o.id === id)?.name || 'Peserta';
+                    return (
+                      <div className="wpp-ukur-baris" key={id}>
+                        <span className="wpp-ukur-nama">{nama}</span>
+                        <span className={`wpp-ukur-nilai n-${nilaiLatensi(q.latencyMs)}`}>
+                          {q.latencyMs} ms
+                        </span>
+                        <span className="wpp-ukur-rinci">
+                          {q.rtt != null ? `jaringan ${q.rtt} ms` : 'jaringan —'}
+                          {q.jitterMs != null ? ` · antrean ${q.jitterMs} ms` : ''}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
             <label className="wpp-setelan-baris">
               <span>Tekan spasi untuk bicara</span>
               <input

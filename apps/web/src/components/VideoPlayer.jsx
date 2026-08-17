@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import Hls from 'hls.js';
 
+/* Peredupan volume film saat ada yang bicara di ruang nonton bareng.
+   Turun jauh lebih cepat daripada naik: telat meredam berarti kata pertama
+   hilang, sedangkan telat mengembalikan hanya terasa lembut. */
+const DUCK_TURUN_MS = 80;
+const DUCK_NAIK_MS = 400;
+
 /**
  * VideoPlayer - Netflix-style HLS player with custom controls
  * Custom overlay: play/pause, seek, volume, brightness, resolution, PiP, fullscreen
@@ -145,11 +151,18 @@ const VideoPlayer = forwardRef(function VideoPlayer(
       if (aktif) duck.current.dasar = video.volume;
       const dari = video.volume;
       const ke = aktif ? duck.current.dasar * 0.22 : duck.current.dasar;
+      // Asimetris, seperti peredupan di penyiaran: turun cepat supaya kata
+      // pertama tidak tertimbun film, naik pelan supaya tidak menyentak di
+      // jeda antar-kalimat.
+      const durasi = aktif ? DUCK_TURUN_MS : DUCK_NAIK_MS;
       const mulai = performance.now();
       cancelAnimationFrame(duck.current.raf);
       const langkah = (t) => {
-        const p = Math.min(1, (t - mulai) / 150);
-        video.volume = dari + (ke - dari) * p;
+        const p = Math.min(1, (t - mulai) / durasi);
+        // Pelengkungan agar perubahan terdengar rata di telinga, bukan rata
+        // secara angka — pendengaran manusia tidak linier terhadap amplitudo.
+        const e = aktif ? p * p : 1 - (1 - p) * (1 - p);
+        video.volume = Math.max(0, Math.min(1, dari + (ke - dari) * e));
         if (p < 1) duck.current.raf = requestAnimationFrame(langkah);
       };
       duck.current.raf = requestAnimationFrame(langkah);

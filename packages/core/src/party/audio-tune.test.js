@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { tuneOpusSdp, createVad, rmsDari, OPUS_DEFAULT } from './audio-tune.js';
+import {
+  tuneOpusSdp,
+  createVad,
+  rmsDari,
+  jitterDelayMs,
+  perkiraanLatensiMs,
+  nilaiLatensi,
+  LATENSI_TETAP_MS,
+  OPUS_DEFAULT,
+} from './audio-tune.js';
 
 const SDP_DENGAN_FMTP = [
   'v=0',
@@ -126,5 +135,58 @@ describe('rmsDari', () => {
   it('data kosong tidak melempar', () => {
     expect(rmsDari(new Uint8Array(0))).toBe(0);
     expect(rmsDari(null)).toBe(0);
+  });
+});
+
+describe('jitterDelayMs', () => {
+  it('memakai selisih dua cuplikan, bukan rata-rata seumur sesi', () => {
+    // Sesi lama punya rata-rata tinggi, tapi belakangan membaik.
+    const sebelum = { delay: 100, count: 1000 };   // rata-rata 100 ms
+    const sesudah = { delay: 102, count: 1100 };   // 100 paket terakhir: 20 ms
+    expect(jitterDelayMs(sebelum, sesudah)).toBe(20);
+  });
+
+  it('cuplikan pertama memakai rata-rata seumur sesi', () => {
+    expect(jitterDelayMs(undefined, { delay: 4.5, count: 100 })).toBe(45);
+  });
+
+  it('tanpa paket baru, jatuh ke rata-rata seumur sesi', () => {
+    const sama = { delay: 4.5, count: 100 };
+    expect(jitterDelayMs(sama, sama)).toBe(45);
+  });
+
+  it('null saat belum ada data — bukan nol, karena artinya berbeda', () => {
+    expect(jitterDelayMs(undefined, { delay: 0, count: 0 })).toBeNull();
+    expect(jitterDelayMs(undefined, undefined)).toBeNull();
+    expect(jitterDelayMs({ delay: 1, count: 10 }, null)).toBeNull();
+  });
+});
+
+describe('perkiraanLatensiMs', () => {
+  it('memakai separuh waktu pulang-pergi, bukan seluruhnya', () => {
+    // rtt 40 → satu arah 20, ditambah jitter 30 dan tetapan
+    expect(perkiraanLatensiMs({ rttMs: 40, jitterMs: 30 })).toBe(20 + 30 + LATENSI_TETAP_MS);
+  });
+
+  it('tetap memberi angka bila salah satu belum terukur', () => {
+    expect(perkiraanLatensiMs({ rttMs: 40, jitterMs: null })).toBe(20 + LATENSI_TETAP_MS);
+    expect(perkiraanLatensiMs({ rttMs: null, jitterMs: 30 })).toBe(30 + LATENSI_TETAP_MS);
+  });
+
+  it('null saat tidak ada yang terukur sama sekali', () => {
+    expect(perkiraanLatensiMs({ rttMs: null, jitterMs: null })).toBeNull();
+  });
+});
+
+describe('nilaiLatensi', () => {
+  it('memberi penilaian yang bisa dibaca, bukan angka telanjang', () => {
+    expect(nilaiLatensi(80)).toBe('bagus');
+    expect(nilaiLatensi(120)).toBe('bagus');
+    expect(nilaiLatensi(121)).toBe('cukup');
+    expect(nilaiLatensi(250)).toBe('cukup');
+    expect(nilaiLatensi(251)).toBe('lambat');
+  });
+  it('null tetap null — belum terukur bukan berarti lambat', () => {
+    expect(nilaiLatensi(null)).toBeNull();
   });
 });

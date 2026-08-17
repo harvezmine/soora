@@ -7,7 +7,13 @@
 //
 // Tanpa TURN, jaringan dengan NAT simetris tidak akan tersambung. Itu batas
 // yang disadari: menyediakan TURN berarti menjalankan server relai sendiri.
-import { tuneOpusSdp, createVad, rmsDari } from './audio-tune.js';
+import {
+  tuneOpusSdp,
+  createVad,
+  rmsDari,
+  jitterDelayMs,
+  perkiraanLatensiMs,
+} from './audio-tune.js';
 
 const RTC_CONFIG = {
   iceServers: [{
@@ -86,6 +92,8 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
   /** @type {Map<string, HTMLAudioElement>} */
   const suara = new Map();
   const analisis = new Map(); // id -> { an, data, vad }
+  // Cuplikan statistik sebelumnya per lawan, untuk menghitung selisih.
+  const statsLalu = new Map(); // id -> { delay, count }
   let lokal = null;
   let audioCtx = null;
   let meterTimer = null;
@@ -162,7 +170,12 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     }, METER_MS);
   };
 
-  /** Laporkan mutu sambungan sesekali: paket hilang dan waktu pulang-pergi. */
+  /**
+   * Laporkan mutu dan latensi sesekali.
+   *
+   * Angkanya diukur, bukan ditebak: waktu pulang-pergi dari pasangan kandidat
+   * yang terpakai, dan antrean penyangga jitter dari selisih dua cuplikan.
+   */
   const mulaiStats = () => {
     if (statsTimer || !onQuality) return;
     statsTimer = setInterval(async () => {
@@ -170,18 +183,28 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
         try {
           const stats = await pc.getStats();
           let hilang = 0, diterima = 0, rtt = null;
+          let jbDelay = 0, jbCount = 0;
           stats.forEach((r) => {
             if (r.type === 'inbound-rtp' && r.kind === 'audio') {
               hilang = r.packetsLost || 0;
               diterima = r.packetsReceived || 0;
+              jbDelay = r.jitterBufferDelay || 0;
+              jbCount = r.jitterBufferEmittedCount || 0;
             }
             if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.currentRoundTripTime != null) {
               rtt = Math.round(r.currentRoundTripTime * 1000);
             }
           });
+
+          const cuplikan = { delay: jbDelay, count: jbCount };
+          const jitterMs = jitterDelayMs(statsLalu.get(id), cuplikan);
+          statsLalu.set(id, cuplikan);
+
           const total = hilang + diterima;
           onQuality(id, {
             rtt,
+            jitterMs,
+            latencyMs: perkiraanLatensiMs({ rttMs: rtt, jitterMs }),
             lossPct: total > 0 ? Math.round((hilang / total) * 100) : 0,
           });
         } catch { /* sambungan sedang ditutup */ }
@@ -195,6 +218,7 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     const el = suara.get(idLawan);
     if (el) { el.srcObject = null; suara.delete(idLawan); }
     analisis.delete(idLawan);
+    statsLalu.delete(idLawan);
     onLevel?.(idLawan, false, 0);
   };
 

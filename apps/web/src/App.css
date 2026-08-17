@@ -13,6 +13,7 @@
   --accent-glow: rgba(var(--accent-rgb), 0.25);
   --accent-glow-strong: rgba(var(--accent-rgb), 0.4);
   --gold: #fbbf24;
+  --ok: #3dd68c;
   /* Vertikal sooraflix (film & series) — merah sinema.
      --flix untuk isian/garis, --flix-text untuk teks di latar gelap
      (merah pekat sebagai teks kecil kontrasnya hanya ~4,2:1). */
@@ -14439,6 +14440,52 @@ a:hover {
   font-size: 0.8rem;
 }
 .wpp-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Latensi terukur — diagnosa, jadi ditaruh di dalam setelan dan bukan
+   dipajang. Angkanya hasil ukur dari getStats, bukan tebakan. */
+.wpp-ukur {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.wpp-ukur-judul {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.wpp-ukur-baris {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 0.5rem;
+  align-items: baseline;
+}
+.wpp-ukur-nama {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wpp-ukur-nilai {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* Warna saja tidak cukup untuk menyampaikan arti, jadi angkanya tetap
+   tertulis dan rinciannya ada di baris bawah. */
+.wpp-ukur-nilai.n-bagus { color: var(--ok, #3dd68c); }
+.wpp-ukur-nilai.n-cukup { color: var(--gold); }
+.wpp-ukur-nilai.n-lambat { color: var(--flix-text); }
+.wpp-ukur-rinci {
+  grid-column: 1 / -1;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .wpp-switch {
   flex: none;
   width: 20px;
