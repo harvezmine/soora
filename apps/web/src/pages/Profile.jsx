@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getMyList } from '../utils/mylist';
 import { getProgressList, removeProgress } from '../utils/progress';
 import { ACCENTS } from '../theme';
+import ContinueRow from '../components/ContinueRow';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -71,6 +72,15 @@ export default function Profile() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Riwayat tontonan — baris geser tepat setelah profil, tiap kartu
+          membawa bar progres sampai menit terakhir. ContinueRow mengembalikan
+          null saat bagiannya kosong, jadi ketiganya boleh dipasang langsung. */}
+      <div className="profile-section profile-history">
+        <ContinueRow section="movie" title="Lanjutkan Nonton" />
+        <ContinueRow section="anime" title="Lanjutkan Anime" />
+        <ContinueRow section="manga" title="Lanjutkan Baca" />
       </div>
 
       <div className="profile-section">

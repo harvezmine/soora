@@ -179,13 +179,14 @@ a:hover {
 .sooraflix-badge {
   background: linear-gradient(135deg, var(--flix), #8e0610) !important;
 }
-.sooraflix-btn-play {
-  background: linear-gradient(135deg, var(--flix), #8e0610) !important;
-}
+/* Tombol hero kini berupa kaca; warna vertikal masuk lewat ikon, garis,
+   dan cahaya saat hover — bukan blok penuh. */
+.sooraflix-btn-play svg { color: var(--flix); }
 .sooraflix-btn-play:hover {
-  background: linear-gradient(135deg, #ff3b45, var(--flix)) !important;
+  border-color: var(--flix) !important;
+  box-shadow: 0 8px 30px var(--flix-glow), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
 }
-.sooraflix-hero .hero-dot.active {
+.sooraflix-hero .hero-dot.active::before {
   background: var(--flix) !important;
 }
 
@@ -222,14 +223,12 @@ a:hover {
 .sooramics-badge {
   background: linear-gradient(135deg, #00d4aa, #009e7e) !important;
 }
-.sooramics-btn-play {
-  background: linear-gradient(135deg, #00d4aa, #009e7e) !important;
-}
+.sooramics-btn-play svg { color: #00d4aa; }
 .sooramics-btn-play:hover {
-  background: linear-gradient(135deg, #1de8be, #00d4aa) !important;
-  box-shadow: 0 4px 24px rgba(0, 212, 170, 0.25) !important;
+  border-color: #00d4aa !important;
+  box-shadow: 0 8px 30px rgba(0, 212, 170, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
 }
-.sooramics-hero .hero-dot.active {
+.sooramics-hero .hero-dot.active::before {
   background: #00d4aa !important;
 }
 .sooramics-page .home-search-form:focus-within {
@@ -278,14 +277,12 @@ a:hover {
 .sooramicsplus-badge {
   background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
 }
-.sooramicsplus-btn-play {
-  background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
-}
+.sooramicsplus-btn-play svg { color: #f43f5e; }
 .sooramicsplus-btn-play:hover {
-  background: linear-gradient(135deg, #fb7185, #f43f5e) !important;
-  box-shadow: 0 4px 24px rgba(244, 63, 94, 0.3) !important;
+  border-color: #f43f5e !important;
+  box-shadow: 0 8px 30px rgba(244, 63, 94, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
 }
-.sooramicsplus-hero .hero-dot.active {
+.sooramicsplus-hero .hero-dot.active::before {
   background: #f43f5e !important;
 }
 .sooramicsplus-page .home-search-form:focus-within {
@@ -2638,27 +2635,54 @@ a:hover {
   font-size: 0.8rem;
   font-weight: 500;
 }
+/* JSX membuang spasi antar-elemen, jadi tanpa gap kedua tombol benar-benar
+   bersentuhan. Flex + gap, dan boleh turun baris di layar sempit. */
 .hero-actions {
-  margin-bottom: 1.2rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.6rem;
 }
 .hero-dots {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
 }
+/* Titiknya tetap kecil secara visual, tapi tombolnya diberi bantalan supaya
+   area sentuhnya layak — 8px saja mustahil ditekan dengan jempol. */
 .hero-dot {
+  width: 26px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.hero-dot::before {
+  content: '';
+  display: block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  border: none;
   background: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition);
-  padding: 0;
+  transition: width var(--transition), background var(--transition), border-radius var(--transition);
 }
-.hero-dot.active {
+.hero-dot:hover::before { background: var(--text-secondary); }
+.hero-dot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-radius: 8px;
+}
+.hero-dot.active::before {
   background: var(--accent);
   width: 24px;
   border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-dot::before { transition: none; }
 }
 
 /* ===== HOME SEARCH ===== */
@@ -5328,13 +5352,9 @@ a:hover {
     width: 12px;
     height: 12px;
   }
-  .hero-dot {
-    width: 5px;
-    height: 5px;
-  }
-  .hero-dot.active {
-    width: 14px;
-  }
+  .hero-dot { width: 22px; height: 30px; }
+  .hero-dot::before { width: 5px; height: 5px; }
+  .hero-dot.active::before { width: 14px; }
 
   /* Cards */
   .card-grid {
@@ -8706,45 +8726,93 @@ a:hover {
   font-size: 0.62rem;
   font-weight: 600;
 }
+/* Tombol hero — kaca semi-transparan bergaris tipis, sepasang dengan
+   .btn-glass di sebelahnya. Warna vertikal masuk lewat garis dan cahaya,
+   bukan blok penuh. */
 .btn-play {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.8rem;
-  border-radius: 10px;
-  border: none;
-  background: var(--accent);
-  color: white;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 46px;
+  padding: 0.75rem 1.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--btn-glass-border);
+  background: var(--btn-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
   letter-spacing: -0.01em;
 }
+/* Ikon putar tetap berwarna aksen — penanda kecil bahwa ini aksi utama,
+   tanpa perlu tombolnya jadi blok pekat. */
+.btn-play svg { flex-shrink: 0; color: var(--accent); }
 .btn-play:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 4px 24px var(--accent-glow);
+  background: var(--btn-glass-hover);
+  border-color: var(--accent);
+  box-shadow:
+    0 8px 30px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transform: translateY(-2px);
 }
+.btn-play:active {
+  transform: translateY(0);
+  background: var(--btn-glass-active);
+}
+.btn-play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-play,
+  .btn-play:hover,
+  .btn-play:active { transform: none; transition: background 0.01ms, border-color 0.01ms; }
+}
+/* Aksi kedua. Bentuknya sama persis dengan .btn-play supaya sepasang rapi;
+   pembedanya cuma bobot huruf dan garis yang tetap netral saat hover. */
 .btn-glass {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 46px;
   padding: 0.75rem 1.5rem;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.06);
-  backdrop-filter: blur(8px);
-  color: white;
+  border-radius: 12px;
+  border: 1px solid var(--btn-glass-border);
+  background: var(--btn-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
   font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    transform var(--transition);
 }
+.btn-glass svg { flex-shrink: 0; }
 .btn-glass:hover {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.25);
+  background: var(--btn-glass-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
   transform: translateY(-1px);
+}
+.btn-glass:active { transform: translateY(0); background: var(--btn-glass-active); }
+.btn-glass:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .btn-glass, .btn-glass:hover, .btn-glass:active { transform: none; }
 }
 
 /* ===== LOADING ===== */
@@ -9683,13 +9751,9 @@ a:hover {
   .hero-dots {
     gap: 4px;
   }
-  .hero-dot {
-    width: 6px;
-    height: 6px;
-  }
-  .hero-dot.active {
-    width: 18px;
-  }
+  .hero-dot { width: 24px; height: 30px; }
+  .hero-dot::before { width: 6px; height: 6px; }
+  .hero-dot.active::before { width: 18px; }
   .btn-play, .btn-glass {
     padding: 0.5rem 0.9rem;
     font-size: 0.78rem;
@@ -13729,4 +13793,39 @@ a:hover {
   .cmt-section { margin-top: 1.6rem; padding: 1.4rem 0 0.5rem; }
   .cmt-avatar { width: 32px; height: 32px; }
   .cmt-replies { padding-left: 0.6rem; }
+}
+
+/* Bar progres pada kartu "Lanjutkan" — penanda sudah nonton sampai mana.
+   Duduk di tepi bawah gambar, di atas gradien, seperti Netflix/YouTube. */
+.cont-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  z-index: 3;
+}
+.cont-progress-bar {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  background: var(--flix);
+  border-radius: 0 2px 2px 0;
+  transition: width var(--transition);
+}
+/* Tiap vertikal memakai warnanya sendiri. */
+.sooranime-page .cont-progress-bar { background: var(--accent); }
+.sooramics-page .cont-progress-bar { background: #00d4aa; }
+.sooramicsplus-page .cont-progress-bar { background: #f43f5e; }
+@media (prefers-reduced-motion: reduce) {
+  .cont-progress-bar { transition: none; }
+}
+
+/* ===== RIWAYAT DI HALAMAN PROFIL ===== */
+.profile-history {
+  margin-top: 2rem;
+}
+.profile-history .srow {
+  margin-bottom: 1.2rem;
 }

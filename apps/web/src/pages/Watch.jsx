@@ -820,7 +820,13 @@ export default function Watch() {
     if (!entry) return;
     const save = () => {
       const t = playerRef.current?.getCurrentTime?.() || 0;
-      saveProgress({ ...entry, time: Math.floor(t) });
+      // Durasi dipakai untuk bar progres di baris "Lanjutkan". Pemutar HLS
+      // tahu durasi aslinya; pemutar embed tidak, jadi runtime TMDB (menit)
+      // dipakai sebagai perkiraan.
+      const dPlayer = playerRef.current?.getDuration?.() || 0;
+      const dMeta = (movieDetails?.runtime || 0) * 60;
+      const duration = Math.floor(dPlayer || dMeta || 0);
+      saveProgress({ ...entry, time: Math.floor(t), ...(duration > 0 ? { duration } : {}) });
     };
     save(); // initial record
     const iv = setInterval(save, 15000);

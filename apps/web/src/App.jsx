@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import MiniPlayer from './components/MiniPlayer';
@@ -9,6 +9,23 @@ import { usePWAMobileOptimizations } from './hooks/usePWAMobile';
 import RequireAuth from './components/RequireAuth';
 import useHeartbeat from './hooks/useHeartbeat';
 import './App.css';
+
+// Vertikal terakhir yang dikunjungi, dipakai oleh halaman netral seperti
+// /profile. sessionStorage: cukup bertahan selama tab dibuka, dan tidak
+// membekukan pilihan lama saat pengguna kembali berhari-hari kemudian.
+const VERTICAL_KEY = 'soora_last_vertical';
+const VERTICALS_VALID = ['sooranime', 'sooraflix', 'sooramics'];
+
+function lastVertical() {
+  try {
+    const v = sessionStorage.getItem(VERTICAL_KEY);
+    return VERTICALS_VALID.includes(v) ? v : 'sooranime';
+  } catch { return 'sooranime'; }
+}
+
+function rememberVertical(v) {
+  try { sessionStorage.setItem(VERTICAL_KEY, v); } catch { /* mode privat */ }
+}
 
 /* ── Route-level code splitting: each page loads its own JS chunk on demand ── */
 const Login = lazy(() => import('./pages/Login'));
@@ -51,10 +68,24 @@ function AppLayout() {
   // Detect which "app" we're in based on path
   const isMovieSection = location.pathname.startsWith('/movies') || location.pathname.startsWith('/movie/') || location.pathname.startsWith('/series/') || location.pathname.startsWith('/watch/movie');
   const isMangaSection = location.pathname.startsWith('/manga');
-  const isAnimeMyList = location.pathname === '/anime/mylist';
   const isMovieMyList = location.pathname === '/movies/mylist';
   const isMangaMyList = location.pathname === '/manga/mylist';
-  const section = isMangaSection || isMangaMyList ? 'sooramics' : isMovieSection || isMovieMyList ? 'sooraflix' : 'sooranime';
+
+  // Halaman netral (mis. /profile) tidak menyebut vertikal apa pun di
+  // jalurnya. Tanpa penanganan khusus ia jatuh ke 'sooranime', sehingga
+  // membuka profil dari sooraflix terasa seperti terlempar ke aplikasi lain.
+  // Jadi vertikal terakhir yang dikunjungi diingat dan dipakai di sana.
+  const NEUTRAL_PATHS = ['/profile'];
+  const isNeutral = NEUTRAL_PATHS.includes(location.pathname);
+  const pathSection = isMangaSection || isMangaMyList
+    ? 'sooramics'
+    : isMovieSection || isMovieMyList
+      ? 'sooraflix'
+      : 'sooranime';
+  const section = isNeutral ? lastVertical() : pathSection;
+  useEffect(() => {
+    if (!isNeutral) rememberVertical(pathSection);
+  }, [isNeutral, pathSection]);
 
   // Hide navbar on manga reader page for immersive reading
   const isMangaReader = location.pathname === '/manga/read';

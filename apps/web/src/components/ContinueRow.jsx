@@ -3,6 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { getProgressList, removeProgress } from '../utils/progress';
 
 /**
+ * Seberapa jauh sebuah judul sudah ditonton, 0-100.
+ *
+ * null berarti tidak ada bar yang digambar: manga tidak punya durasi, dan
+ * entri lama tersimpan sebelum durasi ikut dicatat. Menebak angkanya justru
+ * menyesatkan, jadi lebih baik tidak menampilkan apa pun.
+ */
+function persenTonton(e) {
+  const durasi = Number(e?.duration) || 0;
+  const posisi = Number(e?.time) || 0;
+  if (durasi <= 0 || posisi <= 0) return null;
+  return Math.min(100, Math.max(1, Math.round((posisi / durasi) * 100)));
+}
+
+/**
  * Continue Watching / Reading row. Shows the user's in-progress titles for one
  * section ('anime' | 'movie' | 'manga'), each resuming where they left off.
  * Reads from the local progress store (synced with the backend on login).
@@ -58,7 +72,9 @@ export default function ContinueRow({ section, title = 'Lanjutkan' }) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="22" height="22"><path d="m9 18 6-6-6-6"/></svg>
         </button>
         <div className="cont-scroll" ref={scrollRef}>
-          {items.map((e) => (
+          {items.map((e) => {
+            const persen = persenTonton(e);
+            return (
             <button className="cont-card" key={`${e.section}:${e.id}`} onClick={() => resume(e)}>
               <div className="cont-art">
                 <img src={e.image} alt={e.title} loading="lazy" referrerPolicy="no-referrer" onError={(ev) => { ev.target.style.opacity = 0; }} />
@@ -76,10 +92,23 @@ export default function ContinueRow({ section, title = 'Lanjutkan' }) {
                         ? `EP ${e.ep || 1}`
                         : 'Lanjut'}
                 </span>
+                {persen !== null && (
+                  <div
+                    className="cont-progress"
+                    role="progressbar"
+                    aria-valuenow={persen}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Sudah ditonton ${persen} persen`}
+                  >
+                    <span className="cont-progress-bar" style={{ width: `${persen}%` }} />
+                  </div>
+                )}
               </div>
               <span className="cont-title">{e.title}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

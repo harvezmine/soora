@@ -91,6 +91,12 @@ const VideoPlayer = forwardRef(function VideoPlayer(
     getVideo: () => videoRef.current,
     getHls: () => hlsRef.current,
     getCurrentTime: () => videoRef.current?.currentTime || 0,
+    // NaN sebelum metadata termuat — dinormalkan ke 0 supaya pemanggil
+    // tidak perlu memeriksanya sendiri.
+    getDuration: () => {
+      const d = videoRef.current?.duration;
+      return Number.isFinite(d) ? d : 0;
+    },
     setLevel: (levelIndex) => {
       if (hlsRef.current) {
         hlsRef.current.currentLevel = levelIndex;
