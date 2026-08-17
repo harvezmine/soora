@@ -1578,6 +1578,14 @@ export default function Watch() {
           onToggleBisu={party.toggleBisu}
           selfId={party.selfId}
           notice={galatRuang || party.notice}
+          levelSaya={party.levelSaya}
+          mutu={party.mutu}
+          mikrofon={party.mikrofon}
+          perangkat={party.perangkat}
+          onGantiMikrofon={party.gantiMikrofon}
+          ptt={party.ptt}
+          onSetPtt={party.setModePtt}
+          onTahanBicara={party.tahanBicara}
         />
       )}
     </div>

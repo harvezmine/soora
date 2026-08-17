@@ -33,6 +33,10 @@ const VideoPlayer = forwardRef(function VideoPlayer(
   // true selama perubahan yang datang dari ruang nonton bareng sedang
   // diterapkan, supaya tidak disiarkan balik dan memantul tanpa henti.
   const dariRuang = useRef(false);
+  // Peredupan volume film saat ada yang bicara di ruang nonton bareng.
+  // Nilai sasaran disimpan di ref supaya perubahannya tidak memicu render —
+  // ia berubah tiap kali seseorang mulai dan berhenti bicara.
+  const duck = useRef({ aktif: false, raf: 0, dasar: 1 });
 
   const [hlsLevels, setHlsLevels] = useState([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
@@ -128,6 +132,28 @@ const VideoPlayer = forwardRef(function VideoPlayer(
       if (videoRef.current && Number.isFinite(r)) videoRef.current.playbackRate = r;
     },
     isPlaying: () => !!videoRef.current && !videoRef.current.paused,
+    /**
+     * Turunkan volume film sementara seseorang bicara, lalu kembalikan.
+     *
+     * Diturunkan bertahap sekitar 150 ms, bukan langsung: perubahan volume
+     * yang mendadak terdengar seperti kerusakan, bukan seperti mengalah.
+     */
+    setDuck: (aktif) => {
+      const video = videoRef.current;
+      if (!video || duck.current.aktif === !!aktif) return;
+      duck.current.aktif = !!aktif;
+      if (aktif) duck.current.dasar = video.volume;
+      const dari = video.volume;
+      const ke = aktif ? duck.current.dasar * 0.22 : duck.current.dasar;
+      const mulai = performance.now();
+      cancelAnimationFrame(duck.current.raf);
+      const langkah = (t) => {
+        const p = Math.min(1, (t - mulai) / 150);
+        video.volume = dari + (ke - dari) * p;
+        if (p < 1) duck.current.raf = requestAnimationFrame(langkah);
+      };
+      duck.current.raf = requestAnimationFrame(langkah);
+    },
     getCurrentTime: () => videoRef.current?.currentTime || 0,
     // NaN sebelum metadata termuat — dinormalkan ke 0 supaya pemanggil
     // tidak perlu memeriksanya sendiri.

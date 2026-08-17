@@ -14354,6 +14354,100 @@ a:hover {
 }
 .wpp-bisu.aktif { border-color: var(--gold); color: var(--gold); }
 
+/* Penanda sambungan suara buruk — dikatakan, bukan dibiarkan terlihat
+   seperti orang yang diam saja */
+.wpp-mutu {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  color: var(--gold);
+  font-size: 0.62rem;
+  font-weight: 700;
+  cursor: help;
+}
+
+/* Bilah suara jadi bertingkat: baris tombol, penunjuk level, lalu setelan */
+.wpp-suara { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+.wpp-suara-baris { display: flex; align-items: center; gap: 0.5rem; }
+
+.wpp-mic.bisu { border-color: var(--gold); color: var(--gold); background: rgba(251, 191, 36, 0.08); }
+
+.wpp-gear {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid var(--btn-glass-border);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.wpp-gear:hover, .wpp-gear.aktif { color: var(--text-primary); background: var(--btn-glass); }
+.wpp-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Penunjuk tenaga suara sendiri: cara tercepat memastikan mikrofon memang
+   menangkap sesuatu, sebelum menyalahkan jaringan */
+.wpp-level {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--btn-glass);
+  overflow: hidden;
+}
+.wpp-level-isi {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 80ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wpp-level-isi { transition: none; }
+}
+
+.wpp-setelan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.15rem 0.1rem;
+  border-top: 1px solid var(--border);
+}
+.wpp-setelan-baris {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-height: 40px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.wpp-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 60%;
+  min-height: 38px;
+  padding: 0.35rem 0.5rem;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+.wpp-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wpp-switch {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+
 
 /* Gerbang gabung — menutupi pemutar sampai tamu menyentuhnya sekali */
 .wpg {

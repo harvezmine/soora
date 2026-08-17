@@ -6,7 +6,7 @@ import {
   playbackRateFor,
   projectPosition,
 } from '@soora/core/party';
-import { createVoice } from '@soora/core/party/voice';
+import { createVoice, daftarMikrofon } from '@soora/core/party/voice';
 
 /** Sesering apa tamu memeriksa selisihnya terhadap tuan rumah. */
 const PERIKSA_TIAP_MS = 1000;
@@ -31,6 +31,14 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const [bisu, setBisu] = useState(false);
   /** id peserta yang sedang terdengar bicara */
   const [bicara, setBicara] = useState({});
+  /** tenaga suara mikrofon sendiri, 0..1 — untuk penunjuk level saat menguji */
+  const [levelSaya, setLevelSaya] = useState(0);
+  /** mutu sambungan per lawan: { rtt, lossPct } */
+  const [mutu, setMutu] = useState({});
+  const [mikrofon, setMikrofon] = useState([]);
+  const [perangkat, setPerangkat] = useState(null);
+  /** tekan-untuk-bicara: mikrofon terbuka hanya selama tombol ditahan */
+  const [ptt, setPtt] = useState(false);
   // 'connecting' diturunkan dari adanya roomId, bukan disetel di dalam efek —
   // menyetel keadaan langsung di badan efek memicu render beruntun.
   const [phase, setPhase] = useState(null); // live | reconnecting | ended
@@ -181,6 +189,16 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     }
   }, [playerRef]);
 
+  /* ── Volume film mengalah saat ada yang bicara ──
+     Ini yang paling terasa saat nonton bareng: tanpa itu, orang harus
+     memilih antara mendengar film atau mendengar temannya. Yang dihitung
+     hanya suara ORANG LAIN — suara sendiri tidak boleh meredam film yang
+     kita tonton sendiri. */
+  useEffect(() => {
+    const adaYangBicara = Object.entries(bicara).some(([id, aktif]) => aktif && id !== selfId);
+    playerRef.current?.setDuck?.(adaYangBicara);
+  }, [bicara, selfId, playerRef]);
+
   /* ── Obrolan ── */
   const kirimChat = useCallback((text) => {
     const isi = String(text || '').trim();
@@ -195,21 +213,30 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
       voice.current = createVoice({
         selfId: selfIdRef.current,
         sendRtc: (to, kind, data) => conn.current?.sendRtc(to, kind, data),
-        onLevel: (id, aktif) => setBicara((p) => (p[id] === aktif ? p : { ...p, [id]: aktif })),
+        onLevel: (id, aktif, rms) => {
+          setBicara((p) => (p[id] === aktif ? p : { ...p, [id]: aktif }));
+          if (id === selfIdRef.current) setLevelSaya(rms || 0);
+        },
+        onQuality: (id, q) => setMutu((p) => ({ ...p, [id]: q })),
         onError: (m) => setNotice(m),
       });
     }
     try {
       await voice.current.nyalakan();
       setMicOn(true);
-      setBisu(false);
+      // Tekan-untuk-bicara berarti mulai dalam keadaan diam.
+      voice.current.setBisu(ptt);
+      setBisu(ptt);
       conn.current.sendVoice(true);
+      // Label perangkat baru terbaca setelah izin diberikan, jadi daftarnya
+      // diambil di sini, bukan sebelumnya.
+      daftarMikrofon().then(setMikrofon);
     } catch {
       // Izin ditolak atau tidak ada mikrofon. Dikatakan, bukan dibiarkan
       // terlihat seperti tombol rusak.
       setNotice('Tidak bisa memakai mikrofon. Periksa izin mikrofon di peramban.');
     }
-  }, []);
+  }, [ptt]);
 
   const matikanMic = useCallback(() => {
     voice.current?.matikan();
@@ -229,11 +256,43 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     });
   }, []);
 
+  /* Tekan-untuk-bicara. Saat menyala, mikrofon tertutup sampai ditahan. */
+  const setModePtt = useCallback((nyala) => {
+    setPtt(nyala);
+    if (voice.current?.punyaMic) {
+      voice.current.setBisu(nyala);
+      setBisu(nyala);
+    }
+  }, []);
+
+  const tahanBicara = useCallback((tahan) => {
+    if (!ptt || !voice.current?.punyaMic) return;
+    voice.current.setBisu(!tahan);
+    setBisu(!tahan);
+  }, [ptt]);
+
+  const gantiMikrofon = useCallback(async (deviceId) => {
+    try {
+      await voice.current?.gantiPerangkat(deviceId);
+      setPerangkat(deviceId);
+    } catch {
+      setNotice('Tidak bisa berpindah ke mikrofon itu.');
+    }
+  }, []);
+
   return {
     role,
     room,
     peers,
     chat,
+    levelSaya,
+    mutu,
+    mikrofon,
+    perangkat,
+    gantiMikrofon,
+    ptt,
+    setModePtt,
+    tahanBicara,
     kirimChat,
     micOn,
     bisu,
