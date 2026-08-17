@@ -14193,6 +14193,7 @@ a:hover {
 /* Warnanya mengikuti arti yang sama dengan tombolnya: hijau mengirim, merah
    diam, kelabu sekadar mendengarkan. */
 .wpp-av-badge.mic { background: var(--suara); }
+.wpp-av-badge.bisu { background: var(--suara-mati); }
 .wpp-av-badge.dengar { background: var(--text-muted); }
 .wpp-av-badge.deafen { background: var(--suara-mati); }
 

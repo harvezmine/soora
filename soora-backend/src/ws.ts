@@ -40,6 +40,15 @@ interface Peer {
   /** true saat benar-benar mengirim suara. Murni informatif — tidak
    *  memengaruhi mesh maupun batas MAX_VOICE. */
   micOn: boolean;
+  /**
+   * true saat mikrofonnya terbuka tapi sedang dibisukan.
+   *
+   * Beda dari micOn=false: itu berarti perangkatnya memang tidak dibuka
+   * sama sekali (sekadar mendengarkan). Dibisukan berarti ia berniat
+   * bicara tapi suaranya sedang ditahan — dan itu keadaan yang paling
+   * sering bikin orang bicara sia-sia, jadi peserta lain perlu melihatnya.
+   */
+  muted: boolean;
   /** true saat semua suara masuk dibisukan sendiri. Murni informatif. */
   deafened: boolean;
   /**
@@ -95,7 +104,7 @@ const broadcast = (room: LiveRoom, type: string, data: Record<string, unknown> =
 const peerList = (room: LiveRoom) => {
   const orang: Array<{
     id: string; name: string; avatar: string; host: boolean;
-    voice: boolean; micOn: boolean; deafened: boolean; speaking: boolean;
+    voice: boolean; micOn: boolean; muted: boolean; deafened: boolean; speaking: boolean;
   }> = [];
   const terlihat = new Set<string>();
   for (const p of room.peers) {
@@ -108,8 +117,9 @@ const peerList = (room: LiveRoom) => {
       host: p.userId === room.hostId,
       voice: p.voice,
       micOn: p.voice && p.micOn,
+      muted: p.voice && p.micOn && p.muted,
       deafened: p.voice && p.deafened,
-      speaking: p.voice && p.micOn && p.speaking,
+      speaking: p.voice && p.micOn && !p.muted && p.speaking,
     });
   }
   // Tuan rumah selalu di depan; sisanya urut masuk.
@@ -221,6 +231,7 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
             avatar: data.avatar || '',
             voice: false,
             micOn: false,
+            muted: false,
             deafened: false,
             speaking: false,
             alive: true,
@@ -308,7 +319,7 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
         peer.voice = mau;
         // Keluar kanal berarti mikrofon dan bisu-semua ikut tidak relevan —
         // dibersihkan supaya tidak ada status hantu saat ia bergabung lagi.
-        if (!mau) { peer.micOn = false; peer.deafened = false; peer.speaking = false; }
+        if (!mau) { peer.micOn = false; peer.muted = false; peer.deafened = false; peer.speaking = false; }
         broadcast(room, 'peers', peerList(room));
         return;
       }
@@ -320,10 +331,22 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
       if (msg.type === 'mic') {
         if (!peer.voice) return; // mikrofon tak berarti di luar kanal suara
         peer.micOn = !!msg.on;
-        // Mikrofon mati tidak mungkin masih terdengar. Tanpa ini, penanda
-        // bicara bisa tertinggal menyala kalau mikrofon ditutup tepat saat
-        // sedang bersuara.
-        if (!peer.micOn) peer.speaking = false;
+        // Mikrofon mati tidak mungkin masih terdengar atau dibisukan. Tanpa
+        // ini, penandanya bisa tertinggal menyala kalau mikrofon ditutup
+        // tepat saat sedang bersuara.
+        if (!peer.micOn) { peer.speaking = false; peer.muted = false; }
+        broadcast(room, 'peers', peerList(room));
+        return;
+      }
+
+      // ── Mikrofon dibisukan sementara ──
+      // Terpisah dari "mic" karena artinya berbeda bagi yang melihat:
+      // perangkatnya terbuka, niatnya bicara, tapi suaranya sedang ditahan.
+      if (msg.type === 'mute') {
+        if (!peer.voice || !peer.micOn) return;
+        peer.muted = !!msg.on;
+        // Dibisukan berarti tidak mungkin sedang terdengar.
+        if (peer.muted) peer.speaking = false;
         broadcast(room, 'peers', peerList(room));
         return;
       }
@@ -333,7 +356,7 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
       // beberapa kali per detik saat orang bicara, dan mengirim ulang seluruh
       // daftar peserta setiap kali membuat tiap klien merender ulang semuanya.
       if (msg.type === 'speaking') {
-        if (!peer.voice || !peer.micOn) return;
+        if (!peer.voice || !peer.micOn || peer.muted) return;
         const mau = !!msg.on;
         if (peer.speaking === mau) return; // tidak ada yang berubah
         peer.speaking = mau;

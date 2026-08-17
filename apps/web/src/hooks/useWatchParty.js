@@ -386,6 +386,19 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     });
   }, [micOn]);
 
+  /* Kabarkan status bisu ke peserta lain.
+     Lewat efek, bukan dari tiap tombol: bisu bisa berubah dari banyak arah —
+     tombol, tekan-untuk-bicara, atau dipaksa oleh deafen — dan menaruh
+     pengirimannya di tiap tempat itu berarti satu jalur cepat terlupakan lalu
+     ikon di layar orang lain berbohong. */
+  const bisuTerkirim = useRef(null);
+  useEffect(() => {
+    if (!voiceJoined || !micOn) { bisuTerkirim.current = null; return; }
+    if (bisuTerkirim.current === bisu) return;
+    bisuTerkirim.current = bisu;
+    conn.current?.sendMute(bisu);
+  }, [bisu, micOn, voiceJoined]);
+
   /* ── Bisukan semua suara masuk ── */
   const toggleDeafen = useCallback(() => {
     if (!voiceJoined) return;

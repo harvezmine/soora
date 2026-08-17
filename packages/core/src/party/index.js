@@ -211,6 +211,8 @@ export function connectRoom(roomId, on = {}) {
     sendChat: (text) => kirim('chat', { text }),
     sendVoice: (on_) => kirim('voice', { on: on_ }),
     sendMic: (on_) => kirim('mic', { on: on_ }),
+    /** Mikrofon terbuka tapi ditahan — beda arti dari mikrofon yang mati. */
+    sendMute: (on_) => kirim('mute', { on: on_ }),
     sendDeafen: (on_) => kirim('deafen', { on: on_ }),
     /** Penanda bicara untuk peserta lain. Dikirim hanya saat berubah. */
     sendSpeaking: (on_) => kirim('speaking', { on: on_ }),

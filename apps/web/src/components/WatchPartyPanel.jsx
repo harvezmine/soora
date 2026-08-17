@@ -10,8 +10,12 @@ const jam = (ts) =>
   new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
 /**
- * Lencana status suara di avatar. Prioritasnya bentuk, bukan cuma warna:
- * dibisukan-semua > mikrofon menyala > sekadar bergabung mendengarkan.
+ * Lencana status suara di avatar.
+ *
+ * Urutannya dari yang paling membatasi: membisukan semua suara mengalahkan
+ * mikrofon yang dibisukan, dan itu mengalahkan mikrofon yang menyala.
+ * Bentuk ikonnya berbeda di tiap keadaan, bukan cuma warnanya, supaya tetap
+ * terbaca oleh yang sulit membedakan warna.
  */
 function LencanaSuara({ orang }) {
   if (!orang.voice) return null;
@@ -19,6 +23,13 @@ function LencanaSuara({ orang }) {
     return (
       <span className="wpp-av-badge deafen" aria-label="Membisukan semua suara">
         <IconHeadsetOff size={10} />
+      </span>
+    );
+  }
+  if (orang.micOn && orang.muted) {
+    return (
+      <span className="wpp-av-badge bisu" aria-label="Mikrofon dibisukan">
+        <IconMicOff size={10} />
       </span>
     );
   }
