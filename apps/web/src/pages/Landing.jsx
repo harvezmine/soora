@@ -1,57 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import SplashIntro from '../components/SplashIntro';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ACCENTS, alpha } from '../theme';
-
-/* ── PWA install prompt cache ── */
-let _deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  _deferredPrompt = e;
-});
-
-function isStandalone() {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true ||
-    document.referrer.includes('android-app://')
-  );
-}
 
 export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClick = null }) {
   const navigate = useNavigate();
   const canvasRef = useRef(null);
-  const [installed, setInstalled] = useState(isStandalone);
-  const [showGuide, setShowGuide] = useState(false);
-  const promptRef = useRef(_deferredPrompt);
-
-  /* listen for install prompt */
-  useEffect(() => {
-    const handler = (e) => { e.preventDefault(); promptRef.current = e; _deferredPrompt = e; };
-    const onInstalled = () => setInstalled(true);
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    const prompt = promptRef.current || _deferredPrompt;
-    if (prompt) {
-      prompt.prompt();
-      const result = await prompt.userChoice;
-      if (result.outcome === 'accepted') setInstalled(true);
-      promptRef.current = null;
-      _deferredPrompt = null;
-    } else {
-      setShowGuide((v) => !v);
-    }
-  };
-
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isAndroid = /android/i.test(navigator.userAgent);
 
   // Animated particle background
   useEffect(() => {
@@ -299,64 +253,6 @@ export default function Landing({ showSooramicsPlus = false, onSooramicsPlusClic
           <p>&copy; 2026 soora. Open-source entertainment platform.</p>
         </footer>
       </div>
-
-      {/* ── Mobile-only floating install bar ── */}
-      {!installed && (
-        <div className="landing-mobile-install">
-          <div className="landing-mobile-install-inner">
-            <div className="landing-mobile-install-info">
-              <div className="landing-mobile-install-icon">
-                <img src="/icons/icon-192x192.png" alt="" width="32" height="32" />
-              </div>
-              <div>
-                <div className="landing-mobile-install-title">Soora App</div>
-                <div className="landing-mobile-install-sub">
-                  {isAndroid
-                    ? 'APK native · Gratis, tanpa Play Store'
-                    : 'Install gratis · Tanpa Play Store'}
-                </div>
-              </div>
-            </div>
-            {/* Di Android, arahkan ke APK native — bukan PWA. APK punya pemutar
-                native, audio jalan di latar belakang, dan katalog offline;
-                PWA tidak satu pun. Di iOS dan desktop tidak ada APK, jadi
-                pemasangan PWA tetap jalur yang benar. */}
-            {isAndroid ? (
-              <Link className="landing-mobile-install-btn" to="/download">
-                Unduh APK
-              </Link>
-            ) : (
-              <button className="landing-mobile-install-btn" onClick={handleInstall}>
-                Install
-              </button>
-            )}
-          </div>
-
-          {showGuide && !isAndroid && (
-            <div className="landing-mobile-install-guide">
-              {isIOS ? (
-                <p>
-                  Ketuk{' '}
-                  <span className="landing-install-key">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                    Share
-                  </span>{' '}
-                  → <strong>Add to Home Screen</strong>
-                </p>
-              ) : isAndroid ? (
-                <p>
-                  Ketuk <span className="landing-install-key">⋮</span> →{' '}
-                  <strong>Install App</strong> / <strong>Add to Home Screen</strong>
-                </p>
-              ) : (
-                <p>
-                  Menu browser → <strong>Install App</strong>
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
