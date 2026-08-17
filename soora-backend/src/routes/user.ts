@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import express, { Router, Request, Response } from 'express';
 import { requireAuth } from './auth';
 import * as store from '../services/store';
 import * as avatars from '../services/avatars';
@@ -83,7 +83,8 @@ router.post('/avatar', async (req, res) => {
     // Hanya avatar bawaan yang diterima. Tanpa pemeriksaan ini kolom avatar
     // jadi tempat menitipkan URL apa pun, dan URL itu ikut tampil di kolom
     // komentar orang lain.
-    if (!avatars.avatarSah(url)) {
+    // Hanya avatar bawaan, atau unggahan milik orang ini sendiri.
+    if (!avatars.avatarSah(url) && !avatars.unggahanMilik(url, uid(req))) {
       return res.status(400).json({ error: 'Avatar tidak dikenal' });
     }
     const user = await store.getUserById(uid(req));
@@ -96,5 +97,36 @@ router.post('/avatar', async (req, res) => {
     res.status(500).json({ error: 'Gagal mengganti avatar' });
   }
 });
+
+// POST /user/avatar/upload — unggah gambar sendiri
+//
+// Badannya berupa biner mentah, bukan multipart: satu berkas kecil tidak
+// membutuhkan pengurai multipart beserta dependensinya.
+router.post(
+  '/avatar/upload',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: avatars.MAKS_UNGGAH }),
+  async (req: Request, res: Response) => {
+    try {
+      const buf = req.body as Buffer;
+      if (!Buffer.isBuffer(buf) || buf.length === 0) {
+        return res.status(400).json({ error: 'Tidak ada gambar yang dikirim' });
+      }
+      // Jenisnya ditentukan dari byte awal berkas, bukan dari header yang
+      // dikirim klien — header itu ditulis pengirim dan bisa berisi apa saja.
+      if (!avatars.kenaliGambar(buf)) {
+        return res.status(400).json({ error: 'Hanya PNG, JPG, atau WebP yang bisa dipakai' });
+      }
+      const user = await store.getUserById(uid(req));
+      if (!user) return res.status(401).json({ error: 'Sesi tidak valid' });
+
+      user.avatar = await avatars.simpanUnggahan(uid(req), buf);
+      await store.saveUser(user);
+      res.json({ user: store.publicUser(user) });
+    } catch (e: any) {
+      reportRouteError(req, e, 'user/avatar-upload');
+      res.status(500).json({ error: 'Gagal mengunggah gambar' });
+    }
+  }
+);
 
 export default router;

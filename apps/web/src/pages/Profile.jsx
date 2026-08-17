@@ -1,10 +1,10 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getMyList } from '../utils/mylist';
 import { getProgressList, removeProgress } from '../utils/progress';
 import ContinueRow from '../components/ContinueRow';
-import { apiGetAvatars, apiSetAvatar } from '@soora/core/user';
+import AvatarPicker from '../components/AvatarPicker';
 
 /* Tujuan My List. Ikonnya membedakan barisnya tanpa perlu warna. */
 const PUSTAKA = [
@@ -34,25 +34,6 @@ export default function Profile() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [pilihAvatar, setPilihAvatar] = useState(false);
-  const [avatarTersedia, setAvatarTersedia] = useState([]);
-  const [gantiAvatar, setGantiAvatar] = useState(null); // url yang sedang dikirim
-
-  // Daftar avatar diambil saat pemilihnya dibuka, bukan saat halaman dimuat —
-  // sebagian besar kunjungan ke profil tidak menyentuhnya sama sekali.
-  useEffect(() => {
-    if (!pilihAvatar || avatarTersedia.length) return;
-    apiGetAvatars().then(setAvatarTersedia).catch(() => setAvatarTersedia([]));
-  }, [pilihAvatar, avatarTersedia.length]);
-
-  const pakaiAvatar = useCallback(async (url) => {
-    setGantiAvatar(url);
-    try {
-      const baru = await apiSetAvatar(url);
-      if (baru) { updateUser(baru); setPilihAvatar(false); }
-    } finally {
-      setGantiAvatar(null);
-    }
-  }, [updateUser]);
 
   const counts = useMemo(() => {
     const list = getMyList();
@@ -118,28 +99,11 @@ export default function Profile() {
       </header>
 
       {pilihAvatar && (
-        <div className="prof-avatars">
-          {avatarTersedia.length === 0 ? (
-            <p className="prof-avatars-kosong">Belum ada foto profil bawaan.</p>
-          ) : (
-            <>
-              <h2 className="prof-block-title">Pilih foto profil</h2>
-              <div className="prof-avatars-grid">
-                {avatarTersedia.map((url) => (
-                  <button
-                    key={url}
-                    className={`prof-avatar-opsi ${user.avatar === url ? 'terpilih' : ''}`}
-                    onClick={() => pakaiAvatar(url)}
-                    disabled={!!gantiAvatar}
-                    aria-pressed={user.avatar === url}
-                  >
-                    <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        <AvatarPicker
+          avatarSaatIni={user.avatar}
+          onGanti={(baru) => { updateUser(baru); setPilihAvatar(false); }}
+          onTutup={() => setPilihAvatar(false)}
+        />
       )}
 
       {/* Isi utama halaman ini: apa yang sedang ditonton. Tiap ContinueRow

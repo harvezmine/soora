@@ -39,5 +39,25 @@ export const apiGetAvatars = () => call('/user/avatars').then((d) => d?.items ||
 export const apiSetAvatar = (url) =>
   call('/user/avatar', { method: 'POST', body: { url } }).then((d) => d?.user || null);
 
+/**
+ * Unggah gambar sendiri.
+ *
+ * Dikirim sebagai biner mentah, bukan multipart: satu berkas kecil tidak
+ * membutuhkan pengurai multipart di server. Tidak lewat `call` karena
+ * badannya bukan JSON dan galatnya perlu sampai ke pengguna.
+ */
+export async function apiUploadAvatar(file) {
+  const token = getToken();
+  if (!token) throw new Error('Masuk dulu untuk mengganti foto profil');
+  const res = await fetch(`${getRuntime().apiBase}/user/avatar/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type, Authorization: `Bearer ${token}` },
+    body: file,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Gagal mengunggah gambar');
+  return data?.user || null;
+}
+
 // ── History ──
 export const apiAddHistory = (entry) => call('/user/history', { method: 'POST', body: entry });
