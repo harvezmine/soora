@@ -21,7 +21,7 @@ const isGokuId = (id) => id && (id.includes('watch-') || id.includes('/'));
 function MovieInfoSkeleton() {
   return (
     <div className="info-page">
-      <div className="info-backdrop">
+      <div className="info-backdrop loaded">
         <div className="skel-shimmer" style={{ width: '100%', height: '100%' }} />
       </div>
       <div className="info-content" style={{ position: 'relative', zIndex: 10 }}>
@@ -72,6 +72,10 @@ function MovieInfoSkeleton() {
 // Enlarge Goku thumbnail (250x400 → 600x900)
 const gokuLargeImg = (url) => url ? url.replace(/\/resize\/\d+x\d+\//, '/resize/600x900/') : url;
 
+// Inline placeholder — always resolves, so onLoad fires and the poster is
+// never stuck at opacity 0 when every image source is empty.
+const POSTER_PLACEHOLDER = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320"><rect fill="%231a1a2e" width="220" height="320"/><text x="110" y="160" text-anchor="middle" fill="%23666" font-family="system-ui" font-size="13">No Image</text></svg>')}`;
+
 export default function MovieInfo({ mediaType: routeMediaType }) {
   const params = useParams();
   const location = useLocation();
@@ -86,6 +90,8 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [source, setSource] = useState(null); // 'goku', 'tmdb', or 'lk21'
+  const [posterLoaded, setPosterLoaded] = useState(false);
+  const [backdropLoaded, setBackdropLoaded] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -93,6 +99,8 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
       setLoading(true);
       setError(null);
       setTmdbData(null);
+      setPosterLoaded(false);
+      setBackdropLoaded(false);
       try {
         if (provider === 'lk21') {
           setSource('lk21');
@@ -204,6 +212,8 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
     : isGoku
       ? (tmdbData?.backdrop_path ? tmdbBackdrop(tmdbData.backdrop_path) : gokuLargeImg(info.cover || info.image))
       : tmdbBackdrop(info.backdrop_path)) || navCover || navImg;
+  // Backdrop falls back to the poster; empty means "gradient only".
+  const backdropSrc = backdrop || poster || '';
   const year = isAlt
     ? (info.releaseDate || '')
     : (info.release_date || info.first_air_date || '').split('-')[0];
@@ -297,8 +307,23 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   return (
     <div className="info-page">
       {/* Cinematic backdrop */}
-      <div className="info-backdrop">
-        <img src={backdrop || poster} alt="" referrerPolicy="no-referrer" />
+      <div className={`info-backdrop ${backdropLoaded || !backdropSrc ? 'loaded' : ''}`}>
+        {backdropSrc && (
+          <img
+            src={backdropSrc}
+            alt=""
+            loading="eager"
+            referrerPolicy="no-referrer"
+            onLoad={() => setBackdropLoaded(true)}
+            onError={(e) => {
+              // Never leave the backdrop stuck at opacity 0 — fall back to the
+              // listing image, then reveal regardless.
+              const fb = navCover || navImg;
+              if (fb && e.target.src !== fb) e.target.src = fb;
+              else setBackdropLoaded(true);
+            }}
+          />
+        )}
       </div>
 
       <button className="back-btn" onClick={() => navigate(-1)}>
@@ -310,13 +335,21 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
 
       <div className="info-content">
         <div className="info-header">
-          <div className="info-poster">
+          <div className={`info-poster ${posterLoaded ? 'loaded' : ''}`}>
             <img
-              src={poster}
+              src={poster || navImg || navCover || POSTER_PLACEHOLDER}
               alt={title}
+              loading="eager"
               referrerPolicy="no-referrer"
+              onLoad={() => setPosterLoaded(true)}
               onError={(e) => {
-                e.target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="320" viewBox="0 0 220 320"><rect fill="%231a1a2e" width="220" height="320"/><text x="110" y="160" text-anchor="middle" fill="%23666" font-family="system-ui" font-size="13">No Image</text></svg>')}`;
+                const fb = navImg || navCover;
+                if (fb && e.target.src !== fb) {
+                  e.target.src = fb;
+                  return;
+                }
+                setPosterLoaded(true);
+                e.target.src = POSTER_PLACEHOLDER;
               }}
             />
           </div>
