@@ -36,6 +36,14 @@ export function projectPosition(state, serverNow) {
   return Math.max(0, state.position + lewat);
 }
 
+/**
+ * Asal situs web. Modul ini dipakai bersama apps/mobile, dan React Native
+ * tidak punya `window.location` — jadi globalnya diperiksa, tidak diandaikan.
+ */
+const ORIGIN_BAWAAN = 'https://soora.fun';
+const asalWeb = () =>
+  (typeof window !== 'undefined' && window.location?.origin) || ORIGIN_BAWAAN;
+
 /** Alamat WebSocket dari apiBase. */
 export function wsUrl() {
   const base = getRuntime().apiBase;
@@ -44,23 +52,34 @@ export function wsUrl() {
   }
   // apiBase relatif ("/api") berarti web lewat penulisan ulang Vercel, yang
   // tidak meneruskan WebSocket — jadi soket menuju backend secara langsung.
-  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = window.location.hostname === 'localhost'
-    ? `${window.location.hostname}:4000`
-    : 'api.soora.fun';
+  const loc = typeof window !== 'undefined' ? window.location : null;
+  if (!loc) return 'wss://api.soora.fun/ws';
+  const proto = loc.protocol === 'https:' ? 'wss' : 'ws';
+  const host = loc.hostname === 'localhost' ? `${loc.hostname}:4000` : 'api.soora.fun';
   return `${proto}://${host}/ws`;
 }
 
 async function call(path, { method = 'GET', body } = {}) {
   const token = getToken();
   if (!token) throw new Error('Masuk dulu untuk nonton bareng');
-  const res = await fetch(`${getRuntime().apiBase}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${getRuntime().apiBase}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // Tanpa status: jaringan, bukan penolakan server. Pemanggil akan
+    // mencoba lagi.
+    throw new Error('Jaringan bermasalah. Mencoba lagi…');
+  }
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || 'Gagal memproses ruang');
+  if (!res.ok) {
+    const err = new Error(data?.error || 'Gagal memproses ruang');
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
@@ -73,8 +92,8 @@ const getTicket = (id) =>
   call(`/rooms/${encodeURIComponent(id)}/ticket`, { method: 'POST' }).then((d) => d.ticket);
 
 /** Tautan undangan. Tamu mendarat di halaman tonton yang sama. */
-export const inviteLink = (room) =>
-  `${window.location.origin}${room.watchPath}${room.watchPath.includes('?') ? '&' : '?'}room=${encodeURIComponent(room.id)}`;
+export const inviteLink = (room, origin = asalWeb()) =>
+  `${origin}${room.watchPath}${room.watchPath.includes('?') ? '&' : '?'}room=${encodeURIComponent(room.id)}`;
 
 const SAMPEL_AWAL = 5;
 const PING_TIAP_MS = 30_000;
@@ -115,9 +134,16 @@ export function connectRoom(roomId, on = {}) {
     try {
       ticket = await getTicket(roomId);
     } catch (err) {
+      // Ruang hilang atau sesi berakhir memang tidak bisa ditolong dengan
+      // mencoba lagi. Tapi jaringan yang sedang putus bisa — dan menutup
+      // ruang karena satu permintaan gagal berarti kehilangan ruang tiap
+      // kali sinyal berkedip.
+      const permanen = err.status === 404 || err.status === 401 || err.status === 403;
       on.error?.(err.message);
-      // Ruang hilang atau sesi berakhir — mencoba lagi tidak akan menolong.
-      on.ended?.(err.message);
+      if (permanen) { on.ended?.(err.message); return; }
+      on.reconnecting?.(jedaSambungUlang);
+      setTimeout(sambung, jedaSambungUlang);
+      jedaSambungUlang = Math.min(jedaSambungUlang * 2, SAMBUNG_ULANG_MAKS_MS);
       return;
     }
     if (ditutup) return;

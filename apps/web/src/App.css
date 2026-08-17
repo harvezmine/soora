@@ -7580,6 +7580,8 @@ a:hover {
   max-width: 1200px;
   margin: 0 auto;
   background: #000;
+  /* Wadah bagi lapisan gerbang nonton bareng */
+  position: relative;
 }
 .vidking-player-container {
   position: relative;
@@ -13961,12 +13963,23 @@ a:hover {
 .nf-readonly .nf-progress-wrap { pointer-events: none; cursor: default; }
 .nf-readonly .nf-progress-thumb { display: none; }
 
+/* Hanya untuk pembaca layar — deretan inisial di bawah bersifat hiasan */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Bilah nonton bareng di bawah pemutar */
 .wp-bar {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0.9rem auto 0;
   padding: 0.85rem 1.1rem;
   border: 1px solid var(--border);
@@ -14007,8 +14020,118 @@ a:hover {
 .wp-dot-reconnecting { background: var(--gold); }
 .wp-dot-ended { background: var(--text-muted); }
 
-@media (max-width: 640px) {
-  .wp-bar { flex-wrap: wrap; margin-left: 1rem; margin-right: 1rem; }
-  .wp-actions { width: 100%; }
+/* Deretan peserta */
+.wp-peers { display: flex; align-items: center; flex: none; }
+.wp-peer {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.wp-peer:first-child { margin-left: 0; }
+.wp-peer-more { background: var(--btn-glass); color: var(--text-secondary); font-size: 0.62rem; }
+
+.wp-bar-ended { border-color: var(--border); opacity: 0.8; }
+
+@media (max-width: 720px) {
+  .wp-bar {
+    flex-wrap: wrap;
+    row-gap: 0.7rem;
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+  /* Keterangan mengambil sisa baris pertama; tombol turun ke baris sendiri
+     supaya tidak terhimpit di layar sempit. */
+  .wp-info { flex: 1 1 60%; }
+  .wp-peers { order: 2; }
+  .wp-actions { order: 3; width: 100%; }
   .wp-btn { flex: 1; }
+}
+@media (max-width: 400px) {
+  .wp-bar { padding: 0.75rem 0.9rem; gap: 0.7rem; }
+  .wp-title { font-size: 0.85rem; }
+  .wp-sub { font-size: 0.75rem; }
+}
+
+/* Gerbang gabung — menutupi pemutar sampai tamu menyentuhnya sekali */
+.wpg {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(6, 6, 14, 0.82);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+}
+.wpg-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 30rem;
+  text-align: center;
+}
+.wpg-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.wpg-title {
+  margin: 0;
+  font-size: clamp(1.1rem, 3.5vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+.wpg-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.wpg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 48px;
+  margin-top: 0.7rem;
+  padding: 0.8rem 1.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+}
+.wpg-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.wpg-btn:active { transform: translateY(0); }
+.wpg-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.wpg-note {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-wrap: balance;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wpg-btn, .wpg-btn:hover, .wpg-btn:active { transform: none; transition: background 0.01ms; }
+}
+@media (max-width: 480px) {
+  .wpg { padding: 1rem; }
+  .wpg-btn { width: 100%; }
 }

@@ -37,6 +37,7 @@ import { saveProgress } from '../utils/progress';
 import CommentSection from '../components/CommentSection';
 import { commentKey } from '@soora/core/comments';
 import WatchPartyBar from '../components/WatchPartyBar';
+import WatchPartyGate from '../components/WatchPartyGate';
 import useWatchParty, { createRoom } from '../hooks/useWatchParty';
 
 export default function Watch() {
@@ -1163,6 +1164,14 @@ export default function Watch() {
               </div>
             </div>
           </div>
+        )}
+        {party.perluGabung && (
+          <WatchPartyGate
+            hostName={party.room?.hostName}
+            title={party.room?.title}
+            peers={party.peers?.count || 1}
+            onGabung={party.gabung}
+          />
         )}
       </div>
 

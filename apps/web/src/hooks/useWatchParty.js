@@ -31,6 +31,11 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
   const [notice, setNotice] = useState(null);
   const status = phase ?? (enabled && roomId ? 'connecting' : 'idle');
 
+  // Peramban melarang video mulai sendiri dengan suara. Tamu harus menekan
+  // Gabung sekali — ketukan itulah yang memberi izin pemutaran. Tanpa gerbang
+  // ini video tamu diam tanpa penjelasan apa pun.
+  const [sudahGabung, setSudahGabung] = useState(false);
+
   const conn = useRef(null);
   const state = useRef(null);       // keadaan terakhir dari tuan rumah
   const nudgeTimer = useRef(null);
@@ -64,7 +69,7 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
 
   /* ── Tamu mengikuti tuan rumah ── */
   useEffect(() => {
-    if (role !== 'guest' || status !== 'live') return;
+    if (role !== 'guest' || status !== 'live' || !sudahGabung) return;
 
     const iv = setInterval(() => {
       const p = playerRef.current;
@@ -97,7 +102,7 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     }, PERIKSA_TIAP_MS);
 
     return () => { clearInterval(iv); clearTimeout(nudgeTimer.current); };
-  }, [role, status, playerRef]);
+  }, [role, status, sudahGabung, playerRef]);
 
   /* ── Tuan rumah menyiarkan ── */
   const siarkan = useCallback((playing, position) => {
@@ -105,16 +110,41 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     conn.current?.sendState(!!playing, Number(position) || 0);
   }, [role]);
 
-  // Denyut berkala, supaya yang baru bergabung tidak perlu menunggu tuan
-  // rumah menyentuh apa pun.
+  // Denyut berkala untuk mengoreksi hanyutan yang tidak memicu peristiwa
+  // (memuat penyangga, sistem melambat). Saat dijeda tidak ada yang hanyut,
+  // jadi denyutnya dilewati — server sudah menyimpan keadaan terakhir dan
+  // mengirimkannya ke siapa pun yang baru bergabung.
+  const terakhirDisiarkan = useRef(null);
   useEffect(() => {
     if (role !== 'host' || status !== 'live') return;
     const iv = setInterval(() => {
       const p = playerRef.current;
-      if (p) siarkan(p.isPlaying?.(), p.getCurrentTime?.() ?? 0);
+      if (!p) return;
+      const jalan = p.isPlaying?.();
+      const posisi = p.getCurrentTime?.() ?? 0;
+      const sama = terakhirDisiarkan.current
+        && terakhirDisiarkan.current.jalan === jalan
+        && Math.abs(terakhirDisiarkan.current.posisi - posisi) < 0.5;
+      if (!jalan && sama) return;
+      terakhirDisiarkan.current = { jalan, posisi };
+      siarkan(jalan, posisi);
     }, 5000);
     return () => clearInterval(iv);
   }, [role, status, siarkan, playerRef]);
+
+  const gabung = useCallback(() => {
+    setSudahGabung(true);
+    // Panggilan langsung di dalam penangan klik — inilah gerak pengguna yang
+    // membuka izin pemutaran. Menunggu putaran berikutnya sudah terlambat:
+    // izin itu hanya berlaku selama penanganan peristiwa.
+    const p = playerRef.current;
+    const s = state.current;
+    const c = conn.current;
+    if (p && s && c) {
+      p.remoteSeek?.(projectPosition(s, c.serverNow()));
+      if (s.playing) p.remotePlay?.();
+    }
+  }, [playerRef]);
 
   return {
     role,
@@ -122,6 +152,10 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     peers,
     status,
     notice,
+    sudahGabung,
+    gabung,
+    /** Gerbang hanya untuk tamu yang belum menekan Gabung. */
+    perluGabung: role === 'guest' && !sudahGabung && status === 'live',
     isGuest: role === 'guest',
     isHost: role === 'host',
     /* Diteruskan ke VideoPlayer sebagai onUserPlay / onUserPause / onUserSeek */
