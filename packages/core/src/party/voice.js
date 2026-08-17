@@ -173,6 +173,17 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
 
     pc.ontrack = (e) => {
       kecilkanPenyangga(e.receiver);
+      /**
+       * Trek yang dipasang lewat replaceTrack TIDAK membawa MediaStream apa
+       * pun: yang menuliskan msid ke SDP hanyalah addTrack(track, stream).
+       * Padahal replaceTrack justru jalur yang dipakai pada urutan paling
+       * biasa — bergabung dulu untuk mendengarkan, mikrofon menyusul.
+       *
+       * Akibatnya e.streams kosong, `srcObject` diisi undefined, dan hasilnya
+       * sunyi total meski sambungannya sehat dan penanda bicara menyala.
+       * Jadi stream-nya dirakit sendiri dari treknya, bukan diandaikan ada.
+       */
+      const arus = e.streams?.[0] || new MediaStream([e.track]);
       let el = suara.get(idLawan);
       if (!el) {
         el = new Audio();
@@ -183,9 +194,16 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
         terapkanVolume(idLawan, el);
         suara.set(idLawan, el);
       }
-      el.srcObject = e.streams[0];
-      el.play().catch(() => { /* butuh gerak pengguna; tombol Gabung Suara sudah itu */ });
-      pasangMeter(idLawan, e.streams[0]);
+      el.srcObject = arus;
+      el.play().catch((err) => {
+        // Peramban menolak memutar tanpa gerak pengguna. Tombol "Gabung
+        // Suara" seharusnya sudah cukup, tapi bila tetap ditolak, sunyinya
+        // harus dijelaskan — bukan dibiarkan tampak seperti teman yang diam.
+        if (err?.name === 'NotAllowedError') {
+          onError?.('Peramban memblokir pemutaran suara. Ketuk halaman ini sekali lalu coba lagi.');
+        }
+      });
+      pasangMeter(idLawan, arus);
     };
 
     // Renegosiasi otomatis: transceiver baru saat bergabung (recvonly), atau
@@ -218,15 +236,30 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
       }
     };
 
-    // Arah transceiver mencerminkan niat sendiri saat sambungan dibuat:
-    // sendrecv bila mikrofon sudah menyala, recvonly bila baru mendengarkan.
-    // Peramban lawan menghitung arah gabungannya sendiri — satu sisi boleh
-    // sendrecv sementara sisi lain recvonly, dan suara tetap mengalir satu
-    // arah dengan benar; ini alur normal WebRTC, sama seperti panggilan
-    // video saat salah satu pihak mematikan kameranya.
+    /**
+     * Siapa yang menyiapkan jalur audio pertama.
+     *
+     * Punya mikrofon berarti harus addTrack — tanpa itu tidak ada yang
+     * dikirim. Tanpa mikrofon, jalurnya dibuka HANYA oleh sisi yang tidak
+     * sopan; sisi sopan sengaja tidak membuat apa-apa dan menunggu tawaran
+     * datang.
+     *
+     * Alasannya ditemukan lewat uji dua peramban sungguhan: kalau kedua sisi
+     * sama-sama memanggil addTransceiver lalu sama-sama menawar, sisi sopan
+     * membatalkan tawarannya dan menerima tawaran lawan — tapi Chrome TIDAK
+     * memakai ulang transceiver yang sudah telanjur ia buat sendiri. Ia
+     * membuat yang kedua. Hasilnya SDP dengan dua m=audio; yang kedua tidak
+     * pernah selesai dirundingkan, dan justru ke situlah trek mikrofon
+     * dipasang belakangan. Sambungan tampak "connected", penanda bicara
+     * menyala, paket audio nol.
+     *
+     * Dengan hanya satu sisi yang membuka, tawaran pertama tidak pernah
+     * bertabrakan sama sekali, dan sisi sopan mendapat transceiver-nya dari
+     * tawaran itu — satu m=audio, dipakai bersama selamanya.
+     */
     if (lokal) {
       setelPengirim(pc.addTrack(lokal.getAudioTracks()[0], lokal));
-    } else {
+    } else if (!akuYangSopan(selfId, idLawan)) {
       pc.addTransceiver('audio', { direction: 'recvonly' });
     }
     koneksi.set(idLawan, pc);
@@ -239,6 +272,11 @@ export function createVoice({ selfId, sendRtc, onLevel, onError, onQuality }) {
     if (!trans) { setelPengirim(pc.addTrack(track, lokal)); return; }
     if (trans.direction !== 'sendrecv') trans.direction = 'sendrecv';
     await trans.sender.replaceTrack(track);
+    // Lekatkan stream-nya supaya msid ikut tertulis di SDP. Penerima sudah
+    // punya jalan mundur bila msid tidak ada, tapi mengirim SDP yang benar
+    // sejak awal lebih baik daripada mengandalkan seberang menambalnya —
+    // tidak semua penerima kode kita.
+    try { trans.sender.setStreams?.(lokal); } catch { /* belum didukung peramban ini */ }
     setelPengirim(trans.sender);
   };
 
