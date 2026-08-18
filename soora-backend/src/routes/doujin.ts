@@ -154,6 +154,11 @@ router.get('/img', async (req: Request, res: Response) => {
 
 // GET /doujin/health — apakah rahasia sudah terpegang
 router.get('/health', (_req: Request, res: Response) => {
+  // Tidak boleh disinggahi cache mana pun. Ini penunjuk keadaan yang berubah,
+  // dan nginx sempat menyimpan jawaban pertamanya lalu menyajikannya terus —
+  // sehingga diagnosanya melaporkan "belum punya rahasia" padahal sudah lama
+  // punya. Penunjuk keadaan yang basi lebih buruk daripada tidak ada.
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.json(doujin.statusRahasia());
 });
 
