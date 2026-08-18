@@ -3094,7 +3094,22 @@ a:hover {
 }
 
 /* ===== MODERN SOORANIME SECTIONS (v4.1) ===== */
-.sooranime-home .srow {
+/*
+ * Inset baris berlaku di SEMUA beranda, bukan cuma beranda anime.
+ *
+ * Dulu aturan ini dikunci ke .sooranime-home, jadi baris yang sama —
+ * "Lanjutkan Nonton" — tampil rapi di beranda anime tapi menempel tepi layar
+ * di beranda film dan komik: judul dan kartu pertamanya mulai tepat di x=0,
+ * sementara seluruh isi halaman lain bermargin 16px.
+ *
+ * Nilainya mengikuti .section-header dan .card-row di setiap breakpoint —
+ * 4% di layar lebar, lalu 1.5rem, 1rem, dan 0.5rem — supaya judul baris ini
+ * berdiri di garis yang sama persis dengan judul bagian lain, bukan sekadar
+ * mendekati. 4% saja tidak cukup: di 768px ia jatuh di 31px sementara bagian
+ * lain di 24px, dan selisih tujuh piksel itu terlihat sebagai baris yang
+ * tidak lurus.
+ */
+.srow {
   padding: 0 4%;
   margin: 2.4rem 0;
 }
@@ -4011,7 +4026,25 @@ a:hover {
   overflow-y: visible;
   padding: 0.5rem 4% 1.5rem;
   scroll-behavior: smooth;
-  scroll-snap-type: x proximity;
+  /*
+   * Tanpa scroll-snap — disengaja.
+   *
+   * Rail ini menaruh padding kiri pada kontainer gulirnya sendiri, dan itu
+   * tidak bisa hidup bersama scroll-snap: dengan scroll-snap-align:start pada
+   * kartu pertama, peramban mendarat di posisi snap yang menyejajarkan kartu
+   * itu ke tepi kontainer, lalu menyetel scrollLeft persis sebesar padding-nya.
+   * Terukur: scrollLeft=16 dengan padding-left 16px, hasilnya kartu pertama di
+   * x=0 sementara judul bagiannya di x=16.
+   *
+   * Tiga jalan lain sudah dicoba dan gagal: melepas kartu pertama dari snap
+   * (peramban malah mendarat di kartu KEDUA), menyetel scroll-padding-left,
+   * dan mengganti padding dengan spacer ::before — ketiganya tetap ditelan.
+   *
+   * .cont-scroll tetap memakai snap dan tidak kena masalah ini, sebab inset-nya
+   * datang dari .srow: kontainer gulirnya sendiri berpadding nol, jadi tidak
+   * ada yang bisa ditelan.
+   */
+  scroll-snap-type: none;
   -ms-overflow-style: none;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -4085,7 +4118,25 @@ a:hover {
   overflow-y: visible;
   padding: 0.5rem 4% 1.8rem;
   scroll-behavior: smooth;
-  scroll-snap-type: x proximity;
+  /*
+   * Tanpa scroll-snap — disengaja.
+   *
+   * Rail ini menaruh padding kiri pada kontainer gulirnya sendiri, dan itu
+   * tidak bisa hidup bersama scroll-snap: dengan scroll-snap-align:start pada
+   * kartu pertama, peramban mendarat di posisi snap yang menyejajarkan kartu
+   * itu ke tepi kontainer, lalu menyetel scrollLeft persis sebesar padding-nya.
+   * Terukur: scrollLeft=16 dengan padding-left 16px, hasilnya kartu pertama di
+   * x=0 sementara judul bagiannya di x=16.
+   *
+   * Tiga jalan lain sudah dicoba dan gagal: melepas kartu pertama dari snap
+   * (peramban malah mendarat di kartu KEDUA), menyetel scroll-padding-left,
+   * dan mengganti padding dengan spacer ::before — ketiganya tetap ditelan.
+   *
+   * .cont-scroll tetap memakai snap dan tidak kena masalah ini, sebab inset-nya
+   * datang dari .srow: kontainer gulirnya sendiri berpadding nol, jadi tidak
+   * ada yang bisa ditelan.
+   */
+  scroll-snap-type: none;
   -ms-overflow-style: none;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -5410,7 +5461,8 @@ a:hover {
     padding: 0.5rem 0.5rem 1rem;
     gap: 0.4rem;
   }
-  .section-header {
+  .section-header,
+  .srow {
     padding: 0 0.5rem;
   }
 }
@@ -9312,8 +9364,13 @@ a:hover {
     font-size: 0.65rem;
     padding: 0.18rem 0.45rem;
   }
-  .section-header {
+  .section-header,
+  .srow {
     padding: 0 1.5rem;
+  }
+  .top10-row {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
   .card-row {
     padding: 0.5rem 1.5rem 1rem;
@@ -9812,8 +9869,13 @@ a:hover {
   }
 
   /* Cards */
-  .section-header {
+  .section-header,
+  .srow {
     padding: 0 1rem;
+  }
+  .top10-row {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
   .card-row {
     padding: 0.5rem 1rem 1rem;
