@@ -251,7 +251,7 @@ export default function MovieHome() {
     if (selectedLang === 'id') {
       fetchLK21();
     } else {
-      // Goku removed from the pool (dead 502/empty). TMDB is the EN source.
+      // Kolam internasional dilayani TMDB.
       fetchTMDBFallback().finally(() => {
         if (!cancelled) {
           setHeroReady(true);
@@ -360,7 +360,6 @@ export default function MovieHome() {
   );
 
   const hero = trendingMovies[heroIdx];
-  const gokuHeroImg = (url) => url ? url.replace(/\/resize\/\d+x\d+\//, '/resize/1200x800/') : url;
 
   /* human-readable filter summary */
   const activeFilterCount = [filterType, filterGenre, filterYear, filterSort !== 'popularity.desc' ? filterSort : ''].filter(Boolean).length;
@@ -377,7 +376,7 @@ export default function MovieHome() {
       {hero && (
         <div className="hero-banner sooraflix-hero" key={heroIdx}>
           <div className="hero-bg">
-            <img src={hero.cover || gokuHeroImg(hero.image)} alt="" />
+            <img src={hero.cover || hero.image} alt="" />
           </div>
           <div className="hero-content">
             <div className="hero-top-row">
@@ -745,7 +744,7 @@ export default function MovieHome() {
             <p>Tidak ada data film. Pastikan server API berjalan.</p>
           ) : (
             <>
-              <p>No movie data available. The Goku provider may be unreachable (WARP proxy required).</p>
+              <p>Belum ada data film. Coba muat ulang sebentar lagi.</p>
               <button
                 className="btn-play sooraflix-btn-play"
                 style={{ marginTop: '1rem', padding: '0.6rem 1.5rem', cursor: 'pointer' }}

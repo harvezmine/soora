@@ -14,11 +14,6 @@ import {
   getMovieDetailsTMDB,
   getTVDetailsTMDB,
   getTVSeasonTMDB,
-  getMovieStreamingSources,
-  getTVStreamingSources,
-  getGokuInfo,
-  getGokuMovieStream,
-  getGokuTVStream,
   findTMDBDetailsByTitle,
   tmdbImg,
   tmdbBackdrop,
@@ -61,9 +56,8 @@ export default function Watch() {
   // Common
   const title = searchParams.get('title') || 'Now Playing';
 
-  // Movie / TV params (TMDB, Goku, or LK21)
+  // Movie / TV params (TMDB atau LK21)
   const tmdbId = searchParams.get('tmdbId');
-  const gokuId = searchParams.get('gokuId');
   const lk21Id = searchParams.get('lk21Id');
   const mediaType = searchParams.get('type') || 'movie';
   const season = parseInt(searchParams.get('season')) || 1;
@@ -88,7 +82,6 @@ export default function Watch() {
     }
     const bagian = mediaType === 'tv' ? 'tv' : 'movie';
     if (tmdbId) return commentKey(bagian, bersih(tmdbId));
-    if (gokuId) return commentKey(bagian, `goku:${bersih(gokuId)}`);
     if (lk21Id) return commentKey(bagian, `lk21:${bersih(lk21Id)}`);
     return null;
   })();
@@ -134,7 +127,7 @@ export default function Watch() {
   // Embed fallback state (when consumet extractors fail)
   const [malId, setMalId] = useState(null);
   const [alId, setAlId] = useState(null);
-  const [resolvedTmdbId, setResolvedTmdbId] = useState(null); // TMDB ID found from Goku enrichment
+  const [resolvedTmdbId, setResolvedTmdbId] = useState(null); // TMDB ID hasil pencocokan judul LK21
   const [useEmbedPlayer, setUseEmbedPlayer] = useState(false);
   const [useSubIndo, setUseSubIndo] = useState(subIndoParam); // Auto-activate from Sub Indo tab
   const [subLang, setSubLang] = useState(subIndoParam ? 'id' : null); // null = direct, 'id' | 'en' | 'multi'
@@ -146,7 +139,7 @@ export default function Watch() {
   const triedSources = useRef(new Set()); // source urls already attempted this session (auto-failover)
   const lastFetchedEpisodeId = useRef(null); // detect real episode change vs retry
 
-  // Effective TMDB ID — from URL param or resolved from Goku enrichment
+  // TMDB ID yang berlaku — dari parameter URL atau hasil pencocokan judul LK21
   const effectiveTmdbId = tmdbId || resolvedTmdbId;
 
   // Nonton bareng hanya mungkin pada pemutar HLS milik Soora sendiri.
@@ -197,7 +190,7 @@ export default function Watch() {
 
   // ===== FETCH MOVIE / TV DATA =====
   useEffect(() => {
-    if (!isMovie || (!tmdbId && !gokuId && !lk21Id)) return;
+    if (!isMovie || (!tmdbId && !lk21Id)) return;
     const fetchMovieData = async () => {
       setLoading(true);
       setError(null);
@@ -352,195 +345,6 @@ export default function Watch() {
             }
           }
         }
-        // ── Goku direct flow (from Goku listings) ──
-        else if (gokuId) {
-          let gInfo = null;
-          try {
-            const gokuRes = await getGokuInfo(gokuId);
-            gInfo = gokuRes.data;
-          } catch (infoErr) {
-            console.warn('Goku info fetch failed:', infoErr);
-          }
-
-          // If Goku info failed, try TMDB enrichment by title from URL
-          let enrichedTmdbId = null;
-          const fallbackTitle = title || '';
-          
-          if (gInfo) {
-            details = {
-              title: gInfo.title,
-              name: gInfo.title,
-              overview: gInfo.description || '',
-              poster_path: null,
-              backdrop_path: null,
-              _gokuImage: gInfo.image || '',
-              genres: (gInfo.genres || []).map((g, i) => ({ id: i, name: g })),
-              release_date: gInfo.releaseDate || '',
-              runtime: parseInt(gInfo.duration) || 0,
-              casts: gInfo.casts || [],
-              _isGoku: true,
-            };
-            // For Goku TV, build season episodes from Goku episodes
-            if (mediaType === 'tv' && gInfo.episodes) {
-              const eps = gInfo.episodes.filter((e) => e.season === selectedSeason);
-              setSeasonEpisodes(
-                eps.map((e) => ({
-                  episode_number: e.number,
-                  name: e.title || `Episode ${e.number}`,
-                  id: e.id,
-                }))
-              );
-            }
-            setMovieDetails(details);
-          }
-
-          // Enrich with TMDB data (recommendations, similar, cast photos, backdrop)
-          const enrichTitle = gInfo?.title || fallbackTitle;
-          if (hasTMDBKey() && enrichTitle) {
-            try {
-              const tmdbRes = await findTMDBDetailsByTitle(enrichTitle, mediaType);
-              const td = tmdbRes.data;
-              if (td) {
-                enrichedTmdbId = td.id;
-                setResolvedTmdbId(td.id);
-
-                // If Goku info failed, build details from TMDB instead
-                if (!gInfo) {
-                  details = {
-                    title: td.title || td.name || enrichTitle,
-                    name: td.title || td.name || enrichTitle,
-                    overview: td.overview || '',
-                    poster_path: td.poster_path,
-                    backdrop_path: td.backdrop_path,
-                    genres: td.genres || [],
-                    release_date: td.release_date || td.first_air_date || '',
-                    runtime: td.runtime || 0,
-                    credits: td.credits,
-                    _isGoku: false,
-                  };
-                  setMovieDetails(details);
-
-                  // For TV, fetch season data from TMDB
-                  if (mediaType === 'tv') {
-                    try {
-                      const sRes = await getTVSeasonTMDB(td.id, selectedSeason);
-                      setSeasonEpisodes(sRes.data.episodes || []);
-                    } catch { /* ignore */ }
-                  }
-                } else {
-                  // Merge TMDB enrichment into Goku details
-                  setMovieDetails((prev) => ({
-                    ...prev,
-                    vote_average: td.vote_average || prev.vote_average,
-                    tagline: td.tagline || '',
-                    overview: td.overview || prev.overview,
-                    poster_path: td.poster_path,
-                    backdrop_path: td.backdrop_path,
-                    genres: td.genres || prev.genres,
-                    credits: td.credits,
-                  }));
-                }
-                setRecommendations(
-                  (td.recommendations?.results || []).slice(0, 12).map(normRec)
-                );
-                setSimilar(
-                  (td.similar?.results || []).slice(0, 12).map(normRec)
-                );
-              } else {
-                setRecommendations([]);
-                setSimilar([]);
-              }
-            } catch {
-              setRecommendations([]);
-              setSimilar([]);
-            }
-          } else {
-            setRecommendations([]);
-            setSimilar([]);
-          }
-
-          // If neither Goku info nor TMDB enrichment provided details, bail
-          if (!details && !gInfo) {
-            // Last resort: auto-switch to embed if we have a TMDB ID
-            if (enrichedTmdbId) {
-              setMovieDetails({ title: fallbackTitle, name: fallbackTitle, _isGoku: false });
-              setUseEmbedPlayer(true);
-              setSubLang('multi');
-            } else {
-              setError('Unable to load movie data — provider is unavailable.');
-            }
-            setLoading(false);
-            return;
-          }
-
-          // Stream: try Goku direct → provider-search fallback → auto-embed
-          let streamOk = false;
-
-          // Only try Goku direct if we got Goku info successfully
-          if (gInfo) {
-            try {
-              let streamData;
-              if (mediaType === 'tv') {
-                streamData = await getGokuTVStream(gokuId, season, episode);
-              } else {
-                streamData = await getGokuMovieStream(gokuId);
-              }
-              const srcs = streamData.data?.sources || [];
-              if (srcs.length > 0) {
-                setSources(srcs);
-                setSubtitles(streamData.data?.subtitles || []);
-                setReferer(streamData.data?.headers?.Referer || streamData.data?.headers?.referer || '');
-                const auto = srcs.find((s) => s.quality === 'auto' || s.quality === 'default');
-                const hd = srcs.find((s) => ['1080p', '1080'].includes(s.quality));
-                const med = srcs.find((s) => ['720p', '720'].includes(s.quality));
-                setCurrentSource(auto || hd || med || srcs[0] || null);
-                streamOk = true;
-              }
-            } catch (streamErr) {
-              console.warn('Goku direct stream failed:', streamErr);
-            }
-          }
-
-          // Fallback: try provider-search flow (Goku search → FlixHQ)
-          const searchTitle = gInfo?.title || fallbackTitle;
-          if (!streamOk && searchTitle) {
-            try {
-              const movieTitle = searchTitle;
-              const year = (gInfo?.releaseDate || details?.release_date || '').slice(0, 4);
-              let streamData;
-              if (mediaType === 'tv') {
-                streamData = await getTVStreamingSources(movieTitle, enrichedTmdbId || gokuId, season, episode, year);
-              } else {
-                streamData = await getMovieStreamingSources(movieTitle, enrichedTmdbId || gokuId, year);
-              }
-              const srcs = streamData.data?.sources || [];
-              if (srcs.length > 0) {
-                setSources(srcs);
-                setSubtitles(streamData.data?.subtitles || []);
-                setReferer(streamData.data?.headers?.Referer || streamData.data?.headers?.referer || '');
-                const auto = srcs.find((s) => s.quality === 'auto' || s.quality === 'default');
-                const hd = srcs.find((s) => ['1080p', '1080'].includes(s.quality));
-                const med = srcs.find((s) => ['720p', '720'].includes(s.quality));
-                setCurrentSource(auto || hd || med || srcs[0] || null);
-                streamOk = true;
-              }
-            } catch (fallbackErr) {
-              console.warn('Provider-search fallback failed:', fallbackErr);
-            }
-          }
-
-          // Last resort: auto-switch to embed player if TMDB ID available
-          if (!streamOk) {
-            const tid = enrichedTmdbId || tmdbId;
-            if (tid) {
-              console.info('All direct streams failed, auto-switching to embed player');
-              setUseEmbedPlayer(true);
-              setSubLang('multi');
-            } else {
-              setError('Stream unavailable — sources could not be loaded.');
-            }
-          }
-        }
         // ── TMDB flow (backward compatibility) ──
         else if (tmdbId) {
           if (mediaType === 'tv') {
@@ -572,6 +376,12 @@ export default function Watch() {
               setCurrentSource(src);
               setReferer(vix.ref || '');   // VideoPlayer proxies with this referer
               setUseEmbedPlayer(false);
+            } else if (vix?.embed === false) {
+              // Backend sudah memeriksa iframe cadangannya dan memastikan
+              // kosong. Memasangnya tetap cuma menghasilkan kotak hitam yang
+              // diam — jadi dikatakan saja. Tombol "Embedded Player" di layar
+              // galat tetap ada bagi yang mau mencoba sendiri.
+              setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
             } else {
               console.info('VixSrc had no source — switching to embed player');
               setUseEmbedPlayer(true);
@@ -590,7 +400,7 @@ export default function Watch() {
       }
     };
     fetchMovieData();
-  }, [tmdbId, gokuId, lk21Id, mediaType, selectedSeason, isMovie, season, episode, retryKey]);
+  }, [tmdbId, lk21Id, mediaType, selectedSeason, isMovie, season, episode, retryKey]);
 
   // Fetch new season episodes when tab changes (without full reload)
   useEffect(() => {
@@ -599,18 +409,7 @@ export default function Watch() {
 
     const fetchSeason = async () => {
       try {
-        if (gokuId) {
-          // For Goku, refetch info and filter episodes by season
-          const gokuRes = await getGokuInfo(gokuId);
-          const eps = (gokuRes.data.episodes || []).filter((e) => e.season === selectedSeason);
-          setSeasonEpisodes(
-            eps.map((e) => ({
-              episode_number: e.number,
-              name: e.title || `Episode ${e.number}`,
-              id: e.id,
-            }))
-          );
-        } else if (tmdbId) {
+        if (tmdbId) {
           const res = await getTVSeasonTMDB(tmdbId, selectedSeason);
           setSeasonEpisodes(res.data.episodes || []);
         }
@@ -850,15 +649,15 @@ export default function Watch() {
         };
       }
       if (isMovie && movieDetails) {
-        const id = effectiveTmdbId || gokuId || lk21Id;
+        const id = effectiveTmdbId || lk21Id;
         if (!id) return null;
         return {
           section: 'movie', id,
           title: movieDetails.title || movieDetails.name || title,
-          image: movieDetails.poster_path ? tmdbImg(movieDetails.poster_path) : (movieDetails._lk21PosterImg || movieDetails._gokuImage || ''),
+          image: movieDetails.poster_path ? tmdbImg(movieDetails.poster_path) : (movieDetails._lk21PosterImg || ''),
           mediaType, season, episode,
           tmdbId: effectiveTmdbId || undefined,
-          gokuId: gokuId || undefined, lk21Id: lk21Id || undefined,
+          lk21Id: lk21Id || undefined,
         };
       }
       return null;
@@ -880,7 +679,7 @@ export default function Watch() {
     save(); // initial record
     const iv = setInterval(save, 15000);
     return () => { save(); clearInterval(iv); };
-  }, [isAnime, isMovie, animeInfo, movieDetails, epNum, episode, season, samehadakuId, animeId, effectiveTmdbId, gokuId, lk21Id, mediaType, title]);
+  }, [isAnime, isMovie, animeInfo, movieDetails, epNum, episode, season, samehadakuId, animeId, effectiveTmdbId, lk21Id, mediaType, title]);
 
   const handlePlayerError = useCallback((msg) => {
     console.warn('Player error:', msg);
@@ -1014,20 +813,13 @@ export default function Watch() {
     );
   }
 
-  if (!episodeId && !tmdbId && !gokuId && !lk21Id && !samehadakuId && !(subIndoParam && title)) {
+  if (!episodeId && !tmdbId && !lk21Id && !samehadakuId && !(subIndoParam && title)) {
     return <div className="error-msg">No content ID provided</div>;
   }
 
   if (loading) return <SkeletonWatch episodes={isAnime || mediaType === 'tv'} />;
 
-  // Build seasons from either TMDB or Goku data
-  const isGokuFlow = !!gokuId;
-  let seasons = movieDetails?.seasons?.filter((s) => s.season_number > 0) || [];
-  if (isGokuFlow && seasons.length === 0 && seasonEpisodes.length > 0) {
-    // For Goku, derive seasons from the episodes we loaded
-    // We just show the current season's episodes; info was loaded in the effect
-    seasons = [{ season_number: selectedSeason, episode_count: seasonEpisodes.length }];
-  }
+  const seasons = movieDetails?.seasons?.filter((s) => s.season_number > 0) || [];
 
   // Retry handler for failed streams
   const handleRetry = () => {
@@ -1386,9 +1178,7 @@ export default function Watch() {
                   className={`watch-ep-item ${ep.episode_number === episode && selectedSeason === season ? 'active' : ''}`}
                   onClick={() =>
                     navigate(
-                      isGokuFlow
-                        ? `/watch/movie?gokuId=${encodeURIComponent(gokuId)}&type=tv&season=${selectedSeason}&episode=${ep.episode_number}&title=${encodeURIComponent(ep.name || title)}`
-                        : `/watch/movie?tmdbId=${tmdbId}&type=tv&season=${selectedSeason}&episode=${ep.episode_number}&title=${encodeURIComponent(ep.name || title)}`
+                      `/watch/movie?tmdbId=${tmdbId}&type=tv&season=${selectedSeason}&episode=${ep.episode_number}&title=${encodeURIComponent(ep.name || title)}`
                     )
                   }
                 >

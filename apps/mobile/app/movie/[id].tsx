@@ -31,7 +31,7 @@ export default function MovieInfoScreen() {
   const router = useRouter();
   const isTV = kind === 'tv';
 
-  // Hanya judul TMDB yang punya layar detail di fase 2. LK21 dan Goku memakai
+  // Hanya judul TMDB yang punya layar detail di fase 2. LK21 memakai
   // slug, bukan id TMDB, jadi memanggil endpoint TMDB dengan slug itu hanya
   // menghasilkan 404 dan layar error yang membingungkan.
   const supported = !source || source === 'tmdb';

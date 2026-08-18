@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { isUrlAllowed } from '../utils/ssrfGuard';
+import { contentTypeOf } from '../utils/normalize';
 
 const router = Router();
 
@@ -207,7 +208,7 @@ router.get('/', async (req: Request, res: Response) => {
           responseType: 'arraybuffer',
           timeout: 15000,
         });
-        res.setHeader('Content-Type', retryRes.headers['content-type'] || 'application/octet-stream');
+        res.setHeader('Content-Type', contentTypeOf(retryRes.headers['content-type'], 'application/octet-stream'));
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.send(Buffer.from(retryRes.data));
         return;
@@ -249,7 +250,7 @@ router.get('/manga-img', async (req: Request, res: Response) => {
       timeout: 15000,
     });
 
-    res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Content-Type', contentTypeOf(response.headers['content-type'], 'image/jpeg'));
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(Buffer.from(response.data));

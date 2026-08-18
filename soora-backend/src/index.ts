@@ -21,7 +21,9 @@ import userRoutes from './routes/user';
 import adminRoutes from './routes/admin';
 import commentRoutes from './routes/comments';
 import roomRoutes from './routes/rooms';
+import availabilityRoutes from './routes/availability';
 import { attachWatchParty } from './ws';
+import { contentTypeOf } from './utils/normalize';
 
 const app = express();
 
@@ -110,6 +112,14 @@ app.use('/proxy', proxyRoutes);
 // Pemeriksaan versi untuk APK — distribusi di luar Play Store tidak punya
 // update otomatis, jadi app yang menanyakannya sendiri.
 app.use('/app', appRoutes);
+/**
+ * Catatan ketersediaan. Modul dan route-nya sudah lama ada tapi tidak pernah
+ * didaftarkan, jadi setiap panggilan ke sini menjawab 404 — termasuk
+ * `POST /availability/report`, satu-satunya cara halaman melaporkan judul yang
+ * ternyata tidak bisa diputar. Tanpa itu catatannya hanya bisa diisi dari
+ * dalam proses, dan tidak ada cara memeriksa isinya dari luar.
+ */
+app.use('/availability', availabilityRoutes);
 
 // Manga image proxy (separate mount point)
 import { default as proxyRouter } from './routes/proxy';
@@ -130,7 +140,7 @@ app.get('/manga-img', async (req, res) => {
       headers: { 'Referer': referer, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
       responseType: 'arraybuffer', timeout: 15000,
     });
-    res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Content-Type', contentTypeOf(response.headers['content-type'], 'image/jpeg'));
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(Buffer.from(response.data));

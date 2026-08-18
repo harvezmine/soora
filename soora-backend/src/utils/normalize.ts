@@ -48,23 +48,6 @@ export function deduplicateAnime(primary: any[], ...others: any[][]): any[] {
 }
 
 /**
- * Normalize Goku items to standard format.
- */
-export function normalizeGoku(item: any) {
-  return {
-    id: item.id,
-    title: item.title || 'Unknown',
-    image: item.image || '',
-    type: item.type || 'Movie',
-    releaseDate: item.releaseDate || '',
-    duration: item.duration || '',
-    mediaType: item.type === 'TV Series' ? 'tv' : 'movie',
-    season: item.season || '',
-    latestEpisode: item.latestEpisode || '',
-  };
-}
-
-/**
  * Normalize LK21 items to standard format.
  */
 export function normalizeLK21(item: any) {
@@ -107,4 +90,21 @@ export function extractResults(data: any): any[] {
   if (Array.isArray(data.results)) return data.results;
   if (Array.isArray(data.data?.results)) return data.data.results;
   return [];
+}
+
+/**
+ * Ambil Content-Type dari balasan axios sebagai teks.
+ *
+ * Axios mengetik nilai header sebagai `string | number | boolean | string[] |
+ * AxiosHeaders`, sementara `res.setHeader` hanya menerima teks, angka, atau
+ * larik teks. Menyerahkannya langsung membuat `tsc` gagal — dan karena
+ * `npm run build` dipakai apa adanya oleh skrip deploy yang berjalan dengan
+ * `set -e`, satu galat tipe di sini menghentikan seluruh proses rilis sebelum
+ * PM2 sempat dimuat ulang.
+ *
+ * Yang bukan teks tidak pernah berupa Content-Type yang sah, jadi dijatuhkan
+ * ke nilai cadangan alih-alih dipaksa jadi teks.
+ */
+export function contentTypeOf(nilai: unknown, cadangan: string): string {
+  return typeof nilai === 'string' && nilai ? nilai : cadangan;
 }

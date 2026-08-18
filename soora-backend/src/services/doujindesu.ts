@@ -1,6 +1,7 @@
 import axios from 'axios';
 // @ts-ignore — cheerio types may not be installed on all environments
 import { load as cheerioLoad } from 'cheerio';
+import { contentTypeOf } from '../utils/normalize';
 
 /**
  * Doujindesu scraper service.
@@ -301,7 +302,7 @@ export async function doujindesuProxyImage(imageUrl: string): Promise<{ data: Bu
     });
     return {
       data: Buffer.from(response.data),
-      contentType: response.headers['content-type'] || 'image/jpeg',
+      contentType: contentTypeOf(response.headers['content-type'], 'image/jpeg'),
     };
   } catch {
     return null;

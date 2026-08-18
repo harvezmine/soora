@@ -68,35 +68,11 @@ export async function animeWatch(episodeId: string, provider = 'animekai', param
 
 // ========== MOVIES ==========
 
-export async function movieSearch(query: string, provider = 'goku') {
-  const res = await client.get(`/movies/${provider}/${encodeURIComponent(query)}`);
-  return res.data;
-}
 
-export async function movieInfo(id: string, provider = 'goku') {
-  const res = await client.get(`/movies/${provider}/info`, { params: { id } });
-  return res.data;
-}
 
-export async function movieWatch(episodeId: string, mediaId: string, provider = 'goku') {
-  const res = await client.get(`/movies/${provider}/watch`, { params: { episodeId, mediaId } });
-  return res.data;
-}
 
-export async function movieTrending(type = 'movie', provider = 'goku') {
-  const res = await client.get(`/movies/${provider}/trending`, { params: { type } });
-  return res.data;
-}
 
-export async function movieRecentMovies(provider = 'goku') {
-  const res = await client.get(`/movies/${provider}/recent-movies`);
-  return res.data;
-}
 
-export async function movieRecentShows(provider = 'goku') {
-  const res = await client.get(`/movies/${provider}/recent-shows`);
-  return res.data;
-}
 
 // ========== LK21 ==========
 

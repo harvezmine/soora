@@ -2,8 +2,13 @@ import { Router, Request, Response } from 'express';
 import * as consumet from '../services/consumet';
 import * as tmdb from '../services/tmdb';
 import { cached, cachedSWR, CACHE_TTL } from '../services/cache';
-import { parallel, normalizeGoku, normalizeLK21, extractResults } from '../utils/normalize';
+import { parallel, normalizeLK21, extractResults } from '../utils/normalize';
 import { markAvailability, filterAvailable } from '../services/availability';
+import {
+  saringLayakDiputar,
+  ukuranVidlinkBisaDipercaya,
+  vidlinkBerisi,
+} from '../services/catalogRules';
 import { reportRouteError } from '../services/telegram';
 
 const qs = (v: any): string => String(v ?? '');
@@ -21,13 +26,24 @@ async function resolveVixsrc(kind: 'movie' | 'tv', tmdbId: string, season?: stri
   const apiPath = kind === 'tv'
     ? `https://vixsrc.to/api/tv/${tmdbId}/${season}/${episode}`
     : `https://vixsrc.to/api/movie/${tmdbId}`;
+  /**
+   * 404 berarti judulnya memang tidak ada di katalog VixSrc — itu jawaban yang
+   * sah, bukan kegagalan. Secara bawaan axios melempar untuk status 4xx, dan
+   * lemparan itu dulu melompati SELURUH sisa penangan: catatan ketersediaan
+   * tidak pernah terisi untuk judul yang tidak ada, dan pemeriksaan iframe
+   * cadangan tidak pernah dijalankan — padahal justru judul-judul inilah yang
+   * jadi alasan keduanya dibuat. Yang terlihat dari luar cuma `{ m3u8: null }`
+   * dari blok catch, sama persis seperti sebelum keduanya ada.
+   */
+  const terima = (s: number) => s === 200 || s === 404;
   // step 1: get embed src
-  const a = await axios.get(apiPath, { headers: { 'User-Agent': VIX_UA, Referer: 'https://vixsrc.to/' }, timeout: 12000 });
-  const src = a.data?.src;
+  const a = await axios.get(apiPath, { headers: { 'User-Agent': VIX_UA, Referer: 'https://vixsrc.to/' }, timeout: 12000, validateStatus: terima });
+  const src = a.status === 404 ? null : a.data?.src;
   if (!src) return null;
   const embed = `https://vixsrc.to${src}`;
   // step 2: embed page → masterPlaylist
-  const e = await axios.get(embed, { headers: { 'User-Agent': VIX_UA, Referer: 'https://vixsrc.to/' }, timeout: 12000, responseType: 'text' });
+  const e = await axios.get(embed, { headers: { 'User-Agent': VIX_UA, Referer: 'https://vixsrc.to/' }, timeout: 12000, responseType: 'text', validateStatus: terima });
+  if (e.status === 404) return null;
   const html: string = e.data;
   const url = html.match(/url: *'([^']+)'/)?.[1];
   const token = html.match(/'token': *'([^']+)'/)?.[1];
@@ -38,6 +54,34 @@ async function resolveVixsrc(kind: 'movie' | 'tv', tmdbId: string, season?: stri
   return { m3u8, ref: embed };
 }
 
+/**
+ * Ukuran halaman VidLink dalam byte, atau null bila gagal diambil.
+ *
+ * Dipakai hanya sebagai jalan terakhir, saat VixSrc tidak punya sumber.
+ * Halamannya paling besar sekitar 130 KB, jadi diambil utuh — tidak ada
+ * jalan lain, sebab isinya ditentukan skrip di dalam halaman dan tidak
+ * tercermin di header mana pun.
+ */
+async function ukuranHalamanVidlink(
+  kind: 'movie' | 'tv', tmdbId: string, season?: string, episode?: string
+): Promise<number | null> {
+  const url = kind === 'tv'
+    ? `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`
+    : `https://vidlink.pro/movie/${tmdbId}`;
+  try {
+    const r = await axios.get(url, {
+      headers: { 'User-Agent': VIX_UA },
+      timeout: 8000,
+      responseType: 'text',
+      validateStatus: () => true,
+    });
+    if (r.status >= 400 || typeof r.data !== 'string') return null;
+    return Buffer.byteLength(r.data);
+  } catch {
+    return null;
+  }
+}
+
 router.get('/vixsrc/:type/:tmdbId', async (req: Request, res: Response) => {
   try {
     const type = req.params.type === 'tv' ? 'tv' : 'movie';
@@ -46,8 +90,45 @@ router.get('/vixsrc/:type/:tmdbId', async (req: Request, res: Response) => {
     const episode = qs(req.query.episode) || '1';
     const key = `vixsrc:${type}:${tmdbId}:${type === 'tv' ? `${season}:${episode}` : ''}`;
     const data = await cached(key, () => resolveVixsrc(type, tmdbId, season, episode), CACHE_TTL.STREAM);
-    if (!data) return res.json({ m3u8: null });
-    res.json(data);
+
+    /**
+     * Catat hasilnya. Inilah satu-satunya tempat yang benar-benar tahu sebuah
+     * judul punya sumber atau tidak, dan sebelumnya tidak pernah melapor —
+     * satu-satunya pelapor film adalah /movies/stream, yang penyedianya
+     * (goku, flixhq) sudah lama mati sehingga selalu melapor "tidak ada" —
+     * route itu ikut dihapus bersama perubahan ini.
+     * Akibatnya catatan ketersediaan film tidak pernah terisi, dan
+     * filterAvailable di /movies/home menyaring dari daftar kosong.
+     *
+     * Film dicatat dua arah. Serial hanya dicatat saat berhasil: satu episode
+     * yang hilang bukan berarti seluruh serialnya tidak bisa ditonton, dan
+     * kuncinya tidak membawa nomor musim — mencatat gagal di sini akan
+     * menyembunyikan serial utuh gara-gara satu episode.
+     */
+    const ketemu = !!data?.m3u8;
+    if (type === 'movie' || ketemu) markAvailability('movie', tmdbId, ketemu);
+    if (ketemu) return res.json({ ...data, embed: null });
+
+    /**
+     * VixSrc tidak punya sumber, jadi halaman akan jatuh ke iframe VidLink.
+     * Masalahnya iframe itu lintas-asal: kalau VidLink juga tidak punya
+     * judulnya, tidak ada satu pun peristiwa yang bisa ditangkap — pengguna
+     * cuma melihat kotak hitam yang diam, tanpa penjelasan, selamanya.
+     *
+     * Jadi dicek di sini, dari sisi server, di mana aturan lintas-asal tidak
+     * berlaku. Hanya di jalur gagal: yang berhasil sudah pulang di atas dan
+     * tidak ikut menanggung tambahan waktu ini.
+     *
+     * `embed` bernilai false hanya bila benar-benar diketahui kosong. null
+     * berarti tidak bisa disimpulkan — untuk serial, atau saat halamannya
+     * gagal diambil — dan yang tidak diketahui tetap ditawarkan.
+     */
+    const bytes = ukuranVidlinkBisaDipercaya(type)
+      ? await cached(`vidlink:size:${type}:${tmdbId}`,
+          () => ukuranHalamanVidlink(type, tmdbId, season, episode), CACHE_TTL.STREAM)
+      : null;
+
+    res.json({ m3u8: null, embed: vidlinkBerisi(type, bytes) });
   } catch (err: any) {
     reportRouteError(req, err, 'movies/vixsrc');
     res.json({ m3u8: null });
@@ -70,13 +151,12 @@ const MOVIE_GENRE_SECTIONS = [
 
 /**
  * GET /movies/home
- * Orchestrated home page: TMDB + Goku + LK21 in parallel.
+ * Orchestrated home page: TMDB (kolam internasional) + LK21 (kolam lokal).
  */
 router.get('/home', async (req: Request, res: Response) => {
   try {
     const data = await cachedSWR('movies:home', async () => {
-      // Phase 1: Core sections (all in parallel). Goku is dead (502/empty) —
-      // removed from the pool. EN home is served by TMDB, ID home by LK21.
+      // Beranda internasional dilayani TMDB, beranda lokal oleh LK21.
       const [
         trendingRes, popularMoviesRes, popularTVRes,
         lk21PopularRes, lk21RecentRes, lk21SeriesRes,
@@ -127,7 +207,7 @@ router.get('/home', async (req: Request, res: Response) => {
 
 /**
  * GET /movies/info/:id?type=movie|tv
- * TMDB details + optional Goku/LK21 match for streaming.
+ * TMDB details.
  */
 router.get('/info/:id', async (req: Request, res: Response) => {
   try {
@@ -165,7 +245,7 @@ router.get('/tv-season/:id/:season', async (req: Request, res: Response) => {
 
 /**
  * GET /movies/search?q=query&page=1
- * Multi-provider search: TMDB + Goku + LK21.
+ * Pencarian dua kolam: TMDB (internasional) + LK21 (lokal).
  */
 router.get('/search', async (req: Request, res: Response) => {
   try {
@@ -174,115 +254,39 @@ router.get('/search', async (req: Request, res: Response) => {
     if (!query) return res.status(400).json({ error: 'Missing query' });
 
     const data = await cached(`movies:search:${query}:${page}`, async () => {
-      // Goku removed from the pool (dead). Search = TMDB + LK21.
       const [tmdbRes, lk21Res] = await parallel(
         tmdb.searchMulti(query, page),
         consumet.lk21Search(query).catch(() => null),
       );
 
-      // Indonesian-original films (original_language 'id') don't exist on the
-      // international embed pool (VidLink) and can't be played there. Drop them
-      // from the TMDB branch — Indonesian titles are served by LK21 (direct
-      // HLS) instead, so search only surfaces playable results.
-      const tmdbResults = (tmdbRes?.results || []).filter(
-        (r: any) => r.originalLanguage !== 'id'
-      );
+      // TMDB mengindeks jauh lebih banyak daripada yang bisa diputar: album
+      // soundtrack, film pendek, rekaman acara, rilis daerah. Diukur pada 202
+      // judul, hanya 38% hasil pencarian mentah benar-benar punya sumber —
+      // sisanya membawa orang ke layar hitam. Saringannya di catalogRules.ts,
+      // termasuk membuang judul Indonesia yang memang jatah kolam LK21.
+      const tmdbResults = saringLayakDiputar(tmdbRes?.results || []);
 
       return {
         tmdb: { results: tmdbResults, totalPages: tmdbRes?.totalPages || 0 },
-        goku: { results: [] },
         lk21: { results: extractResults(lk21Res).map(normalizeLK21) },
       };
     }, CACHE_TTL.SEARCH);
 
-    res.json(data);
+    /**
+     * Saringan ketersediaan ditaruh DI LUAR cache, bukan di dalam pembangunnya.
+     *
+     * Isi cache dibekukan sepuluh menit; catatan ketersediaan berubah tiap
+     * kali ada yang mencoba memutar. Kalau disaring di dalam, hasil pencarian
+     * yang sudah terlanjur tersimpan tidak akan pernah ikut belajar sampai
+     * cache-nya kedaluwarsa.
+     */
+    res.json({
+      ...data,
+      tmdb: { ...data.tmdb, results: filterAvailable('movie', data.tmdb?.results || []) },
+    });
   } catch (err: any) {
     reportRouteError(req, err, 'movies/search');
     res.status(500).json({ error: 'Search failed' });
-  }
-});
-
-/**
- * GET /movies/stream?title=&tmdbId=&year=&type=movie|tv&season=&episode=
- * Orchestrated streaming — finds best provider and returns sources.
- */
-router.get('/stream', async (req: Request, res: Response) => {
-  try {
-    const title = qs(req.query.title);
-    const tmdbId = qs(req.query.tmdbId);
-    const year = qs(req.query.year);
-    const type = qs(req.query.type);
-    const season = qs(req.query.season);
-    const episode = qs(req.query.episode);
-    if (!title) return res.status(400).json({ error: 'Missing title' });
-
-    const cacheKey = type === 'tv'
-      ? `movies:stream:${tmdbId}:s${season}e${episode}`
-      : `movies:stream:${tmdbId}`;
-
-    const data = await cached(cacheKey, async () => {
-      const providers = ['goku', 'flixhq'];
-      const title = qs(req.query.title);
-    const normalize = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const titleNorm = normalize(title);
-
-      for (const provider of providers) {
-        try {
-          // 1) Search
-          const searchRes = await consumet.movieSearch(String(title), provider);
-          const results = extractResults(searchRes);
-          if (results.length === 0) continue;
-
-          // Score matches
-          const scored = results.map((r: any) => {
-            let score = 0;
-            const rTitle = normalize(r.title);
-            if (rTitle === titleNorm) score += 10;
-            else if (rTitle.includes(titleNorm) || titleNorm.includes(rTitle)) score += 5;
-            const typeFilter = type === 'tv' ? 'TV Series' : 'Movie';
-            if (r.type === typeFilter) score += 3;
-            if (year && r.releaseDate && r.releaseDate.startsWith(String(year))) score += 2;
-            return { ...r, _score: score };
-          });
-          scored.sort((a: any, b: any) => b._score - a._score);
-          const match = scored[0];
-
-          // 2) Get info
-          const info = await consumet.movieInfo(match.id, provider);
-          const episodes = info.episodes || [];
-
-          if (type === 'tv') {
-            const targetEp = episodes.find(
-              (ep: any) => ep.season === parseInt(String(season)) && ep.number === parseInt(String(episode))
-            );
-            if (!targetEp) continue;
-            const watchRes = await consumet.movieWatch(targetEp.id, match.id, provider);
-            if (watchRes?.sources?.length > 0) {
-              return { ...watchRes, _provider: provider, _mediaTitle: info.title || title, _episodeTitle: targetEp.title };
-            }
-          } else {
-            const ep = episodes[0] || episodes;
-            if (!ep?.id) continue;
-            const watchRes = await consumet.movieWatch(ep.id, match.id, provider);
-            if (watchRes?.sources?.length > 0) {
-              return { ...watchRes, _provider: provider, _mediaTitle: info.title || title };
-            }
-          }
-        } catch { continue; }
-      }
-      return { error: 'No streaming sources found', sources: [] };
-    }, CACHE_TTL.STREAM);
-
-    // Track availability based on stream result
-    if (tmdbId) {
-      markAvailability('movie', tmdbId, (data?.sources?.length || 0) > 0);
-    }
-
-    res.json(data);
-  } catch (err: any) {
-    console.error('[movies/stream]', err.message);
-    reportRouteError(req, err, 'movies/stream');
-    res.status(500).json({ error: 'Failed to get stream' });
   }
 });
 
@@ -358,19 +362,6 @@ router.get('/find-tmdb', async (req: Request, res: Response) => {
   } catch (err: any) {
     reportRouteError(req, err, 'movies/find-tmdb');
     res.status(500).json({ error: 'TMDB lookup failed' });
-  }
-});
-
-// ========== GOKU DIRECT ==========
-
-router.get('/goku/info/:id', async (req: Request, res: Response) => {
-  try {
-    const data = await cached(`goku:info:${req.params.id}`,
-      () => consumet.movieInfo(qs(req.params.id), 'goku'), CACHE_TTL.INFO, 'long');
-    res.json(data);
-  } catch (err: any) {
-    reportRouteError(req, err, 'movies/goku/info');
-    res.status(500).json({ error: 'Failed to get Goku info' });
   }
 });
 

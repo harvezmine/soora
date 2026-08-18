@@ -28,6 +28,8 @@ interface TMDBItem {
   release_date?: string;
   first_air_date?: string;
   vote_average?: number;
+  vote_count?: number;
+  popularity?: number;
   media_type?: string;
   number_of_seasons?: number;
   overview?: string;
@@ -47,6 +49,17 @@ export function normalizeTMDB(item: TMDBItem) {
     mediaType: item.media_type || (item.number_of_seasons || item.first_air_date ? 'tv' : 'movie'),
     overview: item.overview || '',
     originalLanguage: item.original_language || '',
+    /**
+     * Dua sinyal ini dibawa keluar khusus untuk menyaring hasil pencarian.
+     *
+     * TMDB mengindeks jauh lebih banyak daripada yang bisa diputar: album
+     * soundtrack, film pendek, rekaman acara, rilis daerah yang tidak pernah
+     * masuk katalog embed mana pun. Semuanya punya jumlah suara nyaris nol,
+     * dan itu satu-satunya pembeda yang tersedia tanpa memanggil penyedia
+     * satu per satu. Lihat services/catalogRules.ts.
+     */
+    voteCount: item.vote_count ?? 0,
+    popularity: item.popularity ?? 0,
   };
 }
 

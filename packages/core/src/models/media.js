@@ -124,7 +124,7 @@ export function normalizeAnime(raw, source = 'anime') {
  * Film / serial.
  *
  * Dua jalur: TMDB (id numerik, `rating` sudah 0–100, gambar image.tmdb.org)
- * dan LK21 (`_id`, `posterImg`, `qualityResolution`). Goku memakai bentuk
+ * dan LK21 (`_id`, `posterImg`, `qualityResolution`). Penyedia lama memakai bentuk
  * mirip TMDB tapi dengan id string.
  */
 export function normalizeMovie(raw, source = 'tmdb') {

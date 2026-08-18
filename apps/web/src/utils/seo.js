@@ -47,13 +47,11 @@ export function detectMangaProvider(id) {
 
 /**
  * Auto-detect movie provider from ID format:
- * - Contains "watch-" → goku
  * - Purely numeric → tmdb
  * - Otherwise → lk21
  */
 export function detectMovieProvider(id) {
   if (!id) return 'tmdb';
-  if (id.includes('watch-')) return 'goku';
   if (/^\d+$/.test(id)) return 'tmdb';
   return 'lk21';
 }

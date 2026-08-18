@@ -479,7 +479,7 @@ export const getTVSeasonTMDB = (id, season) =>
   });
 
 // Search TMDB by title and return full details (credits, recommendations, similar)
-// Used to enrich Goku data with TMDB metadata (cast images, recs, backdrop, etc.)
+// Dipakai melengkapi data penyedia dengan metadata TMDB (foto pemeran, rekomendasi, backdrop).
 export const findTMDBDetailsByTitle = (title, mediaType = 'movie', year = '') =>
   cachedGet(`tmdb:find:${title}:${mediaType}:${year}`, async () => {
     try {
@@ -601,106 +601,8 @@ export const discoverTMDB = ({ mediaType = 'movie', genre, year, sort = 'popular
   });
 };
 
-// ========== MOVIE / TV STREAMING (Goku — primary, FlixHQ — fallback) ==========
-// Goku returns accessible HLS m3u8 sources with multiple quality levels.
-
-// Helper: search FlixHQ/HiMovies for a title and return the best match
-const _searchMovieProvider = async (provider, title, year, type) => {
-  const res = await api.get(`/movies/${provider}/${encodeURIComponent(title)}`);
-  const results = res.data?.results || [];
-  if (results.length === 0) return null;
-
-  // Try to match by title + year + type for best accuracy
-  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const titleNorm = normalize(title);
-  const typeFilter = type === 'tv' ? 'TV Series' : 'Movie';
-
-  // Prioritize: exact title + correct type + matching year
-  const scored = results.map((r) => {
-    let score = 0;
-    const rTitle = normalize(r.title);
-    if (rTitle === titleNorm) score += 10;
-    else if (rTitle.includes(titleNorm) || titleNorm.includes(rTitle)) score += 5;
-    if (r.type === typeFilter) score += 3;
-    if (year && r.releaseDate && r.releaseDate.startsWith(String(year))) score += 2;
-    return { ...r, _score: score };
-  });
-
-  scored.sort((a, b) => b._score - a._score);
-  return scored[0] || results[0];
-};
-
-// Get streaming sources for a movie — backend handles multi-provider fallback
-export const getMovieStreamingSources = async (title, tmdbId, year) =>
-  cachedGet(`stream:movie:${tmdbId}`, async () => {
-    const res = await api.get('/movies/stream', {
-      params: { title, tmdbId, year, type: 'movie' },
-    });
-    if (res.data?.error) throw new Error(res.data.error);
-    return { data: res.data };
-  });
-
-// Get streaming sources for a TV episode — backend handles multi-provider fallback
-export const getTVStreamingSources = async (title, tmdbId, season, episode, year) =>
-  cachedGet(`stream:tv:${tmdbId}:s${season}e${episode}`, async () => {
-    const res = await api.get('/movies/stream', {
-      params: { title, tmdbId, year, type: 'tv', season, episode },
-    });
-    if (res.data?.error) throw new Error(res.data.error);
-    return { data: res.data };
-  });
-
-// ========== GOKU INFO & DIRECT STREAMING ==========
-export const getGokuInfo = (gokuId) =>
-  cachedGet(`goku:info:${gokuId}`, async () => {
-    const res = await api.get('/movies/goku/info', { params: { id: gokuId } });
-    return { data: res.data };
-  });
-
-// Stream directly by Goku ID (skips search, much faster)
-export const getGokuMovieStream = (gokuId) =>
-  cachedGet(`goku:stream:movie:${gokuId}`, async () => {
-    const infoRes = await api.get('/movies/goku/info', { params: { id: gokuId } });
-    const info = infoRes.data;
-    const ep = info.episodes?.[0];
-    if (!ep?.id) throw new Error('No episode found');
-    const watchRes = await api.get('/movies/goku/watch', {
-      params: { episodeId: ep.id, mediaId: gokuId },
-    });
-    if (!watchRes.data?.sources?.length) throw new Error('No sources');
-    return { data: { ...watchRes.data, _provider: 'goku', _mediaTitle: info.title } };
-  });
-
-export const getGokuTVStream = (gokuId, season, episode) =>
-  cachedGet(`goku:stream:tv:${gokuId}:s${season}e${episode}`, async () => {
-    const infoRes = await api.get('/movies/goku/info', { params: { id: gokuId } });
-    const info = infoRes.data;
-    const episodes = info.episodes || [];
-    const targetEp = episodes.find((ep) => ep.season === season && ep.number === episode);
-    if (!targetEp) throw new Error('Episode not found');
-    const watchRes = await api.get('/movies/goku/watch', {
-      params: { episodeId: targetEp.id, mediaId: gokuId },
-    });
-    if (!watchRes.data?.sources?.length) throw new Error('No sources');
-    return { data: { ...watchRes.data, _provider: 'goku', _mediaTitle: info.title, _episodeTitle: targetEp.title } };
-  });
-
-// ========== GOKU MOVIE LISTINGS ==========
-// Normalize Goku items to match our Card component format
-const normalizeGoku = (item) => ({
-  id: item.id,
-  title: item.title || 'Unknown',
-  image: item.image || '',
-  type: item.type || 'Movie',
-  releaseDate: item.releaseDate || '',
-  duration: item.duration || '',
-  mediaType: item.type === 'TV Series' ? 'tv' : 'movie',
-  season: item.season || '',
-  latestEpisode: item.latestEpisode || '',
-});
-
 // ========== MOVIE HOME BUNDLE ==========
-// Backend orchestrates TMDB + Goku + LK21 in one call, with genre sections.
+// Backend menggabungkan TMDB + LK21 dalam satu panggilan, lengkap dengan bagian genre.
 export const getMovieHomeBundle = () =>
   cachedGetSWR('movies:home-bundle', async () => {
     const res = await api.get('/movies/home');
@@ -708,10 +610,14 @@ export const getMovieHomeBundle = () =>
     const d = res.data || {};
     return {
       data: {
-        trendingMovies: d.gokuTrendingMovies || [],
-        trendingTV: d.gokuTrendingTV || [],
-        recentMovies: d.gokuRecentMovies || [],
-        recentTV: d.gokuRecentTV || [],
+        // Empat bidang ini dipertahankan karena MovieHome membacanya, tapi
+        // isinya memang selalu kosong: dulu diambil dari kunci penyedia lama
+        // yang sudah tidak pernah dikirim backend. MovieHome mengisinya
+        // sendiri dari TMDB atau LK21 sesuai bahasa yang dipilih.
+        trendingMovies: [],
+        trendingTV: [],
+        recentMovies: [],
+        recentTV: [],
         // Extra data from backend (available for future use)
         tmdbTrending: d.trending || [],
         tmdbPopularMovies: d.popularMovies || [],
@@ -723,30 +629,6 @@ export const getMovieHomeBundle = () =>
       },
     };
   }, BUNDLE_CACHE_TTL);
-
-export const getGokuTrendingMovies = () =>
-  cachedGet('goku:trending:movie', async () => {
-    const res = await api.get('/movies/goku/trending', { params: { type: 'movie' } });
-    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
-  });
-
-export const getGokuTrendingTV = () =>
-  cachedGet('goku:trending:tv', async () => {
-    const res = await api.get('/movies/goku/trending', { params: { type: 'tv' } });
-    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
-  });
-
-export const getGokuRecentMovies = () =>
-  cachedGet('goku:recent:movie', async () => {
-    const res = await api.get('/movies/goku/recent-movies');
-    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
-  });
-
-export const getGokuRecentTV = () =>
-  cachedGet('goku:recent:tv', async () => {
-    const res = await api.get('/movies/goku/recent-shows');
-    return { data: (Array.isArray(res.data) ? res.data : res.data?.results || []).map(normalizeGoku) };
-  });
 
 // VixSrc direct HLS resolver — TMDB id → raw m3u8 (ad-free, our hls.js player).
 // Returns { m3u8, proxiedUrl } where proxiedUrl streams through our /proxy
@@ -773,23 +655,32 @@ export const getVixsrcStream = async (type, tmdbId, season, episode) => {
   const res = await api.get(`/movies/vixsrc/${type === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
     params,
   });
-  const { m3u8, ref } = res.data || {};
-  if (!m3u8) return { m3u8: null, ref: null };
+  const { m3u8, ref, embed } = res.data || {};
+  /**
+   * `embed` ikut dibawa keluar: false berarti backend sudah memastikan iframe
+   * cadangannya pun kosong. Tanpa itu pemanggil memasang iframe lintas-asal
+   * yang tidak pernah bisa melaporkan kegagalannya sendiri, dan yang terlihat
+   * cuma kotak hitam diam. null berarti belum bisa disimpulkan — perlakukan
+   * seperti sebelumnya, yaitu tetap tawarkan iframe-nya.
+   */
+  if (!m3u8) return { m3u8: null, ref: null, embed: embed ?? null };
   // Return RAW m3u8 + ref. Pemanggil membungkusnya dengan proxy sekali;
   // pre-proxying di sini pernah menghasilkan /proxy?url=/proxy bersarang → 403.
-  return { m3u8, ref };
+  return { m3u8, ref, embed: embed ?? null };
 };
 
-// English movie/TV search via the backend multi-provider orchestrator
-// (TMDB + Goku + LK21). The old single-provider /movies/goku/:q passthrough
-// returned nothing whenever the Goku scraper was down — this endpoint falls
-// back to TMDB (always available server-side) so search keeps working.
-// Backend already card-normalizes tmdb results; goku/lk21 come as raw results.
-// English movie pool = TMDB ONLY. LK21 is a fully separate Sub-Indo pool
-// (searched via searchLK21 when soora_movie_lang === 'id'). Keeping LK21 out
-// here guarantees the English filter never surfaces LK21 films, and vice
-// versa. Backend /movies/search already strips id-language films from TMDB.
-export const searchGoku = async (query) => {
+/**
+ * Pencarian kolam internasional. Isinya TMDB saja.
+ *
+ * Namanya dulu mengacu ke penyedia lama yang sudah mati dan jalurnya sudah
+ * dibuang; nama itu tertinggal dan menyesatkan siapa pun yang membacanya.
+ *
+ * Kolam lokal punya jalurnya sendiri (`searchLK21`, dipakai saat
+ * soora_movie_lang === 'id'). Pemisahan itu yang menjamin filter Inggris tidak
+ * pernah memunculkan film LK21, dan sebaliknya — backend /movies/search sudah
+ * menyaring judul berbahasa Indonesia dari cabang TMDB.
+ */
+export const searchMovieEN = async (query) => {
   const res = await api.get('/movies/search', { params: { q: query, page: 1 } });
   const tmdbItems = res.data?.tmdb?.results || [];       // already card-ready
   return { data: { results: tmdbItems } };

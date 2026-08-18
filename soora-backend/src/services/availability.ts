@@ -42,8 +42,11 @@ export function markAvailability(type: ContentType, id: string, available: boole
 /**
  * Filter an array of items, removing those known to be unavailable.
  * Items with unknown availability are kept (assumed available).
+ *
+ * Id TMDB berupa angka sementara id penyedia lain berupa teks. Keduanya
+ * dijadikan teks saat menyusun kunci, jadi batasan tipenya menerima dua-duanya.
  */
-export function filterAvailable<T extends { id?: string }>(
+export function filterAvailable<T extends { id?: string | number }>(
   type: ContentType,
   items: T[],
 ): T[] {

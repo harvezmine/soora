@@ -91,35 +91,25 @@ export default async function handler(req, res) {
     }
 
     // --- 3. Movies & Series with clean /movie/ and /series/ paths ---
-    const [trendingMoviesRes, trendingTVRes, lk21Res] = await Promise.allSettled([
-      api.get('/movies/goku/trending-movies'),
-      api.get('/movies/goku/trending-tv'),
+    // Penyedia lama sudah mati dan endpoint-nya dibuang. Yang tren sekarang
+    // datang dari TMDB, satu panggilan berisi film dan serial sekaligus —
+    // dipisah di bawah lewat mediaType, bukan lewat dua endpoint terpisah.
+    const [trendingRes, lk21Res] = await Promise.allSettled([
+      api.get('/movies/trending', { params: { type: 'all', time: 'week' } }),
       api.get('/movies/lk21/home'),
     ]);
+    const trendingItems = trendingRes.status === 'fulfilled'
+      ? (trendingRes.value.data?.results || [])
+      : [];
 
-    if (trendingMoviesRes.status === 'fulfilled') {
-      const items = trendingMoviesRes.value.data?.results || trendingMoviesRes.value.data || [];
-      items.forEach(item => {
-        if (item.id) {
-          urls.push(buildUrlEntry(
-            `${SITE_URL}/movie/${encodePathId(item.id)}`,
-            'weekly', '0.7'
-          ));
-        }
-      });
-    }
-
-    if (trendingTVRes.status === 'fulfilled') {
-      const items = trendingTVRes.value.data?.results || trendingTVRes.value.data || [];
-      items.forEach(item => {
-        if (item.id) {
-          urls.push(buildUrlEntry(
-            `${SITE_URL}/series/${encodePathId(item.id)}`,
-            'weekly', '0.7'
-          ));
-        }
-      });
-    }
+    trendingItems.forEach(item => {
+      if (!item.id) return;
+      const route = item.mediaType === 'tv' ? 'series' : 'movie';
+      urls.push(buildUrlEntry(
+        `${SITE_URL}/${route}/${encodePathId(item.id)}`,
+        'weekly', '0.7'
+      ));
+    });
 
     if (lk21Res.status === 'fulfilled') {
       const data = lk21Res.value.data;

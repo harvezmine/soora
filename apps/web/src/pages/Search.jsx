@@ -3,7 +3,7 @@ import { useSearchParams, useParams } from 'react-router-dom';
 import {
   searchSamehadaku,
   searchMoviesTMDB,
-  searchGoku,
+  searchMovieEN,
   searchLK21,
   searchManga,
   searchKomiku,
@@ -13,8 +13,6 @@ import {
   normalizeMangaTitle,
   getAnimeMostPopular,
   getAnimeTopAiring,
-  getGokuTrendingMovies,
-  getGokuTrendingTV,
   getTrendingTMDB,
   getLK21HomeBundle,
   getPopularManga,
@@ -157,18 +155,14 @@ export default function Search({ searchType }) {
               setDiscover([]);
             }
           } else {
-            // TMDB trending (alive) — Goku is dead. Fall back to Goku only if TMDB empty.
+            // Cadangan penyedia lama sudah dibuang: endpoint-nya mati, jadi
+            // yang tersisa cuma menambah satu permintaan gagal sebelum
+            // menampilkan daftar kosong yang sama.
             let merged = [];
             try {
               const tr = await getTrendingTMDB('all', 'week');
               merged = (tr.data?.results || []);
-            } catch { /* try goku */ }
-            if (merged.length === 0) {
-              const [mRes, tRes] = await Promise.allSettled([getGokuTrendingMovies(), getGokuTrendingTV()]);
-              const movies = mRes.status === 'fulfilled' ? (mRes.value.data || []) : [];
-              const tv = tRes.status === 'fulfilled' ? (tRes.value.data || []) : [];
-              merged = [...movies, ...tv];
-            }
+            } catch { /* biarkan kosong */ }
             const seen = new Set();
             const dedup = [];
             merged.forEach(i => { if (i && !seen.has(i.id)) { seen.add(i.id); dedup.push(i); } });
@@ -274,7 +268,7 @@ export default function Search({ searchType }) {
             } catch { /* bundle fallback also failed */ }
           }
         } else {
-          res = await searchGoku(q);
+          res = await searchMovieEN(q);
         }
       } else if (type === 'manga') {
         const mangaLang = localStorage.getItem('soora_manga_lang') || 'en';

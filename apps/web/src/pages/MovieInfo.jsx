@@ -6,7 +6,6 @@ import {
   tmdbImg,
   tmdbBackdrop,
   hasTMDBKey,
-  getGokuInfo,
   findTMDBDetailsByTitle,
   getLK21Info,
   getLK21SeriesInfo,
@@ -14,8 +13,6 @@ import {
 import { useSEO, buildMovieSchema, buildMovieUrl, detectMovieProvider } from '../utils/seo';
 import Card from '../components/Card';
 
-// Detect if an id is a Goku ID (contains "watch-") vs numeric TMDB ID
-const isGokuId = (id) => id && (id.includes('watch-') || id.includes('/'));
 
 /* ===== Skeleton Loader for MovieInfo ===== */
 function MovieInfoSkeleton() {
@@ -69,8 +66,6 @@ function MovieInfoSkeleton() {
   );
 }
 
-// Enlarge Goku thumbnail (250x400 → 600x900)
-const gokuLargeImg = (url) => url ? url.replace(/\/resize\/\d+x\d+\//, '/resize/600x900/') : url;
 
 // Inline placeholder — always resolves, so onLoad fires and the poster is
 // never stuck at opacity 0 when every image source is empty.
@@ -89,7 +84,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   const [tmdbData, setTmdbData] = useState(null); // Enrichment data from TMDB
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [source, setSource] = useState(null); // 'goku', 'tmdb', or 'lk21'
+  const [source, setSource] = useState(null); // 'tmdb' atau 'lk21'
   const [posterLoaded, setPosterLoaded] = useState(false);
   const [backdropLoaded, setBackdropLoaded] = useState(false);
 
@@ -107,19 +102,6 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
           const res = type === 'tv'
             ? await getLK21SeriesInfo(id)
             : await getLK21Info(id);
-          setInfo(res.data);
-          setLoading(false); // show content immediately, enrich in background
-
-          // Enrich with TMDB data in background (non-blocking)
-          if (hasTMDBKey() && res.data?.title) {
-            findTMDBDetailsByTitle(res.data.title, type)
-              .then(tmdbRes => { if (tmdbRes.data) setTmdbData(tmdbRes.data); })
-              .catch(() => {});
-          }
-          return; // skip finally
-        } else if (isGokuId(id)) {
-          setSource('goku');
-          const res = await getGokuInfo(id);
           setInfo(res.data);
           setLoading(false); // show content immediately, enrich in background
 
@@ -151,10 +133,10 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
 
   // SEO hook (must be before early returns to satisfy Rules of Hooks)
   const seoMovieTitle = info
-    ? (source === 'goku' || source === 'lk21' ? (info.title || 'Unknown') : (info.title || info.name || 'Unknown'))
+    ? (source === 'lk21' ? (info.title || 'Unknown') : (info.title || info.name || 'Unknown'))
     : '';
   const seoYear = info
-    ? (source === 'goku' || source === 'lk21'
+    ? (source === 'lk21'
       ? (info.releaseDate || '')
       : (info.release_date || info.first_air_date || '').split('-')[0])
     : '';
@@ -162,7 +144,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
     ? (tmdbData?.overview || info.synopsis || info.description || info.overview || '')
     : '';
   const seoGenres = info
-    ? ((source === 'goku' || source === 'lk21')
+    ? ((source === 'lk21')
       ? (tmdbData?.genres || (info.genres || []).map((g, i) => ({ id: i, name: g })))
       : (info.genres || []))
     : [];
@@ -170,9 +152,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   const seoPoster = info
     ? (source === 'lk21'
       ? (tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : info.posterImg || '')
-      : source === 'goku'
-        ? (tmdbData?.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}` : info.image || '')
-        : (info.poster_path ? `https://image.tmdb.org/t/p/w500${info.poster_path}` : ''))
+      : (info.poster_path ? `https://image.tmdb.org/t/p/w500${info.poster_path}` : ''))
     : '';
 
   const seoGenreText = seoGenres.map(g => typeof g === 'string' ? g : g.name).filter(Boolean).slice(0, 3).join(', ');
@@ -191,10 +171,9 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   if (error) return <div className="error-msg">{error}</div>;
   if (!info) return <div className="error-msg">No data found</div>;
 
-  // Normalize fields for Goku, TMDB, and LK21
-  const isGoku = source === 'goku';
+  // Normalisasi bidang untuk TMDB dan LK21
   const isLK21 = source === 'lk21';
-  const isAlt = isGoku || isLK21; // non-TMDB source
+  const isAlt = isLK21; // sumber non-TMDB
   const title = isAlt
     ? (info.title || 'Unknown')
     : (info.title || info.name || 'Unknown');
@@ -204,14 +183,10 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   const navCover = location.state?._cover || location.state?._img || '';
   const poster = (isLK21
     ? (tmdbData?.poster_path ? tmdbImg(tmdbData.poster_path, 'w500') : info.posterImg || '')
-    : isGoku
-      ? (tmdbData?.poster_path ? tmdbImg(tmdbData.poster_path, 'w500') : gokuLargeImg(info.image))
-      : tmdbImg(info.poster_path, 'w500')) || navImg;
+    : tmdbImg(info.poster_path, 'w500')) || navImg;
   const backdrop = (isLK21
     ? (tmdbData?.backdrop_path ? tmdbBackdrop(tmdbData.backdrop_path) : info.posterImg || '')
-    : isGoku
-      ? (tmdbData?.backdrop_path ? tmdbBackdrop(tmdbData.backdrop_path) : gokuLargeImg(info.cover || info.image))
-      : tmdbBackdrop(info.backdrop_path)) || navCover || navImg;
+    : tmdbBackdrop(info.backdrop_path)) || navCover || navImg;
   // Backdrop falls back to the poster; empty means "gradient only".
   const backdropSrc = backdrop || poster || '';
   const year = isAlt
@@ -235,8 +210,6 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
   const rating = isAlt
     ? (tmdbData?.vote_average?.toFixed(1) || info.rating || null)
     : info.vote_average?.toFixed(1);
-  const tagline = isAlt ? (tmdbData?.tagline || '') : (info.tagline || '');
-  const episodes = isGoku ? (info.episodes || []) : [];
   const recommendations = isAlt
     ? (tmdbData?.recommendations?.results || []).slice(0, 12)
     : (info.recommendations?.results || []).slice(0, 12);
@@ -245,20 +218,6 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
     : (info.similar?.results || []).slice(0, 12);
   const seasons = isAlt ? [] : (info.seasons?.filter((s) => s.season_number > 0) || []);
   const tmdbId = isAlt ? tmdbData?.id : info.id;
-
-  // Build seasons from Goku episodes
-  const gokuSeasons = [];
-  if (isGoku && episodes.length > 0 && type === 'tv') {
-    const seasonMap = {};
-    episodes.forEach((ep) => {
-      const s = ep.season || 1;
-      if (!seasonMap[s]) seasonMap[s] = [];
-      seasonMap[s].push(ep);
-    });
-    Object.keys(seasonMap).sort((a, b) => a - b).forEach((s) => {
-      gokuSeasons.push({ season: Number(s), count: seasonMap[s].length });
-    });
-  }
 
   const handleWatch = (s = 1, ep = 1) => {
     if (isLK21) {
@@ -269,16 +228,6 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
       } else {
         navigate(
           `/watch/movie?lk21Id=${encodeURIComponent(id)}&type=movie&title=${encodeURIComponent(title)}`
-        );
-      }
-    } else if (isGoku) {
-      if (type === 'tv') {
-        navigate(
-          `/watch/movie?gokuId=${encodeURIComponent(id)}&type=tv&season=${s}&episode=${ep}&title=${encodeURIComponent(title)}`
-        );
-      } else {
-        navigate(
-          `/watch/movie?gokuId=${encodeURIComponent(id)}&type=movie&title=${encodeURIComponent(title)}`
         );
       }
     } else {
@@ -355,8 +304,7 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
           </div>
           <div className="info-details">
             <h1>{title}</h1>
-            {!isGoku && info.tagline && <p className="info-tagline">"{info.tagline}"</p>}
-            {isGoku && tagline && <p className="info-tagline">"{tagline}"</p>}
+            {info.tagline && <p className="info-tagline">"{info.tagline}"</p>}
 
             <div className="info-meta">
               <span className="badge badge-accent">
@@ -366,9 +314,6 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
               {duration && <span className="badge">{duration}</span>}
               {info.number_of_seasons > 0 && (
                 <span className="badge">{info.number_of_seasons} Seasons</span>
-              )}
-              {gokuSeasons.length > 0 && (
-                <span className="badge">{gokuSeasons.length} Seasons</span>
               )}
               {rating && rating !== '0.0' && (
                 <span className="badge badge-gold">★ {rating}</span>
@@ -449,25 +394,6 @@ export default function MovieInfo({ mediaType: routeMediaType }) {
                 >
                   <span className="ep-num">Season {s.season_number}</span>
                   <span className="ep-title">{s.episode_count} episodes</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Seasons — Goku TV */}
-        {gokuSeasons.length > 0 && (
-          <div className="episode-section">
-            <h2>Seasons</h2>
-            <div className="episodes-grid">
-              {gokuSeasons.map((s) => (
-                <button
-                  className="ep-btn"
-                  key={s.season}
-                  onClick={() => handleWatch(s.season, 1)}
-                >
-                  <span className="ep-num">Season {s.season}</span>
-                  <span className="ep-title">{s.count} episodes</span>
                 </button>
               ))}
             </div>
