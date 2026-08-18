@@ -67,7 +67,22 @@ const CACHE_TTL = 10 * 60 * 1000;       // 10 min default
 const MANGA_CACHE_TTL = 30 * 60 * 1000; // 30 min for slow manga fetches
 const BUNDLE_CACHE_TTL = 15 * 60 * 1000; // 15 min for home bundles
 
-const _ssKey = (k) => `soora_cache:${k}`;
+/**
+ * Versi skema cache.
+ *
+ * Dinaikkan saat isi cache lama tidak lagi boleh dipercaya — bukan saat
+ * bentuknya berubah, tapi saat MAKNANYA berubah. Daftar film yang tersimpan
+ * sebelum verifikasi ketersediaan dipasang masih memuat judul yang tidak bisa
+ * diputar, dan cache persisten bertahan sampai 45 menit; tanpa penanda ini,
+ * orang yang sudah pernah membuka beranda tetap disuguhi daftar lama itu dan
+ * mengira perbaikannya tidak jalan.
+ *
+ * Menaikkannya membuat seluruh entri lama tidak pernah terbaca lagi, dan
+ * terbuang sendiri saat storage-nya dibersihkan.
+ */
+const CACHE_SCHEMA = 'v2';
+
+const _ssKey = (k) => `soora_cache:${CACHE_SCHEMA}:${k}`;
 
 // Lapisan persisten cache. Web → sessionStorage, native → MMKV.
 // Port sudah menelan error I/O sendiri; try/catch di sini hanya untuk JSON.parse.
