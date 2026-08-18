@@ -401,6 +401,40 @@ router.get('/lk21/series/streams/:id', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /movies/lk21/home-bundle
+ *
+ * Beranda kolam lokal. Sebelumnya jatuh ke passthrough umum di bawah, jadi
+ * isinya sampai ke layar tanpa diperiksa sama sekali — sama persis dengan
+ * lubang yang membuat judul mati bertahan di kolam internasional.
+ */
+router.get('/lk21/home-bundle', async (req: Request, res: Response) => {
+  try {
+    const data = await cachedSWR('movies:lk21:home-bundle', async () => {
+      const bundle: any = await consumet.passthrough('/movies/lk21/home-bundle', {});
+      const daftar: Array<[string, boolean]> = [
+        ['popularMovies', false], ['recentMovies', false], ['topRatedMovies', false],
+        ['latestSeries', true], ['popularSeries', true],
+      ];
+      const keluar: Record<string, any> = { ...bundle };
+      // Berurutan, sama alasannya seperti sapuan beranda internasional:
+      // menumpuk sapuan membuat penyedianya menolak, dan penolakan terbaca
+      // sebagai "tidak diketahui" lalu diloloskan.
+      for (const [kunci, serial] of daftar) {
+        const isi = Array.isArray(bundle?.[kunci]) ? bundle[kunci] : [];
+        keluar[kunci] = await saringBisaDiputarLk21(
+          isi.map((x: any) => ({ ...x, id: x._id || x.id })), serial
+        );
+      }
+      return keluar;
+    }, CACHE_TTL.HOME_BUNDLE);
+    res.json(data);
+  } catch (err: any) {
+    reportRouteError(req, err, 'movies/lk21/home-bundle');
+    res.status(502).json({ error: 'Gagal memuat beranda LK21' });
+  }
+});
+
+/**
  * GET /movies/lk21/search/:query
  * LK21 search with home-bundle fallback.
  * The upstream Consumet LK21 search is often blocked by Cloudflare,
@@ -472,7 +506,12 @@ router.get('/lk21/search/:query', async (req: Request, res: Response) => {
       return { results: [], totalPages: 0 };
     }, CACHE_TTL.SEARCH);
 
-    res.json(data);
+    // Di luar cache, supaya hasil yang sudah tersimpan ikut belajar dari
+    // catatan ketersediaan yang terus diperbarui.
+    res.json({
+      ...data,
+      results: await saringBisaDiputarLk21(data?.results || []),
+    });
   } catch (err: any) {
     console.error('[movies/lk21/search]', err.message);
     reportRouteError(req, err, 'movies/lk21/search');

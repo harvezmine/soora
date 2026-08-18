@@ -283,6 +283,7 @@ function panaskanBeranda() {
   const GENRE = [28, 35, 18, 27, 10749, 878, 53, 16, 10751, 99];
   const jalur = [
     '/movies/home',
+    '/movies/lk21/home-bundle',
     '/tmdb/trending/movie/week',
     '/tmdb/trending/tv/week',
     '/tmdb/movie/popular?page=1',
