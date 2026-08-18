@@ -4,11 +4,7 @@ import * as tmdb from '../services/tmdb';
 import { cached, cachedSWR, CACHE_TTL } from '../services/cache';
 import { parallel, normalizeLK21, extractResults } from '../utils/normalize';
 import { markAvailability, filterAvailable } from '../services/availability';
-import {
-  saringLayakDiputar,
-  ukuranVidlinkBisaDipercaya,
-  vidlinkBerisi,
-} from '../services/catalogRules';
+import { saringLayakDiputar } from '../services/catalogRules';
 import { reportRouteError } from '../services/telegram';
 
 const qs = (v: any): string => String(v ?? '');
@@ -54,34 +50,6 @@ async function resolveVixsrc(kind: 'movie' | 'tv', tmdbId: string, season?: stri
   return { m3u8, ref: embed };
 }
 
-/**
- * Ukuran halaman VidLink dalam byte, atau null bila gagal diambil.
- *
- * Dipakai hanya sebagai jalan terakhir, saat VixSrc tidak punya sumber.
- * Halamannya paling besar sekitar 130 KB, jadi diambil utuh — tidak ada
- * jalan lain, sebab isinya ditentukan skrip di dalam halaman dan tidak
- * tercermin di header mana pun.
- */
-async function ukuranHalamanVidlink(
-  kind: 'movie' | 'tv', tmdbId: string, season?: string, episode?: string
-): Promise<number | null> {
-  const url = kind === 'tv'
-    ? `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`
-    : `https://vidlink.pro/movie/${tmdbId}`;
-  try {
-    const r = await axios.get(url, {
-      headers: { 'User-Agent': VIX_UA },
-      timeout: 8000,
-      responseType: 'text',
-      validateStatus: () => true,
-    });
-    if (r.status >= 400 || typeof r.data !== 'string') return null;
-    return Buffer.byteLength(r.data);
-  } catch {
-    return null;
-  }
-}
-
 router.get('/vixsrc/:type/:tmdbId', async (req: Request, res: Response) => {
   try {
     const type = req.params.type === 'tv' ? 'tv' : 'movie';
@@ -107,28 +75,17 @@ router.get('/vixsrc/:type/:tmdbId', async (req: Request, res: Response) => {
      */
     const ketemu = !!data?.m3u8;
     if (type === 'movie' || ketemu) markAvailability('movie', tmdbId, ketemu);
-    if (ketemu) return res.json({ ...data, embed: null });
-
     /**
-     * VixSrc tidak punya sumber, jadi halaman akan jatuh ke iframe VidLink.
-     * Masalahnya iframe itu lintas-asal: kalau VidLink juga tidak punya
-     * judulnya, tidak ada satu pun peristiwa yang bisa ditangkap — pengguna
-     * cuma melihat kotak hitam yang diam, tanpa penjelasan, selamanya.
+     * Tidak ada lagi cadangan iframe untuk film, jadi tidak ada apa pun yang
+     * perlu diperiksa saat VixSrc kosong: kosong berarti tidak tersedia.
      *
-     * Jadi dicek di sini, dari sisi server, di mana aturan lintas-asal tidak
-     * berlaku. Hanya di jalur gagal: yang berhasil sudah pulang di atas dan
-     * tidak ikut menanggung tambahan waktu ini.
-     *
-     * `embed` bernilai false hanya bila benar-benar diketahui kosong. null
-     * berarti tidak bisa disimpulkan — untuk serial, atau saat halamannya
-     * gagal diambil — dan yang tidak diketahui tetap ditawarkan.
+     * Sebelumnya di sini ada pemeriksaan halaman VidLink untuk membedakan
+     * "iframe cadangan punya isi" dari "kosong". Cadangannya sendiri sudah
+     * dibuang — diuji dengan peramban sungguhan, VidLink menolak memutar di
+     * dalam sandbox dan memunculkan popup beserta jaringan iklan bila
+     * sandbox-nya dilepas — jadi pembedaan itu tidak lagi ada gunanya.
      */
-    const bytes = ukuranVidlinkBisaDipercaya(type)
-      ? await cached(`vidlink:size:${type}:${tmdbId}`,
-          () => ukuranHalamanVidlink(type, tmdbId, season, episode), CACHE_TTL.STREAM)
-      : null;
-
-    res.json({ m3u8: null, embed: vidlinkBerisi(type, bytes) });
+    res.json(data || { m3u8: null });
   } catch (err: any) {
     reportRouteError(req, err, 'movies/vixsrc');
     res.json({ m3u8: null });

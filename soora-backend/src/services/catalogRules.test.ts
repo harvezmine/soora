@@ -4,8 +4,6 @@ import {
   MIN_POPULARITY,
   layakDiputar,
   saringLayakDiputar,
-  vidlinkBerisi,
-  VIDLINK_MIN_BYTES,
 } from './catalogRules';
 
 /** Pembantu ringkas: judul dengan angka yang diatur per kasus. */
@@ -85,35 +83,5 @@ describe('saringLayakDiputar', () => {
       { id: 350632, ...judul(1, 0.1) },          // film pendek
     ];
     expect(saringLayakDiputar(inception).map((x) => x.id)).toEqual([27205]);
-  });
-});
-
-describe('vidlinkBerisi', () => {
-  it('mengenali halaman film yang berisi', () => {
-    // Inception: 92 KB terukur.
-    expect(vidlinkBerisi('movie', 92_662)).toBe(true);
-  });
-
-  it('mengenali halaman film yang kosong', () => {
-    // Album soundtrack "Inception": 13,7 KB terukur.
-    expect(vidlinkBerisi('movie', 13_742)).toBe(false);
-  });
-
-  it('menolak menyimpulkan apa pun untuk serial', () => {
-    // Halaman serial selalu ~10,5 KB, berisi atau tidak. Angka sebesar apa
-    // pun tetap "tidak tahu" - bukan "tidak ada".
-    expect(vidlinkBerisi('tv', 10_543)).toBe(null);
-    expect(vidlinkBerisi('tv', 500_000)).toBe(null);
-  });
-
-  it('mengembalikan null saat halamannya gagal diambil', () => {
-    expect(vidlinkBerisi('movie', null)).toBe(null);
-    expect(vidlinkBerisi('movie', 0)).toBe(null);
-    expect(vidlinkBerisi('movie', NaN)).toBe(null);
-  });
-
-  it('menerima tepat di ambang', () => {
-    expect(vidlinkBerisi('movie', VIDLINK_MIN_BYTES)).toBe(true);
-    expect(vidlinkBerisi('movie', VIDLINK_MIN_BYTES - 1)).toBe(false);
   });
 });

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import VideoPlayer from '../components/VideoPlayer';
 import AnimeEmbedPlayer from '../components/AnimeEmbedPlayer';
-import MovieEmbedPlayer from '../components/MovieEmbedPlayer';
 import SubIndoPlayer from '../components/SubIndoPlayer';
 import { useMiniPlayer } from '../context/MiniPlayerContext';
 import {
@@ -298,33 +297,37 @@ export default function Watch() {
               const hlsSources = lkSources
                 .filter((s) => s.type === 'hls' && s.directUrl)
                 .sort((a, b) => isDeadHost(a.directUrl) - isDeadHost(b.directUrl));
-              const embedOnly = lkSources.filter((s) => s.type !== 'hls');
-
-              const allSources = [
-                // Direct HLS sources first (best quality, no iframe)
-                ...hlsSources.map((s) => ({
-                  url: s.directUrl || s.url,
-                  quality: s.provider || 'default',
-                  provider: s.provider,
-                  isEmbed: false,
-                })),
-                // Embed fallbacks
-                ...embedOnly.map((s) => ({
-                  url: s.url,
-                  quality: s.provider || 'default',
-                  provider: s.provider,
-                  isEmbed: true,
-                })),
-              ];
+              /**
+               * Sumber embed (CAST, P2P) sengaja TIDAK diikutkan.
+               *
+               * Keduanya menunjuk videonode.de, yang membalas dengan
+               * `Content-Security-Policy: frame-ancestors` berisi daftar
+               * domain LK21 saja. soora.fun tidak ada di daftar itu, jadi
+               * peramban menolak merender frame-nya sama sekali — yang
+               * terlihat cuma halaman galat, bukan pemutar. Diuji dengan
+               * peramban sungguhan: iframe-nya berakhir di
+               * chrome-error://chromewebdata/.
+               *
+               * Menyertakannya cuma membuat failover otomatis singgah di
+               * frame yang mustahil hidup sebelum menyerah. Lebih baik
+               * langsung berkata tidak ada.
+               *
+               * Halaman itu juga memasang tautan iklan yang menutupi seluruh
+               * pemutar — tapi itu bukan alasan utamanya, sebab iklan tersebut
+               * memang tidak pernah sampai ke pengguna kita.
+               */
+              const allSources = hlsSources.map((s) => ({
+                url: s.directUrl || s.url,
+                quality: s.provider || 'default',
+                provider: s.provider,
+                isEmbed: false,
+              }));
 
               if (allSources.length > 0) {
                 setSources(allSources);
                 setCurrentSource(allSources[0]);
-                // Set referer for HLS proxy — needed by cloud.hownetwork.xyz and cdn4.turboviplay.com
-                if (!allSources[0].isEmbed) {
-                  const urlObj = new URL(allSources[0].url);
-                  setReferer(urlObj.origin);
-                }
+                // Referer untuk proxy HLS — dibutuhkan cdn4.turboviplay.com
+                try { setReferer(new URL(allSources[0].url).origin); } catch { setReferer(''); }
                 streamOk = true;
               }
             }
@@ -332,17 +335,10 @@ export default function Watch() {
             console.warn('LK21 stream fetch failed:', streamErr);
           }
 
-          // Fallback: if we resolved TMDB ID, try embed player
           if (!streamOk) {
-            const tid = resolvedTmdbId || tmdbId;
-            if (tid) {
-              setUseEmbedPlayer(true);
-              setSubLang('id');
-            } else {
-              // Auto-switch to SubIndo player with the title
-              setUseSubIndo(true);
-              setSubLang('id');
-            }
+            // Tidak ada aliran langsung, dan tidak ada cadangan iframe yang
+            // layak. Dikatakan apa adanya.
+            setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
           }
         }
         // ── TMDB flow (backward compatibility) ──
@@ -376,21 +372,25 @@ export default function Watch() {
               setCurrentSource(src);
               setReferer(vix.ref || '');   // VideoPlayer proxies with this referer
               setUseEmbedPlayer(false);
-            } else if (vix?.embed === false) {
-              // Backend sudah memeriksa iframe cadangannya dan memastikan
-              // kosong. Memasangnya tetap cuma menghasilkan kotak hitam yang
-              // diam — jadi dikatakan saja. Tombol "Embedded Player" di layar
-              // galat tetap ada bagi yang mau mencoba sendiri.
-              setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
             } else {
-              console.info('VixSrc had no source — switching to embed player');
-              setUseEmbedPlayer(true);
-              setSubLang('multi');
+              /**
+               * Tidak ada cadangan iframe lagi.
+               *
+               * Cadangannya dulu VidLink. Diuji dengan peramban sungguhan:
+               * di dalam sandbox ia menolak memutar dan menampilkan tulisan
+               * "Please Disable Sandbox"; tanpa sandbox ia memang memutar,
+               * tapi membuka dua tab popup dan memuat jaringan iklan
+               * a.pemsrv.com begitu area video diklik.
+               *
+               * Dua-duanya tidak bisa diterima, jadi ia dibuang seluruhnya.
+               * Judul yang tidak ada di VixSrc sekarang dikatakan tidak
+               * tersedia — jujur, dan tanpa satu pun iklan.
+               */
+              setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
             }
           } catch (streamErr) {
-            console.warn('VixSrc resolve failed, embed fallback:', streamErr);
-            setUseEmbedPlayer(true);
-            setSubLang('multi');
+            console.warn('VixSrc resolve failed:', streamErr);
+            setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
           }
         }
       } catch (err) {
@@ -853,48 +853,6 @@ export default function Watch() {
             alId={alId}
             episode={parseInt(epNum) || 1}
           />
-        ) : isMovie && useEmbedPlayer && effectiveTmdbId ? (
-          <MovieEmbedPlayer
-            tmdbId={effectiveTmdbId}
-            mediaType={mediaType}
-            season={season}
-            episode={episode}
-          />
-        ) : currentSource?.isEmbed ? (
-          <div className="player-wrapper">
-            {/*
-              Sumber embed kolam lokal (videonode.de, dipakai CAST dan P2P)
-              memasang tautan iklan yang menutupi seluruh pemutar:
-
-                <a id="overlay" href="https://yellowishgather.com/b.3UV/…"
-                   target="_blank"></a>
-
-              Overlay-nya tidak terlihat dan menutupi area video, jadi klik
-              apa pun — termasuk menekan play — membuka tab iklan. Halaman
-              yang sama juga menjalankan pengintai devtools yang memindahkan
-              alamat ke google.com.
-
-              `sandbox` tanpa allow-popups dan tanpa allow-top-navigation
-              melumpuhkan keduanya: target="_blank" tidak lagi boleh membuka
-              apa pun, dan halaman tidak bisa menyeret tab induk ke mana-mana.
-              Daftar izinnya sengaja sama persis dengan MovieEmbedPlayer —
-              cukup untuk hls.js dan pemutarnya berjalan, tidak lebih.
-
-              Iframe ini bukan jalur utama: sumber HLS langsung selalu diurut
-              lebih dulu. Tapi failover otomatis memang sampai ke sini saat
-              HLS-nya mati, tanpa pengguna memilih apa pun — jadi tidak boleh
-              dibiarkan telanjang.
-            */}
-            <iframe
-              src={currentSource.url}
-              style={{ width: '100%', height: '100%', border: 'none', minHeight: '400px' }}
-              allowFullScreen
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-              title="LK21 Player"
-              referrerPolicy="no-referrer"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-presentation"
-            />
-          </div>
         ) : currentSource ? (
           <div className="player-wrapper">
             <VideoPlayer
@@ -949,12 +907,6 @@ export default function Watch() {
                     Embedded Player
                   </button>
                 )}
-                {isMovie && effectiveTmdbId && (
-                  <button className="btn-play btn-sm" onClick={() => { setError(null); setSubLang('multi'); setUseEmbedPlayer(true); }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                    Embedded Player
-                  </button>
-                )}
                 <button className="btn-glass btn-sm" onClick={() => navigate(-1)}>
                   Go Back
                 </button>
@@ -970,7 +922,7 @@ export default function Watch() {
                 <button className="btn-play btn-sm" onClick={handleRetry}>
                   Retry
                 </button>
-                {((isAnime && (malId || alId)) || (isMovie && effectiveTmdbId)) && (
+                {isAnime && (malId || alId) && (
                   <button className="btn-play btn-sm" onClick={() => { setSubLang('multi'); setUseEmbedPlayer(true); }}>
                     Embedded Player
                   </button>
