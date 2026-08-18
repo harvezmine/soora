@@ -106,7 +106,7 @@ export default function Profile({ section = 'anime' }) {
   const counts = useMemo(() => {
     const list = getMyList().filter((i) =>
       bagian.kunci === 'manga'
-        ? i.listType === 'manga' || i.listType === 'komikplus'
+        ? ['manga', 'komikplus', 'doujin'].includes(i.listType)
         : i.listType === bagian.kunci
     );
     return { list: list.length, prog: getProgressList(bagian.kunci).length };

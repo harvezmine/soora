@@ -15101,3 +15101,272 @@ a:hover {
 @media (max-width: 600px) {
   .prof-lain { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════ sooramics+ — pustaka tambahan ═══════════════
+   Memakai kembali kp-*, af-*, dan mangareader-* dari sooramics; yang ditulis
+   di sini hanya bagian yang memang belum ada. Warna aksennya datang dari
+   .sooramicsplus-page, jadi tidak ada warna yang ditulis ulang di sini. */
+
+.kp-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 4% calc(4rem + env(safe-area-inset-bottom));
+}
+
+/* ── Bilah atas ── */
+.kp-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0 1rem;
+}
+.kp-nav-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 200px;
+  flex: 1;
+  max-width: 340px;
+  margin-left: auto;
+  padding: 0 0.85rem;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-muted);
+}
+.kp-nav-search:focus-within { border-color: var(--accent); }
+.kp-nav-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  /* 16px supaya iOS tidak memperbesar layar saat kolomnya disentuh */
+  font-size: 16px;
+}
+.kp-nav-search input:focus { outline: none; }
+.kp-nav-search-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: var(--btn-glass);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.kp-nav-search-clear:hover { color: var(--text-primary); }
+
+/* ── Sorotan ── */
+.kp-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  margin-bottom: 2rem;
+  isolation: isolate;
+}
+.kp-hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 22%;
+  filter: blur(26px) saturate(1.25);
+  transform: scale(1.15);
+  z-index: -2;
+}
+.kp-hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(10, 10, 14, 0.94) 30%, rgba(10, 10, 14, 0.7) 100%);
+  z-index: -1;
+}
+.kp-hero-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 1.8rem;
+}
+.kp-hero-cover {
+  width: 150px;
+  flex: none;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border-hover);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+.kp-hero-text { min-width: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+.kp-hero-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.kp-hero-title {
+  margin: 0;
+  font-size: clamp(1.3rem, 3vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.kp-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.kp-hero-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.kp-hero-dots { display: flex; gap: 0.4rem; margin-top: 0.3rem; }
+.kp-hero-dot {
+  width: 22px;
+  height: 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--btn-glass);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.kp-hero-dot.aktif { background: var(--accent); }
+
+/* ── Kartu ── */
+.kp-card-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.kp-card-kosong {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-card);
+  color: var(--text-muted);
+}
+/* Rangka pemuatan seukuran kartu, supaya barisnya tidak melompat saat isinya
+   datang — pergeseran tata letak justru paling terasa di baris bergeser. */
+.kp-card-skel {
+  flex: 0 0 clamp(130px, 15vw, 170px);
+  aspect-ratio: 3 / 4.6;
+  border-radius: 10px;
+  background: linear-gradient(100deg, var(--bg-card) 30%, var(--btn-glass) 50%, var(--bg-card) 70%);
+  background-size: 220% 100%;
+  animation: kpSkel 1.3s ease-in-out infinite;
+}
+@keyframes kpSkel { to { background-position: -120% 0; } }
+
+/* ── Detail ── */
+.kp-h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 2rem 0 0.8rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.kp-detail-orang { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--text-secondary); }
+.kp-detail-orang b { color: var(--text-primary); font-weight: 600; }
+.kp-detail-sinopsis p {
+  margin: 0;
+  max-width: 70ch;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.kp-tag-link { border: none; cursor: pointer; font-family: inherit; }
+.kp-tag-link:hover { color: var(--accent); }
+
+/* ── Daftar chapter ── */
+.kp-ch-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.kp-ch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.kp-ch-row:hover { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.07); }
+.kp-ch-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kp-ch-num {
+  flex: none;
+  min-width: 62px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.kp-ch-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kp-ch-date { flex: none; font-size: 0.72rem; color: var(--text-muted); }
+
+/* ── Pembaca ── */
+.mangareader-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10, 10, 14, 0.92);
+  backdrop-filter: blur(12px);
+}
+.mangareader-chapter-nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 2rem 1rem calc(3rem + env(safe-area-inset-bottom));
+}
+
+/* ── Keadaan aktif yang dipakai bersama ── */
+.af-chip.aktif {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
+}
+.btn-glass.aktif { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 768px) {
+  .kp-page { padding: 0.6rem 1rem calc(3.5rem + env(safe-area-inset-bottom)); }
+  .kp-nav-search { order: 3; max-width: none; margin-left: 0; width: 100%; }
+  .kp-hero-inner { flex-direction: column; align-items: flex-start; gap: 1.1rem; padding: 1.2rem; }
+  .kp-hero-cover { width: 116px; }
+  .kp-ch-num { min-width: 52px; }
+  .kp-ch-date { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kp-card-skel { animation: none; }
+}

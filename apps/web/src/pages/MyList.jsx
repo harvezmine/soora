@@ -34,7 +34,7 @@ export default function MyList({ section = 'anime' }) {
   const counts = useMemo(() => ({
     anime: allItems.filter((i) => i.listType === 'anime').length,
     movie: allItems.filter((i) => i.listType === 'movie').length,
-    manga: allItems.filter((i) => i.listType === 'manga' || i.listType === 'komikplus').length,
+    manga: allItems.filter((i) => ['manga', 'komikplus', 'doujin'].includes(i.listType)).length,
   }), [allItems]);
 
   const totalCount = counts.anime + counts.movie + counts.manga;
@@ -42,7 +42,7 @@ export default function MyList({ section = 'anime' }) {
   /* -- Load list -- */
   const loadList = useCallback(() => {
     const list = getMyList().filter((i) => {
-      if (section === 'manga') return i.listType === 'manga' || i.listType === 'komikplus';
+      if (section === 'manga') return ['manga', 'komikplus', 'doujin'].includes(i.listType);
       return i.listType === section;
     });
     setItems(list);

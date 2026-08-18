@@ -12,6 +12,7 @@
     "./party/voice": "./src/party/voice.js",
     "./party/audio-tune": "./src/party/audio-tune.js",
     "./komikplus": "./src/komikplus/index.js",
+    "./doujin": "./src/doujin/index.js",
     "./user": "./src/user/index.js",
     "./runtime": "./src/runtime.js",
     "./ports": "./src/ports/index.js",
