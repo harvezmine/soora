@@ -148,11 +148,18 @@ router.get('/home', async (req: Request, res: Response) => {
        * catatan ketersediaan, jadi penyusunan berikutnya hampir seluruhnya
        * dijawab dari ingatan dan nyaris tanpa jaringan.
        */
-      const [trending, popularMovies, popularTV] = await Promise.all([
-        saringBisaDiputarTmdb(trendingRes?.results || []),
-        saringBisaDiputarTmdb(popularMoviesRes?.results || []),
-        saringBisaDiputarTmdb(popularTVRes?.results || []),
-      ]);
+      /**
+       * Berurutan, bukan Promise.all.
+       *
+       * Tiap sapuan sudah membuka delapan sambungan sekaligus; menjalankan
+       * tiga bagian bersamaan membuatnya dua puluh empat, dan penyedianya
+       * mulai menolak. Penolakan itu terbaca sebagai "tidak diketahui", dan
+       * yang tidak diketahui dipertahankan — jadi menumpuk sapuan justru
+       * meloloskan judul mati ke permukaan, persis yang mau dicegah.
+       */
+      const trending = await saringBisaDiputarTmdb(trendingRes?.results || []);
+      const popularMovies = await saringBisaDiputarTmdb(popularMoviesRes?.results || []);
+      const popularTV = await saringBisaDiputarTmdb(popularTVRes?.results || []);
 
       const genres: Record<string, any> = {};
       for (const [i, g] of MOVIE_GENRE_SECTIONS.entries()) {
@@ -166,11 +173,9 @@ router.get('/home', async (req: Request, res: Response) => {
         };
       }
 
-      const [lk21Popular, lk21Recent, lk21Series] = await Promise.all([
-        saringBisaDiputarLk21((Array.isArray(lk21PopularRes) ? lk21PopularRes : []).map(normalizeLK21)),
-        saringBisaDiputarLk21((Array.isArray(lk21RecentRes) ? lk21RecentRes : []).map(normalizeLK21)),
-        saringBisaDiputarLk21((Array.isArray(lk21SeriesRes) ? lk21SeriesRes : []).map(normalizeLK21), true),
-      ]);
+      const lk21Popular = await saringBisaDiputarLk21((Array.isArray(lk21PopularRes) ? lk21PopularRes : []).map(normalizeLK21));
+      const lk21Recent = await saringBisaDiputarLk21((Array.isArray(lk21RecentRes) ? lk21RecentRes : []).map(normalizeLK21));
+      const lk21Series = await saringBisaDiputarLk21((Array.isArray(lk21SeriesRes) ? lk21SeriesRes : []).map(normalizeLK21), true);
 
       return { trending, popularMovies, popularTV, lk21Popular, lk21Recent, lk21Series, genres };
     }, CACHE_TTL.HOME_BUNDLE);
@@ -262,10 +267,8 @@ router.get('/search', async (req: Request, res: Response) => {
      * beberapa judul, dan sapuan beranda biasanya sudah menjawabnya dari
      * ingatan.
      */
-    const [tmdbBisa, lk21Bisa] = await Promise.all([
-      saringBisaDiputarTmdb(data.tmdb?.results || []),
-      saringBisaDiputarLk21(data.lk21?.results || []),
-    ]);
+    const tmdbBisa = await saringBisaDiputarTmdb(data.tmdb?.results || []);
+    const lk21Bisa = await saringBisaDiputarLk21(data.lk21?.results || []);
     res.json({
       tmdb: { ...data.tmdb, results: tmdbBisa },
       lk21: { ...data.lk21, results: lk21Bisa },

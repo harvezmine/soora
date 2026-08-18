@@ -75,17 +75,41 @@ export async function adaDiVixsrc(
     ? `https://vixsrc.to/api/tv/${id}/1/1`
     : `https://vixsrc.to/api/movie/${id}`;
   try {
-    const r = await axios.get(path, {
-      headers: { 'User-Agent': UA, Referer: 'https://vixsrc.to/' },
-      timeout: 10_000,
-      validateStatus: (s) => s === 200 || s === 404,
-    });
+    const r = await ambilUlang(path);
+    if (!r) return null;
     const ada = r.status === 200 && !!r.data?.src;
     markAvailability('movie', id, ada);
     return ada;
   } catch {
     return null;
   }
+}
+
+/**
+ * Ambil sekali, dan bila gagal karena jaringan, coba sekali lagi.
+ *
+ * Percobaan tunggal terbukti tidak cukup: kegagalan sesaat dibaca sebagai
+ * "tidak diketahui", dan yang tidak diketahui sengaja dipertahankan supaya
+ * tontonan sehat tidak ikut hilang — jadi tiap kedipan jaringan meloloskan
+ * satu judul mati ke permukaan. Terukur tiga dari lima puluh empat judul
+ * beranda lolos begitu.
+ *
+ * Yang diulang hanya kegagalan jaringan. Balasan 404 bukan kegagalan; itu
+ * jawaban, dan diteruskan apa adanya.
+ */
+async function ambilUlang(path: string) {
+  for (let percobaan = 0; percobaan < 2; percobaan++) {
+    try {
+      return await axios.get(path, {
+        headers: { 'User-Agent': UA, Referer: 'https://vixsrc.to/' },
+        timeout: 10_000,
+        validateStatus: (s) => s === 200 || s === 404,
+      });
+    } catch {
+      if (percobaan === 0) await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+  return null;
 }
 
 /** Apakah judul LK21 ini punya aliran langsung yang bisa diputar. */
