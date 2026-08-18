@@ -17,6 +17,7 @@
 import axios from 'axios';
 import * as consumet from './consumet';
 import { isAvailable, markAvailability } from './availability';
+import { layakDiputar } from './catalogRules';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
@@ -166,4 +167,63 @@ export async function saringBisaDiputarLk21<T extends ItemLk21>(
     6 // LK21 lebih lambat per permintaan; jangan bebani inti tunggal VPS
   );
   return items.filter((_, i) => cek[i] !== false);
+}
+
+/**
+ * Bentuk mentah TMDB — beda nama bidang dari hasil normalisasi kita.
+ */
+interface MentahTmdb {
+  id?: number;
+  media_type?: string;
+  vote_count?: number;
+  popularity?: number;
+  original_language?: string;
+}
+
+/**
+ * Jalur passthrough TMDB yang mengembalikan DAFTAR judul.
+ *
+ * Halaman film tidak memakai /movies/home untuk kolam internasional; ia
+ * memanggil TMDB langsung lewat passthrough ini — trending, populer, dan
+ * sembilan bagian genre. Jadi verifikasi di /movies/home saja tidak pernah
+ * menyentuh apa yang sebenarnya dilihat orang di beranda.
+ *
+ * Hanya jalur berisi daftar yang dicegat. Jalur detail (`/movie/123`) dan
+ * daftar genre (`/genre/movie/list`) mengembalikan objek, bukan tontonan, dan
+ * harus lewat apa adanya.
+ */
+const JALUR_DAFTAR = /^\/(trending\/(movie|tv|all)\/|(movie|tv)\/popular|(movie|tv)\/top_rated|(movie|tv)\/now_playing|(movie|tv)\/upcoming|(movie|tv)\/on_the_air|(movie|tv)\/airing_today|discover\/(movie|tv)|search\/(movie|tv|multi))/;
+
+export function jalurTmdbBerdaftar(path: string): boolean {
+  return JALUR_DAFTAR.test(path);
+}
+
+/**
+ * Saring balasan passthrough TMDB supaya hanya menyisakan judul yang benar-
+ * benar bisa diputar.
+ *
+ * Jenis media diambil dari isinya bila ada, dan dari jalurnya bila tidak —
+ * `/movie/popular` tidak pernah menuliskan media_type pada tiap barisnya.
+ */
+export async function saringHasilTmdbMentah(path: string, data: any): Promise<any> {
+  if (!data || !Array.isArray(data.results) || !data.results.length) return data;
+  const bawaan: 'movie' | 'tv' = /\/tv\/|\/tv$|discover\/tv|trending\/tv|search\/tv/.test(path) ? 'tv' : 'movie';
+
+  // Saringan murah lebih dulu: yang jelas mustahil tidak perlu ditanyakan ke
+  // penyedia sama sekali.
+  const layak = (data.results as MentahTmdb[]).filter((r) =>
+    layakDiputar({
+      originalLanguage: r.original_language,
+      voteCount: r.vote_count,
+      popularity: r.popularity,
+    })
+  );
+
+  const cek = await berbondong(
+    layak.map((r) => () => adaDiVixsrc(
+      (r.media_type === 'tv' || (!r.media_type && bawaan === 'tv')) ? 'tv' : 'movie',
+      r.id ?? ''
+    ))
+  );
+  return { ...data, results: layak.filter((_, i) => cek[i] !== false) };
 }

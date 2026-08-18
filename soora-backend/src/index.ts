@@ -25,6 +25,7 @@ import availabilityRoutes from './routes/availability';
 import { attachWatchParty } from './ws';
 import { contentTypeOf } from './utils/normalize';
 import axios from 'axios';
+import { jalurTmdbBerdaftar, saringHasilTmdbMentah } from './services/playable';
 
 const app = express();
 
@@ -170,8 +171,17 @@ app.get('/tmdb/*', async (req, res) => {
     const tmdbSvc = await import('./services/tmdb');
     const path = req.originalUrl.replace(/^\/tmdb/, '').split('?')[0];
     const data = await tmdbSvc.passthrough(path, req.query as Record<string, any>);
+    /**
+     * Daftar yang lewat sini diverifikasi dulu.
+     *
+     * Beranda film membangun seluruh kolam internasionalnya dari passthrough
+     * ini — trending, populer, dan sembilan bagian genre — bukan dari
+     * /movies/home. Tanpa cegatan di sini, judul tanpa sumber tetap terpajang
+     * di depan dan baru ketahuan mati setelah orang menekan putar.
+     */
+    const keluar = jalurTmdbBerdaftar(path) ? await saringHasilTmdbMentah(path, data) : data;
     res.setHeader('Cache-Control', 'public, max-age=600');
-    res.json(data);
+    res.json(keluar);
   } catch (err: any) {
     res.status(err.response?.status || 502).json(err.response?.data || { error: 'TMDB error' });
   }
@@ -261,10 +271,34 @@ server.listen(config.port, '0.0.0.0', () => {
  * sungguhan tetap bisa menyusunnya sendiri.
  */
 function panaskanBeranda() {
-  setTimeout(() => {
-    axios.get(`http://127.0.0.1:${config.port}/movies/home`, { timeout: 120_000 })
-      .then(() => console.log('   Beranda film sudah dipanaskan'))
-      .catch(() => { /* permintaan sungguhan akan menyusunnya sendiri */ });
+  /**
+   * Jalur yang benar-benar dipakai halaman film untuk kolam internasional.
+   *
+   * Sengaja tidak diturunkan dari /movies/home: beranda tidak memanggil
+   * bundel itu sama sekali untuk kolam internasional, melainkan menyusun
+   * sendiri dari trending, populer, dan sembilan bagian genre lewat
+   * passthrough TMDB. Daftar ini harus mengikuti apa yang benar-benar
+   * dipanggil MovieHome — kalau di sana berubah, di sini ikut berubah.
+   */
+  const GENRE = [28, 35, 18, 27, 10749, 878, 53, 16, 10751, 99];
+  const jalur = [
+    '/movies/home',
+    '/tmdb/trending/movie/week',
+    '/tmdb/trending/tv/week',
+    '/tmdb/movie/popular?page=1',
+    '/tmdb/tv/popular?page=1',
+    ...GENRE.map((g) => `/tmdb/discover/movie?with_genres=${g}&page=1&sort_by=popularity.desc`),
+  ];
+  setTimeout(async () => {
+    // Berurutan: tiap sapuan sudah membuka delapan sambungan ke penyedianya,
+    // dan menumpuknya membuat mereka menolak — penolakan itu terbaca sebagai
+    // "tidak diketahui", dan yang tidak diketahui dipertahankan.
+    for (const p of jalur) {
+      try {
+        await axios.get(`http://127.0.0.1:${config.port}${p}`, { timeout: 180_000 });
+      } catch { /* permintaan sungguhan akan menyusunnya sendiri */ }
+    }
+    console.log('   Beranda film sudah dipanaskan');
   }, 3000);
 }
 

@@ -24,6 +24,7 @@ import {
   getSamehadakuAnimeInfo,
   getSubIndoGenre,
   getVixsrcStream,
+  laporkanTidakBisaDiputar,
 } from '@soora/core/api';
 import Card from '../components/Card';
 import SkeletonWatch from '../components/SkeletonWatch';
@@ -337,7 +338,9 @@ export default function Watch() {
 
           if (!streamOk) {
             // Tidak ada aliran langsung, dan tidak ada cadangan iframe yang
-            // layak. Dikatakan apa adanya.
+            // layak. Dikatakan apa adanya, sekaligus dikabarkan supaya judul
+            // ini hilang dari permukaan untuk semua orang.
+            laporkanTidakBisaDiputar(lk21Id);
             setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
           }
         }
@@ -386,9 +389,13 @@ export default function Watch() {
                * Judul yang tidak ada di VixSrc sekarang dikatakan tidak
                * tersedia — jujur, dan tanpa satu pun iklan.
                */
+              laporkanTidakBisaDiputar(tmdbId);
               setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
             }
           } catch (streamErr) {
+            // Sengaja TIDAK dilaporkan: ini kegagalan jaringan kita sendiri,
+            // bukan bukti judulnya tidak ada. Menandainya mati di sini berarti
+            // menghapus tontonan sehat gara-gara satu permintaan gagal.
             console.warn('VixSrc resolve failed:', streamErr);
             setError('Judul ini tidak tersedia di sumber mana pun untuk saat ini.');
           }

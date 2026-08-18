@@ -650,6 +650,24 @@ export const getMovieHomeBundle = () =>
  * Aturan yang sama sudah ditegakkan di cache katalog lewat daftar NEVER_CACHE;
  * jalur ini terlewat karena tidak melalui cache tersebut.
  */
+/**
+ * Kabarkan bahwa sebuah judul ternyata tidak bisa diputar.
+ *
+ * Verifikasi di backend adalah potret pada satu saat: judul yang sehat waktu
+ * disapu bisa hilang dari penyedianya sejam kemudian, dan daftar yang sudah
+ * terlanjur tersimpan di perangkat masih memajangnya. Laporan ini menutup
+ * celah itu — begitu satu orang menemukannya mati, judulnya ditandai dan
+ * hilang dari permukaan untuk semua orang.
+ *
+ * Dikirim dan dilupakan: kegagalannya tidak boleh mengganggu apa pun yang
+ * sedang dilihat orang.
+ */
+export const laporkanTidakBisaDiputar = (id) => {
+  if (!id) return;
+  api.post('/availability/report', { type: 'movie', id: String(id), available: false })
+    .catch(() => { /* sekadar kabar; kegagalannya tidak penting */ });
+};
+
 export const getVixsrcStream = async (type, tmdbId, season, episode) => {
   const params = type === 'tv' ? { season, episode } : {};
   const res = await api.get(`/movies/vixsrc/${type === 'tv' ? 'tv' : 'movie'}/${tmdbId}`, {
