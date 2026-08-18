@@ -14147,6 +14147,16 @@ a:hover {
   .wpp-tabs { display: none; }
   .wpp-body.tab-obrolan .wpp-orang,
   .wpp-body.tab-orang .wpp-chat { display: flex; }
+  .wpp-h3-obrolan { display: block; padding: 0.7rem 0.9rem 0; margin: 0; }
+  .wpp-chat-list { padding-top: 0.5rem; }
+}
+
+/* Daftar orang */
+.wpp-orang { display: flex; flex-direction: column; min-height: 0; padding: 0.6rem 0.6rem 0; }
+/* Ditulis setelah aturan dasar di atas, bukan digabung ke blok layar-lebar
+   yang letaknya lebih awal: dua aturan sama kuat, yang belakangan menang,
+   dan `padding` ringkas di atas menghapus padding-bawah pemisah ini. */
+@media (min-width: 1024px) {
   .wpp-orang {
     /* Menyusut mengikuti isinya sampai batas atas, bukan selalu memakan
        sepertiga panel walau cuma berisi satu orang. */
@@ -14156,12 +14166,7 @@ a:hover {
     border-bottom: 1px solid var(--border);
     background: rgba(255, 255, 255, 0.016);
   }
-  .wpp-h3-obrolan { display: block; padding: 0.7rem 0.9rem 0; margin: 0; }
-  .wpp-chat-list { padding-top: 0.5rem; }
 }
-
-/* Daftar orang */
-.wpp-orang { display: flex; flex-direction: column; min-height: 0; padding: 0.6rem 0.6rem 0; }
 .wpp-h3 {
   margin: 0 0 0.4rem; padding: 0 0.4rem;
   font-size: 0.68rem; font-weight: 700;
