@@ -51,6 +51,8 @@ let rahasia: Rahasia | null = null;
 /** Pengambilan yang sedang berjalan, supaya banyak permintaan tidak memicu
  *  banyak pengambilan bundle sekaligus saat cache baru kedaluwarsa. */
 let sedangAmbil: Promise<Rahasia> | null = null;
+/** Ditandai saat kegagalan menunjuk ke rahasia yang sudah berganti. */
+let perluRahasiaBaru = false;
 
 async function ambilTeks(url: string): Promise<string> {
   const ac = new AbortController();
@@ -87,18 +89,37 @@ async function pastikanRahasia(paksa = false): Promise<Rahasia> {
 const deviceId = () =>
   `dev_${Math.random().toString(36).slice(2, 15)}_${Date.now().toString(36)}`;
 
+const jeda = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Berapa kali satu panggilan boleh diulang sebelum menyerah. */
+const MAKS_COBA = 3;
+
 /**
- * Satu panggilan ke API sumber.
+ * Satu panggilan ke API sumber, dengan pengulangan.
  *
- * Dicoba dua kali: kegagalan dekripsi dan penolakan 401/403 hampir selalu
- * berarti rahasianya sudah berganti, dan itu bisa dipulihkan sendiri dengan
- * mengambil bundle terbaru. Percobaan kedua memakai rahasia yang baru diambil.
+ * Dua jenis kegagalan diulang, dan keduanya memang pulih sendiri:
+ *
+ * - Rahasia basi (401/403 atau dekripsi gagal). Situsnya baru dibangun ulang,
+ *   jadi bundle-nya diambil ulang sebelum mencoba lagi.
+ * - Gangguan sesaat (jaringan putus, waktu habis, 5xx). Sumbernya membatasi
+ *   laju permintaan dan sesekali menolak; tanpa pengulangan, satu kedipan itu
+ *   sampai ke pengguna sebagai pencarian yang gagal total. Ini benar-benar
+ *   terjadi saat pengujian — permintaan yang sama berhasil pada percobaan
+ *   berikutnya.
+ *
+ * Jeda bertambah antar-percobaan supaya pengulangan tidak justru memperparah
+ * pembatasan laju yang sedang berlaku.
  */
 async function apiGet(path: string): Promise<any> {
   let galatTerakhir: Error | null = null;
 
-  for (let percobaan = 0; percobaan < 2; percobaan++) {
-    const r = await pastikanRahasia(percobaan > 0);
+  for (let percobaan = 0; percobaan < MAKS_COBA; percobaan++) {
+    if (percobaan > 0) await jeda(400 * 2 ** (percobaan - 1));
+    // Rahasia hanya diambil ulang bila kegagalan sebelumnya memang menunjuk
+    // ke sana; gangguan jaringan tidak perlu memicu pengambilan bundle.
+    const r = await pastikanRahasia(perluRahasiaBaru);
+    perluRahasiaBaru = false;
+
     const ac = new AbortController();
     const jam = setTimeout(() => ac.abort(), TIMEOUT_MS);
     try {
@@ -116,7 +137,14 @@ async function apiGet(path: string): Promise<any> {
 
       if (res.status === 401 || res.status === 403) {
         galatTerakhir = new Error(`HTTP ${res.status}`);
-        continue; // rahasia basi — ambil ulang lalu coba lagi
+        perluRahasiaBaru = true;
+        continue;
+      }
+      // 5xx dan 429 sifatnya sesaat; 4xx lain berarti permintaannya memang
+      // salah dan mengulangnya cuma membuang waktu.
+      if (res.status >= 500 || res.status === 429) {
+        galatTerakhir = new Error(`HTTP ${res.status} untuk ${path}`);
+        continue;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status} untuk ${path}`);
 
@@ -127,8 +155,13 @@ async function apiGet(path: string): Promise<any> {
         return decryptResponse(JSON.parse(teks)._enc_resp_, r.salt);
       } catch (e: any) {
         galatTerakhir = e;
-        continue; // salt basi — ambil ulang lalu coba lagi
+        perluRahasiaBaru = true;
+        continue;
       }
+    } catch (e: any) {
+      // Jaringan putus atau waktu habis. Dilempar ulang hanya setelah semua
+      // percobaan habis, supaya gangguan sesaat tidak terlihat oleh pengguna.
+      galatTerakhir = e;
     } finally {
       clearTimeout(jam);
     }
