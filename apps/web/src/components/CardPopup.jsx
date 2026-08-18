@@ -153,10 +153,12 @@ export default function CardPopup({ item, type, style: posStyle, onMouseEnter, o
           <iframe
             ref={iframeRef}
             className="cpop-trailer-iframe"
-            src={`https://www.youtube.com/embed/${trailer.id}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${trailer.id}&start=0`}
+            src={`https://www.youtube-nocookie.com/embed/${trailer.id}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${trailer.id}&start=0`}
             allow="autoplay; encrypted-media"
             allowFullScreen
             title="Trailer"
+            referrerPolicy="no-referrer"
+            sandbox="allow-same-origin allow-scripts allow-presentation"
           />
         ) : (
           <img

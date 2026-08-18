@@ -862,6 +862,29 @@ export default function Watch() {
           />
         ) : currentSource?.isEmbed ? (
           <div className="player-wrapper">
+            {/*
+              Sumber embed kolam lokal (videonode.de, dipakai CAST dan P2P)
+              memasang tautan iklan yang menutupi seluruh pemutar:
+
+                <a id="overlay" href="https://yellowishgather.com/b.3UV/…"
+                   target="_blank"></a>
+
+              Overlay-nya tidak terlihat dan menutupi area video, jadi klik
+              apa pun — termasuk menekan play — membuka tab iklan. Halaman
+              yang sama juga menjalankan pengintai devtools yang memindahkan
+              alamat ke google.com.
+
+              `sandbox` tanpa allow-popups dan tanpa allow-top-navigation
+              melumpuhkan keduanya: target="_blank" tidak lagi boleh membuka
+              apa pun, dan halaman tidak bisa menyeret tab induk ke mana-mana.
+              Daftar izinnya sengaja sama persis dengan MovieEmbedPlayer —
+              cukup untuk hls.js dan pemutarnya berjalan, tidak lebih.
+
+              Iframe ini bukan jalur utama: sumber HLS langsung selalu diurut
+              lebih dulu. Tapi failover otomatis memang sampai ke sini saat
+              HLS-nya mati, tanpa pengguna memilih apa pun — jadi tidak boleh
+              dibiarkan telanjang.
+            */}
             <iframe
               src={currentSource.url}
               style={{ width: '100%', height: '100%', border: 'none', minHeight: '400px' }}
@@ -869,6 +892,7 @@ export default function Watch() {
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
               title="LK21 Player"
               referrerPolicy="no-referrer"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-presentation"
             />
           </div>
         ) : currentSource ? (

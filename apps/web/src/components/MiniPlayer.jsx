@@ -5,7 +5,7 @@ import { useMiniPlayer } from '../context/MiniPlayerContext';
 
 /**
  * MiniPlayer — YouTube-style floating mini player (bottom-right).
- * Plays HLS anime streams. For movies (VidKing/iframe) we don't support mini.
+ * Plays HLS anime streams. For movies (iframe embed) we don't support mini.
  */
 export default function MiniPlayer() {
   const { miniPlayer, closeMini, updateTime } = useMiniPlayer();
