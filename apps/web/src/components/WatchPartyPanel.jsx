@@ -262,6 +262,11 @@ export default function WatchPartyPanel({
 
         {/* ── Obrolan ── */}
         <section className="wpp-chat" aria-label="Obrolan">
+          {/* Judul ini hanya tampil di layar lebar. Di ponsel tabnya sudah
+              bertuliskan "Obrolan", jadi mengulanginya cuma memakan tempat;
+              di layar lebar tabnya disembunyikan dan tanpa judul ini daftar
+              orang langsung menempel ke pesan tanpa batas yang jelas. */}
+          <h3 className="wpp-h3 wpp-h3-obrolan">Obrolan</h3>
           <div className="wpp-chat-list" ref={daftarRef}>
             {chat.length === 0 ? (
               <p className="wpp-kosong">Belum ada obrolan di ruang ini.</p>

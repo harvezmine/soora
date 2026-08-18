@@ -22,6 +22,7 @@ const BAGIAN = {
     listLabel: 'My List Anime',
     listPath: '/anime/mylist',
     lanjutLabel: 'Lanjutkan Anime',
+    progLabel: 'anime belum selesai',
     beranda: '/anime',
     ikon: <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
   },
@@ -32,6 +33,7 @@ const BAGIAN = {
     listLabel: 'My List Film',
     listPath: '/movies/mylist',
     lanjutLabel: 'Lanjutkan Nonton',
+    progLabel: 'film belum selesai',
     beranda: '/movies',
     ikon: <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="m10 8 5 3-5 3z" /></>,
   },
@@ -42,8 +44,47 @@ const BAGIAN = {
     listLabel: 'My List Manga',
     listPath: '/manga/mylist',
     lanjutLabel: 'Lanjutkan Baca',
+    progLabel: 'komik belum selesai',
     beranda: '/manga',
     ikon: <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />,
+  },
+};
+
+/**
+ * Wajah tiap vertikal saat muncul sebagai tujuan pindah.
+ *
+ * Ikonnya menggambarkan isinya — layar untuk film, buku terbuka untuk komik —
+ * bukan sekadar titik berwarna. Titik berwarna memaksa orang menghafal warna
+ * mana milik siapa; gambar langsung terbaca, dan warnanya jadi penegas, bukan
+ * satu-satunya petunjuk.
+ */
+const VERTIKAL = {
+  sooranime: {
+    sub: 'Anime sub & dub',
+    ikon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none" />
+      </>
+    ),
+  },
+  sooraflix: {
+    sub: 'Film & serial TV',
+    ikon: (
+      <>
+        <rect x="2.5" y="4" width="19" height="13" rx="2" />
+        <path d="M8 21h8M12 17v4" />
+      </>
+    ),
+  },
+  sooramics: {
+    sub: 'Manga & komik',
+    ikon: (
+      <>
+        <path d="M12 6.5C10.5 5 8.5 4.5 6 4.5A2 2 0 0 0 4 6.5v10A2 2 0 0 0 6 18.5c2.5 0 4.5.5 6 2" />
+        <path d="M12 6.5C13.5 5 15.5 4.5 18 4.5A2 2 0 0 1 20 6.5v10a2 2 0 0 1-2 2c-2.5 0-4.5.5-6 2z" />
+      </>
+    ),
   },
 };
 
@@ -114,7 +155,7 @@ export default function Profile({ section = 'anime' }) {
             <p className="prof-meta">
               {counts.list > 0 && <span><b>{counts.list}</b> di My List</span>}
               {counts.list > 0 && counts.prog > 0 && <span className="prof-meta-sep" aria-hidden="true" />}
-              {counts.prog > 0 && <span><b>{counts.prog}</b> sedang berjalan</span>}
+              {counts.prog > 0 && <span><b>{counts.prog}</b> {bagian.progLabel}</span>}
             </p>
           )}
         </div>
@@ -155,11 +196,24 @@ export default function Profile({ section = 'anime' }) {
           {(LAIN[bagian.kunci] || []).map((vertikal) => (
             <button
               key={vertikal}
-              className={`prof-lain-btn v-${vertikal}`}
+              className={`prof-lain-kartu v-${vertikal}`}
               onClick={() => navigate(jalurProfil(vertikal))}
             >
-              <span className="prof-lain-titik" aria-hidden="true" />
-              {vertikal}
+              <span className="prof-lain-ikon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+                  width="22" height="22">
+                  {VERTIKAL[vertikal]?.ikon}
+                </svg>
+              </span>
+              <span className="prof-lain-teks">
+                <span className="prof-lain-nama">{vertikal}</span>
+                <span className="prof-lain-sub">{VERTIKAL[vertikal]?.sub}</span>
+              </span>
+              <svg className="prof-lain-chev" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" width="15" height="15" aria-hidden="true">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
             </button>
           ))}
         </div>

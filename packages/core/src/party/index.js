@@ -210,6 +210,8 @@ export function connectRoom(roomId, on = {}) {
     sendState: (playing, position) => kirim('state', { playing, position }),
     sendChat: (text) => kirim('chat', { text }),
     sendVoice: (on_) => kirim('voice', { on: on_ }),
+    /** Hanya tuan rumah. Menutup ruang untuk semua orang, tidak bisa dibatalkan. */
+    sendEnd: () => kirim('end', {}),
     sendMic: (on_) => kirim('mic', { on: on_ }),
     /** Mikrofon terbuka tapi ditahan — beda arti dari mikrofon yang mati. */
     sendMute: (on_) => kirim('mute', { on: on_ }),

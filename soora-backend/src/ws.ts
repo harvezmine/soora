@@ -274,6 +274,19 @@ export function attachWatchParty(server: HttpServer): WebSocketServer {
         return;
       }
 
+      // ── Tuan rumah mengakhiri ruang ──
+      // Tanpa pesan ini, "Akhiri" hanya memutus soket tuan rumah — dan itu
+      // dibaca server sebagai ia sedang terputus sementara, jadi tenggang
+      // kembalinya dinyalakan, ruangnya tetap hidup, dan tamu masih bisa
+      // masuk lagi. Mengakhiri harus berarti berakhir: semua diberi tahu,
+      // semua soket ditutup, dan catatannya dihapus sehingga karcis baru
+      // tidak bisa diterbitkan lagi untuk ruang itu.
+      if (msg.type === 'end') {
+        if (peer.userId !== room.hostId) return;
+        tutupRuang(room, 'Ruang diakhiri tuan rumah');
+        return;
+      }
+
       // ── Keadaan pemutar ──
       if (msg.type === 'state') {
         // Inti janji fitur ini. Klien tidak dipercaya: siapa pun bisa membuka

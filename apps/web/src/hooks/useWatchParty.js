@@ -270,6 +270,17 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     playerRef.current?.setDuck?.(adaYangBicara);
   }, [bicaraLokal, selfId, playerRef]);
 
+  /**
+   * Akhiri ruang untuk semua orang. Hanya tuan rumah; server memeriksa ulang.
+   *
+   * Berbeda dari sekadar menutup halaman: memutus soket saja dibaca server
+   * sebagai tuan rumah yang sedang terputus, jadi tenggang kembalinya
+   * dinyalakan dan ruangnya tetap bisa dimasuki lagi.
+   */
+  const akhiriRuang = useCallback(() => {
+    conn.current?.sendEnd();
+  }, []);
+
   /* ── Obrolan ── */
   const kirimChat = useCallback((text) => {
     const isi = String(text || '').trim();
@@ -460,6 +471,7 @@ export default function useWatchParty({ roomId, playerRef, enabled = true }) {
     setModePtt,
     tahanBicara,
     kirimChat,
+    akhiriRuang,
     voiceJoined,
     gabungSuara,
     keluarSuara,

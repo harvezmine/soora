@@ -22,9 +22,11 @@ export default function WatchPartyBar({
   onBuat,
   onBukaPanel,
   onKeluar,
+  onAkhiri,
   panelTerbuka,
 }) {
   const [tersalin, setTersalin] = useState(false);
+  const [tanyaAkhiri, setTanyaAkhiri] = useState(false);
 
   const salin = async () => {
     if (!room) return;
@@ -110,10 +112,36 @@ export default function WatchPartyBar({
             </button>
           </>
         )}
-        <button className="wp-btn wp-btn-quiet" onClick={onKeluar}>
+        {/* Tuan rumah menutup ruang untuk SEMUA orang, dan itu tidak bisa
+            dibatalkan — jadi ditanya dulu. Tamu cuma keluar sendiri, tidak
+            ada yang perlu dikonfirmasi. */}
+        <button
+          className="wp-btn wp-btn-quiet"
+          onClick={() => (!berakhir && role === 'host' ? setTanyaAkhiri(true) : onKeluar())}
+        >
           {berakhir ? 'Tutup' : role === 'host' ? 'Akhiri' : 'Keluar'}
         </button>
       </div>
+
+      {tanyaAkhiri && (
+        <div className="wp-akhiri" role="alertdialog" aria-label="Akhiri ruang">
+          <p className="wp-akhiri-teks">
+            Akhiri ruang untuk semua orang? Semua peserta akan dikeluarkan dan
+            tautan undangannya tidak bisa dipakai lagi.
+          </p>
+          <div className="wp-akhiri-aksi">
+            <button className="wp-akhiri-batal" onClick={() => setTanyaAkhiri(false)}>
+              Batal
+            </button>
+            <button
+              className="wp-akhiri-ok"
+              onClick={() => { setTanyaAkhiri(false); onAkhiri?.(); }}
+            >
+              Akhiri ruang
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

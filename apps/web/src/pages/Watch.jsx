@@ -1042,6 +1042,7 @@ export default function Watch() {
             onBuat={buatRuang}
             onBukaPanel={() => setPanelRuang((v) => !v)}
             onKeluar={keluarRuang}
+            onAkhiri={() => { party.akhiriRuang(); keluarRuang(); }}
             panelTerbuka={panelRuang}
           />
         )}
