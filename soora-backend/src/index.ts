@@ -14,6 +14,7 @@ import movieRoutes from './routes/movies';
 import mangaRoutes from './routes/manga';
 import doujindesuRoutes from './routes/doujindesu';
 import doujinRoutes from './routes/doujin';
+import nekoRoutes from './routes/neko';
 import komikplusRoutes from './routes/komikplus';
 import proxyRoutes from './routes/proxy';
 import appRoutes from './routes/app';
@@ -109,6 +110,7 @@ app.use('/movies', movieRoutes);
 app.use('/manga', mangaRoutes);
 app.use('/doujindesu', doujindesuRoutes);
 app.use('/doujin', doujinRoutes);
+app.use('/video', nekoRoutes);
 app.use('/komikplus', komikplusRoutes);
 
 // ========== PROXY ROUTES ==========

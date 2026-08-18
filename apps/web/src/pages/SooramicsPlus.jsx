@@ -3,36 +3,40 @@ import {
   daftarDoujin, cariDoujin, genreDoujin, detailDoujin, chapterDoujin,
   gambarDoujin, URUTAN, JENIS,
 } from '@soora/core/doujin';
+import {
+  daftarVideo, kategoriVideo, videoPerKategori, cariVideo, detailVideo,
+} from '@soora/core/video';
 import { addToMyList, removeFromMyList, isInMyList, getMyList } from '../utils/mylist';
 import Loading from '../components/Loading';
+import SkeletonSection from '../components/SkeletonSection';
 import CustomSelect from '../components/CustomSelect';
+import MangaReaderView from '../components/MangaReaderView';
 import Landing from './Landing';
 import { IconStar, IconBook, IconHash, IconPages, IconHeart } from '../components/icons';
 
 /**
- * Pustaka tambahan (sooramics+).
+ * Pustaka tambahan (sooramics+): komik dan video.
  *
- * Satu sumber saja, dilayani backend kita sendiri di /doujin. Sebelumnya
- * halaman ini menggabungkan dua sumber berbeda lewat sebuah sakelar mode,
- * dan keduanya punya bentuk data, penomoran halaman, serta aturan gambar
- * yang berbeda — hampir semua kerumitan halaman ini lahir dari situ.
+ * Susunannya sengaja meniru sooramics — spanduk sorotan, panel filter yang
+ * sama, baris kartu bergeser — dan memakai kelas yang sama pula (hero-*,
+ * af-*, kp-*, mangareader-*). Bukan demi hemat menulis: kalau tampilannya
+ * ditulis terpisah, keduanya pelan-pelan menyimpang dan tiap perbaikan harus
+ * dikerjakan dua kali.
  *
- * Tampilannya sengaja memakai kelas yang sama dengan sooramics (kp-*, af-*,
- * mangareader-*) supaya keduanya tidak pelan-pelan menyimpang: satu perbaikan
- * tampilan berlaku untuk dua-duanya.
+ * Pembacanya benar-benar komponen yang sama dengan sooramics
+ * (MangaReaderView), jadi mode gulir, mode halaman, gulir otomatis, dan
+ * sambung chapter berperilaku persis sama.
  */
 
-/** Baris di beranda. Tiap baris hanya berbeda pada pengurutannya. */
-const BARIS_BERANDA = [
+/** Baris beranda. Bedanya cuma pengurutan. */
+const BARIS = [
   { kunci: 'latest_chapter', label: 'Update Terbaru' },
   { kunci: 'views', label: 'Paling Banyak Dibaca' },
   { kunci: 'rating', label: 'Rating Tertinggi' },
   { kunci: 'created_at', label: 'Baru Ditambahkan' },
 ];
 
-/** Simpanan My List memakai jenis sendiri, terpisah dari sooramics biasa. */
 const JENIS_LIST = 'doujin';
-
 const PER_HALAMAN = 24;
 
 const angkaRingkas = (n) => {
@@ -50,19 +54,27 @@ const tanggalRingkas = (iso) => {
     : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-/* ════════════════════════════════════════════
-   Kartu & baris
-   ════════════════════════════════════════════ */
+/* ══════════════ Kartu ══════════════ */
 
-function Kartu({ item, onKlik, onHapus }) {
+function Kartu({ item, onKlik, onHapus, video = false }) {
+  // Gambar video datang dari host yang tidak menuntut Referer, jadi dipakai
+  // langsung; sampul komik harus lewat proxy.
+  const src = video ? item.thumb : gambarDoujin(item.thumb);
   return (
-    <button className="kp-card" onClick={() => onKlik(item)} title={item.title}>
+    <button className={`kp-card ${video ? 'kp-card-video' : ''}`} onClick={() => onKlik(item)} title={item.title}>
       <div className="kp-card-img-wrap">
-        {item.thumb
-          ? <img src={gambarDoujin(item.thumb)} alt="" loading="lazy" />
+        {src
+          ? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" />
           : <div className="kp-card-kosong" aria-hidden="true"><IconBook size={22} /></div>}
-        {item.latestChapter != null && (
+        {!video && item.latestChapter != null && (
           <span className="kp-card-badge">Ch {item.latestChapter}</span>
+        )}
+        {video && (
+          <span className="kp-card-play" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <polygon points="6 3 20 12 6 21 6 3" />
+            </svg>
+          </span>
         )}
         {onHapus && (
           <span
@@ -80,27 +92,30 @@ function Kartu({ item, onKlik, onHapus }) {
       <div className="kp-card-body">
         <span className="kp-card-title">{item.title}</span>
         <span className="kp-card-meta">
-          {item.rating != null && <><IconStar size={11} /> {item.rating}</>}
-          {item.rating != null && item.type && <span className="kp-sep">·</span>}
-          {item.type}
+          {video ? item.date : (
+            <>
+              {item.rating != null && <><IconStar size={11} /> {item.rating}</>}
+              {item.rating != null && item.type && <span className="kp-sep">·</span>}
+              {item.type}
+            </>
+          )}
         </span>
       </div>
     </button>
   );
 }
 
-function BarisGeser({ judul, items, memuat, onKlik }) {
+function Baris({ judul, items, memuat, onKlik, video }) {
   const ref = useRef(null);
   const geser = (arah) => {
     const el = ref.current;
     if (el) el.scrollBy({ left: arah * el.clientWidth * 0.85, behavior: 'smooth' });
   };
-  if (!memuat && !items.length) return null;
+  if (memuat) return <SkeletonSection />;
+  if (!items.length) return null;
   return (
     <section className="srow">
-      <div className="srow-head">
-        <h2 className="srow-title">{judul}</h2>
-      </div>
+      <div className="srow-head"><h2 className="srow-title">{judul}</h2></div>
       <div className="srail">
         <button className="srail-arrow srail-arrow-left" onClick={() => geser(-1)} aria-label="Geser kiri">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="22" height="22"><path d="m15 18-6-6 6-6" /></svg>
@@ -109,41 +124,35 @@ function BarisGeser({ judul, items, memuat, onKlik }) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="22" height="22"><path d="m9 18 6-6-6-6" /></svg>
         </button>
         <div className="card-row" ref={ref}>
-          {memuat
-            ? Array.from({ length: 8 }).map((_, i) => <div className="kp-card-skel" key={i} />)
-            : items.map((it) => (
-              <div className="kp-card-row-item" key={it.id}>
-                <Kartu item={it} onKlik={onKlik} />
-              </div>
-            ))}
+          {items.map((it) => (
+            <div className="kp-card-row-item" key={it.id}>
+              <Kartu item={it} onKlik={onKlik} video={video} />
+            </div>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
-/* ════════════════════════════════════════════
-   Halaman
-   ════════════════════════════════════════════ */
+/* ══════════════ Halaman ══════════════ */
 
 export default function SooramicsPlus() {
-  const [view, setView] = useState('landing'); // landing | home | jelajah | mylist | detail | reader
+  const [view, setView] = useState('landing');
   const [sebelumnya, setSebelumnya] = useState('home');
   const pindah = useCallback((next) => {
     setView((cur) => { setSebelumnya(cur); return next; });
     window.scrollTo({ top: 0 });
   }, []);
 
-  // ── Beranda ──
+  // ── Komik: beranda ──
   const [baris, setBaris] = useState({});
   const [muatBeranda, setMuatBeranda] = useState(true);
   const [hero, setHero] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
-
-  // ── Genre ──
   const [genres, setGenres] = useState([]);
 
-  // ── Jelajah ──
+  // ── Komik: jelajah ──
   const [urut, setUrut] = useState('latest_chapter');
   const [jenis, setJenis] = useState('');
   const [genre, setGenre] = useState('');
@@ -153,19 +162,28 @@ export default function SooramicsPlus() {
   const [halaman, setHalaman] = useState(1);
   const [muatHasil, setMuatHasil] = useState(false);
   const [adaLagi, setAdaLagi] = useState(true);
-
-  // ── Pencarian ──
   const [kotakCari, setKotakCari] = useState('');
   const [kataCari, setKataCari] = useState('');
 
-  // ── Detail & pembaca ──
+  // ── Komik: detail & baca ──
   const [detail, setDetail] = useState(null);
   const [muatDetail, setMuatDetail] = useState(false);
   const [galatDetail, setGalatDetail] = useState('');
-  const [chapterAktif, setChapterAktif] = useState(null);
-  const [isiChapter, setIsiChapter] = useState(null);
-  const [muatChapter, setMuatChapter] = useState(false);
-  const [galatGambar, setGalatGambar] = useState({});
+  const [chapterAwal, setChapterAwal] = useState(null);
+  const [halamanAwal, setHalamanAwal] = useState([]);
+  const [muatBaca, setMuatBaca] = useState(false);
+
+  // ── Video ──
+  const [videoList, setVideoList] = useState([]);
+  const [videoKategori, setVideoKategori] = useState([]);
+  const [katAktif, setKatAktif] = useState('');
+  const [videoHal, setVideoHal] = useState(1);
+  const [videoLagi, setVideoLagi] = useState(false);
+  const [muatVideo, setMuatVideo] = useState(false);
+  const [videoCari, setVideoCari] = useState('');
+  const [videoDetailData, setVideoDetailData] = useState(null);
+  const [muatVideoDetail, setMuatVideoDetail] = useState(false);
+  const [pemutarIdx, setPemutarIdx] = useState(0);
 
   // ── My List ──
   const [myList, setMyList] = useState(
@@ -175,43 +193,42 @@ export default function SooramicsPlus() {
     setMyList(getMyList().filter((i) => i.listType === JENIS_LIST));
   }, []);
 
-  /* ── Beranda: empat baris + genre, sekali jalan ── */
+  const diLanding = view === 'landing';
+
+  /* ── Beranda komik ── */
   useEffect(() => {
-    if (view === 'landing') return;
+    if (diLanding) return;
     let batal = false;
     (async () => {
       setMuatBeranda(true);
       const hasilBaris = await Promise.all(
-        BARIS_BERANDA.map((b) =>
-          daftarDoujin({ sort: b.kunci, limit: 20 }).catch(() => [])
-        )
+        BARIS.map((b) => daftarDoujin({ sort: b.kunci, limit: 20 }).catch(() => []))
       );
       if (batal) return;
       const peta = {};
-      BARIS_BERANDA.forEach((b, i) => { peta[b.kunci] = hasilBaris[i]; });
+      BARIS.forEach((b, i) => { peta[b.kunci] = hasilBaris[i]; });
       setBaris(peta);
-      // Sorotan diambil dari rating tertinggi yang punya sampul — kartu tanpa
-      // gambar di panggung utama terlihat seperti halaman gagal dimuat.
+      // Sorotan hanya dari yang bersampul: kartu kosong di panggung utama
+      // terbaca sebagai halaman yang gagal dimuat.
       setHero((peta.rating || []).filter((x) => x.thumb).slice(0, 6));
       setMuatBeranda(false);
     })();
     return () => { batal = true; };
-  }, [view === 'landing']); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [diLanding]);
 
   useEffect(() => {
-    if (view === 'landing') return;
+    if (diLanding) return;
     genreDoujin().then(setGenres).catch(() => setGenres([]));
-  }, [view === 'landing']); // eslint-disable-line react-hooks/exhaustive-deps
+    kategoriVideo().then(setVideoKategori).catch(() => setVideoKategori([]));
+  }, [diLanding]);
 
-  /* Sorotan berganti sendiri. Dihentikan saat bukan di beranda supaya tidak
-     ada timer yang jalan di latar sambil membaca. */
   useEffect(() => {
     if (view !== 'home' || hero.length < 2) return;
     const t = setInterval(() => setHeroIdx((i) => (i + 1) % hero.length), 6000);
     return () => clearInterval(t);
   }, [view, hero.length]);
 
-  /* ── Jelajah: muat saat filter berubah ── */
+  /* ── Jelajah komik ── */
   const muatJelajah = useCallback(async (hal, gabung) => {
     setHalaman(hal);
     setMuatHasil(true);
@@ -231,33 +248,59 @@ export default function SooramicsPlus() {
 
   useEffect(() => {
     if (view !== 'jelajah') return;
-    // Pemuatan memang dipicu dari sini, bukan dari tiap penangan filter.
-    // Urutan, jenis, genre, dan kata cari semuanya mengubah hasil yang sama;
-    // menaruh pemanggilan di masing-masing tombol berarti satu tombol baru
-    // suatu saat akan lupa memuat ulang — jenis bug yang sudah pernah terjadi
-    // di fitur lain. Aturan lint di bawah menyoroti penyetelan penanda muat
-    // yang berjalan serentak, dan itu memang disengaja di sini.
+    // Dipicu dari sini, bukan dari tiap penangan filter: urutan, jenis, genre,
+    // dan kata cari mengubah hasil yang sama, dan menyebar pemanggilannya ke
+    // tiap tombol membuat satu tombol baru suatu saat lupa memuat ulang.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     muatJelajah(1, false);
   }, [view, muatJelajah]);
 
-  const muatLagi = () => muatJelajah(halaman + 1, true);
+  /* ── Video ── */
+  const muatDaftarVideo = useCallback(async (hal, gabung, kat, q) => {
+    setVideoHal(hal);
+    setMuatVideo(true);
+    try {
+      const d = q ? await cariVideo(q, hal)
+        : kat ? await videoPerKategori(kat, hal)
+          : await daftarVideo(hal);
+      setVideoLagi(!!d.hasNext);
+      setVideoList((lama) => (gabung ? [...lama, ...(d.videos || [])] : (d.videos || [])));
+    } catch {
+      if (!gabung) setVideoList([]);
+      setVideoLagi(false);
+    } finally {
+      setMuatVideo(false);
+    }
+  }, []);
 
-  const kirimCari = (e) => {
-    e.preventDefault();
-    setKataCari(kotakCari.trim());
-    pindah('jelajah');
-  };
+  useEffect(() => {
+    if (view !== 'video') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    muatDaftarVideo(1, false, katAktif, videoCari);
+  }, [view, katAktif, videoCari, muatDaftarVideo]);
 
-  /* ── Detail ── */
+  const bukaVideo = useCallback(async (item) => {
+    pindah('videoDetail');
+    setVideoDetailData(null);
+    setPemutarIdx(0);
+    setMuatVideoDetail(true);
+    try {
+      setVideoDetailData(await detailVideo(item.id));
+    } catch {
+      setVideoDetailData({ id: item.id, title: item.title, players: [], thumb: item.thumb, synopsis: '' });
+    } finally {
+      setMuatVideoDetail(false);
+    }
+  }, [pindah]);
+
+  /* ── Detail komik ── */
   const bukaDetail = useCallback(async (item) => {
     pindah('detail');
     setDetail(null);
     setGalatDetail('');
     setMuatDetail(true);
     try {
-      const d = await detailDoujin(item.id);
-      setDetail(d);
+      setDetail(await detailDoujin(item.id));
     } catch (err) {
       setGalatDetail(err.message || 'Judul ini tidak bisa dibuka');
     } finally {
@@ -265,62 +308,72 @@ export default function SooramicsPlus() {
     }
   }, [pindah]);
 
-  /* ── Pembaca ── */
-  const bukaChapter = useCallback(async (ch) => {
-    pindah('reader');
-    setChapterAktif(ch);
-    setIsiChapter(null);
-    setGalatGambar({});
-    setMuatChapter(true);
-    try {
-      setIsiChapter(await chapterDoujin(ch.id));
-    } catch {
-      setIsiChapter({ images: [] });
-    } finally {
-      setMuatChapter(false);
-    }
-  }, [pindah]);
-
-  /** Chapter diurutkan menurun dari sumber, jadi "berikutnya" ada di indeks
-   *  yang lebih kecil. Diurus di satu tempat supaya tombolnya tidak terbalik. */
-  const tetangga = useMemo(() => {
+  /** Sumber mengurutkan chapter menurun; pembaca menganggap urutan menaik. */
+  const chapterUrut = useMemo(() => {
     const list = detail?.chapters || [];
-    const i = list.findIndex((c) => c.id === chapterAktif?.id);
-    if (i < 0) return { sebelum: null, sesudah: null };
-    return { sebelum: list[i + 1] || null, sesudah: list[i - 1] || null };
-  }, [detail, chapterAktif]);
+    return [...list]
+      .sort((a, b) => (a.number ?? 0) - (b.number ?? 0))
+      .map((c) => ({ id: c.id, chapter: c.number, title: c.title }));
+  }, [detail]);
+
+  const ambilHalaman = useCallback(async (chId) => {
+    const isi = await chapterDoujin(chId);
+    return (isi.images || []).map((url, i) => ({ img: url, page: i + 1 }));
+  }, []);
+
+  const srcHalaman = useCallback((page) => gambarDoujin(page?.img), []);
+
+  const bukaChapter = useCallback(async (ch) => {
+    setMuatBaca(true);
+    pindah('reader');
+    try {
+      const pg = await ambilHalaman(ch.id);
+      setChapterAwal(ch.id);
+      setHalamanAwal(pg);
+    } catch {
+      setChapterAwal(ch.id);
+      setHalamanAwal([]);
+    } finally {
+      setMuatBaca(false);
+    }
+  }, [ambilHalaman, pindah]);
 
   /* ── My List ── */
   const tersimpan = detail ? isInMyList(detail.id, JENIS_LIST) : false;
   const toggleSimpan = () => {
     if (!detail) return;
-    if (tersimpan) {
-      removeFromMyList(detail.id, JENIS_LIST);
-    } else {
+    if (tersimpan) removeFromMyList(detail.id, JENIS_LIST);
+    else {
       addToMyList({
-        id: detail.id,
-        title: detail.title,
-        image: detail.thumb,
-        type: detail.type,
-        listType: JENIS_LIST,
-        rating: detail.rating,
+        id: detail.id, title: detail.title, image: detail.thumb,
+        type: detail.type, listType: JENIS_LIST, rating: detail.rating,
       });
     }
     muatMyList();
   };
-
 
   const genreTersaring = useMemo(() => {
     const q = cariGenre.trim().toLowerCase();
     return q ? genres.filter((g) => g.name.toLowerCase().includes(q)) : genres;
   }, [genres, cariGenre]);
 
-  /* ════════ Gerbang masuk ════════ */
-  if (view === 'landing') {
+  const adaFilter = !!(genre || jenis || kataCari);
+  const diVideo = view === 'video' || view === 'videoDetail';
+
+  /* ══════ Gerbang masuk ══════ */
+  if (diLanding) {
     return <Landing showSooramicsPlus onSooramicsPlusClick={() => pindah('home')} />;
   }
 
-  /* ════════ Bilah atas ════════ */
+  const kirimCari = (e) => {
+    e.preventDefault();
+    const q = kotakCari.trim();
+    if (diVideo) { setVideoCari(q); setKatAktif(''); pindah('video'); return; }
+    setKataCari(q);
+    pindah('jelajah');
+  };
+
+  /* ══════ Bilah atas ══════ */
   const Nav = (
     <div className="kp-nav">
       <div className="kp-nav-left">
@@ -334,10 +387,10 @@ export default function SooramicsPlus() {
 
       <div className="kp-nav-tabs">
         <button className={`kp-nav-tab ${view === 'home' ? 'aktif' : ''}`} onClick={() => pindah('home')}>Beranda</button>
-        <button className={`kp-nav-tab ${view === 'jelajah' ? 'aktif' : ''}`} onClick={() => pindah('jelajah')}>Jelajah</button>
+        <button className={`kp-nav-tab ${view === 'jelajah' || view === 'detail' || view === 'reader' ? 'aktif' : ''}`} onClick={() => pindah('jelajah')}>Komik</button>
+        <button className={`kp-nav-tab ${diVideo ? 'aktif' : ''}`} onClick={() => pindah('video')}>Video</button>
         <button className={`kp-nav-tab ${view === 'mylist' ? 'aktif' : ''}`} onClick={() => { muatMyList(); pindah('mylist'); }}>
-          My List
-          {myList.length > 0 && <span className="kp-nav-badge">{myList.length}</span>}
+          My List{myList.length > 0 && <span className="kp-nav-badge">{myList.length}</span>}
         </button>
       </div>
 
@@ -348,11 +401,16 @@ export default function SooramicsPlus() {
         <input
           value={kotakCari}
           onChange={(e) => setKotakCari(e.target.value)}
-          placeholder="Cari judul…"
-          aria-label="Cari judul"
+          placeholder={diVideo ? 'Cari video…' : 'Cari judul…'}
+          aria-label="Cari"
         />
         {kotakCari && (
-          <button type="button" className="kp-nav-search-clear" onClick={() => { setKotakCari(''); setKataCari(''); }} aria-label="Bersihkan">
+          <button
+            type="button"
+            className="kp-nav-search-clear"
+            onClick={() => { setKotakCari(''); setKataCari(''); setVideoCari(''); }}
+            aria-label="Bersihkan"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" width="13" height="13"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         )}
@@ -360,56 +418,150 @@ export default function SooramicsPlus() {
     </div>
   );
 
-  /* ════════ Beranda ════════ */
+  /** Panel filter — susunan af-card > af-header > af-body sama persis dengan
+   *  sooramics. Kelas `open` yang menggerakkan akordeonnya. */
+  const PanelFilter = (
+    <div className="af-panel">
+      <div className={`af-card ${filterBuka ? 'open' : ''}`}>
+        <button className="af-header" onClick={() => setFilterBuka((v) => !v)}>
+          <div className="af-header-left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+            </svg>
+            <span>Filter</span>
+            {adaFilter && !filterBuka && (
+              <span className="af-header-count">{[genre, jenis, kataCari].filter(Boolean).length}</span>
+            )}
+          </div>
+          <svg className={`af-chevron ${filterBuka ? 'open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+
+        <div className="af-body">
+          <div className="af-body-inner">
+            <div className="af-group">
+              <span className="af-label">Jenis</span>
+              <div className="af-pills">
+                {JENIS.map((j) => (
+                  <button
+                    key={j.nilai || 'semua'}
+                    className={`af-chip ${jenis === j.nilai ? 'aktif' : ''}`}
+                    onClick={() => setJenis(j.nilai)}
+                  >
+                    {j.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="af-divider" />
+
+            <div className="af-genre-section">
+              <div className="af-header-left">
+                <span className="af-label">Genre</span>
+                <div className="af-tag-search-wrap">
+                  <input
+                    className="af-tag-search"
+                    value={cariGenre}
+                    onChange={(e) => setCariGenre(e.target.value)}
+                    placeholder="Cari genre…"
+                    aria-label="Cari genre"
+                  />
+                  {cariGenre && (
+                    <button className="af-tag-search-clear" onClick={() => setCariGenre('')} aria-label="Bersihkan">×</button>
+                  )}
+                </div>
+              </div>
+              <div className="af-pills af-pills-scroll">
+                <button className={`af-chip ${!genre ? 'aktif' : ''}`} onClick={() => setGenre('')}>Semua</button>
+                {genreTersaring.map((g) => (
+                  <button
+                    key={g.slug}
+                    className={`af-chip ${genre === g.slug ? 'aktif' : ''}`}
+                    onClick={() => setGenre(g.slug === genre ? '' : g.slug)}
+                  >
+                    {g.name}<span className="af-tag-count">{angkaRingkas(g.count)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {adaFilter && (
+              <button
+                className="af-reset"
+                onClick={() => { setGenre(''); setJenis(''); setKataCari(''); setKotakCari(''); }}
+              >
+                Atur ulang filter
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ══════ Beranda ══════ */
   if (view === 'home') {
     const sorot = hero[heroIdx];
     return (
-      <div className="kp-page sooramicsplus-page">
-        {Nav}
+      <div className="home-page sooramicsplus-page">
+        <div className="kp-page-nav">{Nav}</div>
 
         {sorot && (
-          <section className="kp-hero">
-            <div className="kp-hero-bg" style={{ backgroundImage: `url(${gambarDoujin(sorot.thumb)})` }} aria-hidden="true" />
-            <div className="kp-hero-shade" aria-hidden="true" />
-            <div className="kp-hero-inner">
-              <img className="kp-hero-cover" src={gambarDoujin(sorot.thumb)} alt="" />
-              <div className="kp-hero-text">
-                <span className="kp-hero-eyebrow">Rating tertinggi</span>
-                <h1 className="kp-hero-title">{sorot.title}</h1>
-                <div className="kp-hero-meta">
-                  {sorot.rating != null && <span><IconStar size={13} /> {sorot.rating}</span>}
-                  {sorot.type && <span className="kp-tag">{sorot.type}</span>}
-                  {sorot.latestChapter != null && <span>Ch {sorot.latestChapter}</span>}
-                </div>
-                <div className="hero-actions">
-                  <button className="btn-play sooramicsplus-btn-play" onClick={() => bukaDetail(sorot)}>
-                    <IconBook size={16} /> Baca sekarang
-                  </button>
-                </div>
-                <div className="kp-hero-dots">
+          <div className="hero-banner sooramicsplus-hero" key={sorot.id}>
+            <div className="hero-bg">
+              <img src={gambarDoujin(sorot.thumb)} alt="" referrerPolicy="no-referrer" />
+            </div>
+            <div className="hero-content">
+              <div className="hero-top-row">
+                <div className="hero-badge sooramicsplus-badge">{sorot.type || 'manga'}</div>
+                {sorot.rating != null && (
+                  <span className="hero-quality"><IconStar size={12} /> {sorot.rating}</span>
+                )}
+              </div>
+              <h1 className="hero-title">{sorot.title}</h1>
+              <p className="hero-desc">
+                {sorot.latestChapter != null
+                  ? `Sudah sampai chapter ${sorot.latestChapter}.`
+                  : 'Salah satu yang paling tinggi ratingnya.'}
+              </p>
+              <div className="hero-actions">
+                <button className="btn-play sooramicsplus-btn-play" onClick={() => bukaDetail(sorot)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+                  </svg>
+                  Baca Sekarang
+                </button>
+                <button className="btn-glass" onClick={() => bukaDetail(sorot)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  Detail
+                </button>
+              </div>
+              {hero.length > 1 && (
+                <div className="hero-dots">
                   {hero.map((h, i) => (
                     <button
                       key={h.id}
-                      className={`kp-hero-dot ${i === heroIdx ? 'aktif' : ''}`}
+                      className={`hero-dot ${i === heroIdx ? 'active' : ''}`}
                       onClick={() => setHeroIdx(i)}
                       aria-label={`Sorotan ${i + 1}`}
                     />
                   ))}
                 </div>
-              </div>
+              )}
             </div>
-          </section>
+          </div>
         )}
 
-        {BARIS_BERANDA.map((b) => (
-          <BarisGeser
-            key={b.kunci}
-            judul={b.label}
-            items={baris[b.kunci] || []}
-            memuat={muatBeranda}
-            onKlik={bukaDetail}
-          />
+        {BARIS.map((b) => (
+          <Baris key={b.kunci} judul={b.label} items={baris[b.kunci] || []} memuat={muatBeranda} onKlik={bukaDetail} />
         ))}
+
+        <Baris judul="Video Terbaru" items={videoList.slice(0, 20)} memuat={false} onKlik={bukaVideo} video />
 
         {genres.length > 0 && (
           <section className="srow">
@@ -431,108 +583,32 @@ export default function SooramicsPlus() {
     );
   }
 
-  /* ════════ Jelajah ════════ */
+  /* ══════ Jelajah komik ══════ */
   if (view === 'jelajah') {
-    const adaFilter = !!(genre || jenis || kataCari);
     return (
       <div className="kp-page sooramicsplus-page">
         {Nav}
-
         <div className="af-top">
           <div className="af-header-left">
             <h2 className="kp-ml-title">
-              {kataCari ? `Hasil untuk "${kataCari}"` : genre ? genres.find((g) => g.slug === genre)?.name || 'Jelajah' : 'Jelajah'}
+              {kataCari ? `Hasil untuk "${kataCari}"`
+                : genre ? genres.find((g) => g.slug === genre)?.name || 'Komik'
+                  : 'Semua Komik'}
             </h2>
-            {hasil.length > 0 && <span className="af-header-count">{hasil.length} judul</span>}
+            {hasil.length > 0 && <span className="af-header-count">{hasil.length}</span>}
           </div>
-          <div className="af-group">
-            {!kataCari && (
-              <CustomSelect
-                value={urut}
-                onChange={setUrut}
-                options={URUTAN.map((u) => ({ value: u.nilai, label: u.label }))}
-              />
-            )}
-            <button className={`btn-glass ${filterBuka ? 'aktif' : ''}`} onClick={() => setFilterBuka((v) => !v)}>
-              Filter{adaFilter ? ' •' : ''}
-            </button>
-          </div>
+          {!kataCari && (
+            <CustomSelect
+              value={urut}
+              onChange={setUrut}
+              options={URUTAN.map((u) => ({ value: u.nilai, label: u.label }))}
+            />
+          )}
         </div>
 
-        {filterBuka && (
-          /* Susunan af-panel > af-card.open > af-body > af-body-inner harus
-             utuh. Akordeonnya diatur CSS lewat kelas `open`; tanpa itu isinya
-             tetap terkatup (grid-template-rows: 0fr, max-height: 0) — panelnya
-             terlihat terbuka tapi kosong, dan chip-nya yang terpotong justru
-             menutupi grid di bawahnya sehingga tidak bisa diklik. */
-          <div className="af-panel">
-            <div className="af-card open">
-              <div className="af-body">
-                <div className="af-body-inner">
-                <div className="af-group">
-                  <span className="af-label">Jenis</span>
-                  <div className="af-pills">
-                    {JENIS.map((j) => (
-                      <button
-                        key={j.nilai || 'semua'}
-                        className={`af-chip ${jenis === j.nilai ? 'aktif' : ''}`}
-                        onClick={() => setJenis(j.nilai)}
-                      >
-                        {j.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+        {PanelFilter}
 
-                <div className="af-divider" />
-
-                <div className="af-genre-section">
-                  <div className="af-header">
-                    <span className="af-label">Genre</span>
-                    <div className="af-tag-search-wrap">
-                      <input
-                        className="af-tag-search"
-                        value={cariGenre}
-                        onChange={(e) => setCariGenre(e.target.value)}
-                        placeholder="Cari genre…"
-                        aria-label="Cari genre"
-                      />
-                      {cariGenre && (
-                        <button className="af-tag-search-clear" onClick={() => setCariGenre('')} aria-label="Bersihkan">×</button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="af-pills af-pills-scroll">
-                    <button className={`af-chip ${!genre ? 'aktif' : ''}`} onClick={() => setGenre('')}>Semua</button>
-                    {genreTersaring.map((g) => (
-                      <button
-                        key={g.slug}
-                        className={`af-chip ${genre === g.slug ? 'aktif' : ''}`}
-                        onClick={() => setGenre(g.slug === genre ? '' : g.slug)}
-                      >
-                        {g.name}<span className="af-tag-count">{angkaRingkas(g.count)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {adaFilter && (
-                  <button
-                    className="af-reset"
-                    onClick={() => { setGenre(''); setJenis(''); setKataCari(''); setKotakCari(''); }}
-                  >
-                    Atur ulang filter
-                  </button>
-                )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {muatHasil && hasil.length === 0 ? (
-          <Loading />
-        ) : hasil.length === 0 ? (
+        {muatHasil && hasil.length === 0 ? <Loading /> : hasil.length === 0 ? (
           <div className="kp-empty">
             <p className="kp-empty-title">Tidak ada yang cocok</p>
             <p className="kp-empty-desc">Coba kata kunci lain, atau longgarkan filternya.</p>
@@ -544,7 +620,7 @@ export default function SooramicsPlus() {
             </div>
             {adaLagi && (
               <div className="kp-pagination">
-                <button className="btn-glass" onClick={muatLagi} disabled={muatHasil}>
+                <button className="btn-glass" onClick={() => muatJelajah(halaman + 1, true)} disabled={muatHasil}>
                   {muatHasil ? 'Memuat…' : 'Muat lebih banyak'}
                 </button>
               </div>
@@ -555,7 +631,141 @@ export default function SooramicsPlus() {
     );
   }
 
-  /* ════════ My List ════════ */
+  /* ══════ Daftar video ══════ */
+  if (view === 'video') {
+    return (
+      <div className="kp-page sooramicsplus-page">
+        {Nav}
+        <div className="af-top">
+          <div className="af-header-left">
+            <h2 className="kp-ml-title">
+              {videoCari ? `Video untuk "${videoCari}"`
+                : katAktif ? videoKategori.find((k) => k.slug === katAktif)?.name || 'Video'
+                  : 'Video Terbaru'}
+            </h2>
+            {videoList.length > 0 && <span className="af-header-count">{videoList.length}</span>}
+          </div>
+        </div>
+
+        {videoKategori.length > 0 && (
+          <div className="af-chips kp-kat">
+            <button
+              className={`af-chip ${!katAktif && !videoCari ? 'aktif' : ''}`}
+              onClick={() => { setKatAktif(''); setVideoCari(''); setKotakCari(''); }}
+            >
+              Terbaru
+            </button>
+            {videoKategori.map((k) => (
+              <button
+                key={k.slug}
+                className={`af-chip ${katAktif === k.slug ? 'aktif' : ''}`}
+                onClick={() => { setKatAktif(k.slug === katAktif ? '' : k.slug); setVideoCari(''); setKotakCari(''); }}
+              >
+                {k.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {muatVideo && videoList.length === 0 ? <Loading /> : videoList.length === 0 ? (
+          <div className="kp-empty">
+            <p className="kp-empty-title">Tidak ada video</p>
+            <p className="kp-empty-desc">Coba kategori atau kata kunci lain.</p>
+          </div>
+        ) : (
+          <>
+            <div className="kp-grid kp-grid-video">
+              {videoList.map((v) => <Kartu key={v.id} item={v} onKlik={bukaVideo} video />)}
+            </div>
+            {videoLagi && (
+              <div className="kp-pagination">
+                <button
+                  className="btn-glass"
+                  disabled={muatVideo}
+                  onClick={() => muatDaftarVideo(videoHal + 1, true, katAktif, videoCari)}
+                >
+                  {muatVideo ? 'Memuat…' : 'Muat lebih banyak'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  /* ══════ Detail video ══════ */
+  if (view === 'videoDetail') {
+    const v = videoDetailData;
+    const pemutar = v?.players?.[pemutarIdx];
+    return (
+      <div className="kp-page sooramicsplus-page">
+        {Nav}
+        {muatVideoDetail ? <Loading /> : !v ? (
+          <div className="kp-empty">
+            <p className="kp-empty-title">Video tidak bisa dibuka</p>
+            <button className="btn-glass" onClick={() => pindah('video')}>Kembali</button>
+          </div>
+        ) : (
+          <>
+            <h1 className="kp-video-judul">{v.title}</h1>
+
+            {pemutar ? (
+              <div className="kp-player">
+                {/* Pemutarnya milik pihak ketiga, jadi bingkainya dikurung.
+                    allow-same-origin sengaja TIDAK diberikan — digabung dengan
+                    allow-scripts, kurungannya jadi tidak berarti apa-apa. Tanpa
+                    allow-top-navigation, iklan di dalamnya tidak bisa menyeret
+                    halaman kita pindah. */}
+                <iframe
+                  key={pemutar}
+                  src={pemutar}
+                  title={v.title}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  sandbox="allow-scripts allow-forms allow-popups allow-presentation"
+                />
+              </div>
+            ) : (
+              <div className="kp-empty">
+                <p className="kp-empty-title">Pemutar tidak tersedia</p>
+                <p className="kp-empty-desc">Sumbernya tidak menyediakan pemutar yang dikenali untuk judul ini.</p>
+              </div>
+            )}
+
+            {v.players?.length > 1 && (
+              <div className="af-chips kp-server">
+                <span className="af-label">Server</span>
+                {v.players.map((p, i) => (
+                  <button
+                    key={p}
+                    className={`af-chip ${i === pemutarIdx ? 'aktif' : ''}`}
+                    onClick={() => setPemutarIdx(i)}
+                  >
+                    Server {i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {v.synopsis && (
+              <section className="kp-detail-sinopsis">
+                <h2 className="kp-h2">Sinopsis</h2>
+                <p>{v.synopsis}</p>
+              </section>
+            )}
+
+            <div className="kp-pagination">
+              <button className="btn-glass" onClick={() => pindah('video')}>Kembali ke daftar</button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  /* ══════ My List ══════ */
   if (view === 'mylist') {
     return (
       <div className="kp-page sooramicsplus-page">
@@ -585,14 +795,12 @@ export default function SooramicsPlus() {
     );
   }
 
-  /* ════════ Detail ════════ */
+  /* ══════ Detail komik ══════ */
   if (view === 'detail') {
     return (
       <div className="kp-page sooramicsplus-page">
         {Nav}
-        {muatDetail ? (
-          <Loading />
-        ) : galatDetail || !detail ? (
+        {muatDetail ? <Loading /> : galatDetail || !detail ? (
           <div className="kp-empty">
             <p className="kp-empty-title">Gagal memuat judul</p>
             <p className="kp-empty-desc">{galatDetail || 'Judul ini tidak ditemukan.'}</p>
@@ -601,7 +809,7 @@ export default function SooramicsPlus() {
         ) : (
           <>
             <div className="kp-detail-top">
-              <img className="kp-detail-cover" src={gambarDoujin(detail.thumb)} alt="" />
+              <img className="kp-detail-cover" src={gambarDoujin(detail.thumb)} alt="" referrerPolicy="no-referrer" />
               <div className="kp-detail-info">
                 <h1 className="kp-detail-title">{detail.title}</h1>
                 {detail.altTitle && <p className="kp-detail-subtitle">{detail.altTitle}</p>}
@@ -623,11 +831,8 @@ export default function SooramicsPlus() {
                 )}
 
                 <div className="kp-detail-actions">
-                  {detail.chapters.length > 0 && (
-                    <button
-                      className="btn-play sooramicsplus-btn-play"
-                      onClick={() => bukaChapter(detail.chapters[detail.chapters.length - 1])}
-                    >
+                  {chapterUrut.length > 0 && (
+                    <button className="btn-play sooramicsplus-btn-play" onClick={() => bukaChapter(chapterUrut[0])}>
                       <IconBook size={16} /> Mulai dari awal
                     </button>
                   )}
@@ -683,65 +888,20 @@ export default function SooramicsPlus() {
     );
   }
 
-  /* ════════ Pembaca ════════ */
+  /* ══════ Pembaca — komponen yang sama persis dengan sooramics ══════ */
+  if (muatBaca) return <Loading text="Memuat chapter..." theme="sooramics" />;
+
   return (
-    <div className="mangareader-content sooramicsplus-page">
-      <div className="mangareader-bar">
-        <button className="mangareader-back" onClick={() => pindah('detail')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="17" height="17">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          Kembali
-        </button>
-        <span className="mangareader-ch-title">
-          {isiChapter?.title || chapterAktif?.title || 'Chapter'}
-        </span>
-      </div>
-
-      {muatChapter ? (
-        <Loading />
-      ) : !isiChapter?.images?.length ? (
-        <div className="kp-empty">
-          <p className="kp-empty-title">Chapter ini belum ada gambarnya</p>
-          <p className="kp-empty-desc">Biasanya berarti chapternya baru didaftarkan tapi belum diunggah.</p>
-          <button className="btn-glass" onClick={() => pindah('detail')}>Kembali ke daftar chapter</button>
-        </div>
-      ) : (
-        <>
-          {isiChapter.images.map((src, i) => (
-            <div className="mangareader-img-wrap" key={`${src}-${i}`}>
-              {galatGambar[i] ? (
-                <div className="mangareader-img-error">Halaman {i + 1} gagal dimuat</div>
-              ) : (
-                <img
-                  src={gambarDoujin(src)}
-                  alt={`Halaman ${i + 1}`}
-                  loading="lazy"
-                  onError={() => setGalatGambar((g) => ({ ...g, [i]: true }))}
-                />
-              )}
-            </div>
-          ))}
-
-          <div className="mangareader-chapter-nav">
-            <button
-              className="btn-glass"
-              disabled={!tetangga.sebelum}
-              onClick={() => tetangga.sebelum && bukaChapter(tetangga.sebelum)}
-            >
-              Chapter sebelumnya
-            </button>
-            <button className="btn-glass" onClick={() => pindah('detail')}>Daftar chapter</button>
-            <button
-              className="btn-glass"
-              disabled={!tetangga.sesudah}
-              onClick={() => tetangga.sesudah && bukaChapter(tetangga.sesudah)}
-            >
-              Chapter berikutnya
-            </button>
-          </div>
-        </>
-      )}
+    <div className="sooramicsplus-page">
+      <MangaReaderView
+        mangaTitle={detail?.title || ''}
+        chapters={chapterUrut}
+        initialChapterId={chapterAwal}
+        initialPages={halamanAwal}
+        fetchPages={ambilHalaman}
+        getPageSrc={srcHalaman}
+        onBack={() => pindah('detail')}
+      />
     </div>
   );
 }

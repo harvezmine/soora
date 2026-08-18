@@ -13,6 +13,7 @@
     "./party/audio-tune": "./src/party/audio-tune.js",
     "./komikplus": "./src/komikplus/index.js",
     "./doujin": "./src/doujin/index.js",
+    "./video": "./src/video/index.js",
     "./user": "./src/user/index.js",
     "./runtime": "./src/runtime.js",
     "./ports": "./src/ports/index.js",

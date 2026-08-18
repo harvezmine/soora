@@ -15375,3 +15375,64 @@ a:hover {
 @media (prefers-reduced-motion: reduce) {
   .kp-card-skel { animation: none; }
 }
+
+/* ═══════════ sooramics+ — bagian video ═══════════ */
+
+/* Bilah atas beranda memakai tata letak home-page yang tidak berpadding sisi,
+   jadi bilahnya diberi padding sendiri supaya sejajar dengan baris kartu. */
+.kp-page-nav { padding: 1rem 4% 0; }
+
+/* Kartu video mendatar (16:9), beda dari sampul komik yang tegak. */
+.kp-card-video .kp-card-img-wrap { aspect-ratio: 16 / 9; }
+.kp-card-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.35);
+  transition: opacity var(--transition);
+}
+.kp-card-video:hover .kp-card-play,
+.kp-card-video:focus-visible .kp-card-play { opacity: 1; }
+.kp-grid-video { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+
+.kp-video-judul {
+  margin: 0 0 1rem;
+  font-size: clamp(1.1rem, 2.4vw, 1.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+/* Bingkai pemutar. Rasionya dikunci supaya tinggi halaman tidak melompat saat
+   bingkainya selesai dimuat. */
+.kp-player {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--border);
+}
+.kp-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.kp-kat { margin-bottom: 1.2rem; }
+.kp-server { align-items: center; gap: 0.5rem; margin: 0.9rem 0 0; }
+
+@media (max-width: 768px) {
+  .kp-page-nav { padding: 0.6rem 1rem 0; }
+  .kp-grid-video { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  /* Sentuhan tidak punya keadaan hover, jadi penanda putarnya dibiarkan
+     terlihat samar — kalau tidak, kartunya tampak seperti gambar biasa. */
+  .kp-card-play { opacity: 0.85; background: none; }
+}
