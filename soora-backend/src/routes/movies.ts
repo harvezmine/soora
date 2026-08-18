@@ -3,7 +3,8 @@ import * as consumet from '../services/consumet';
 import * as tmdb from '../services/tmdb';
 import { cached, cachedSWR, CACHE_TTL } from '../services/cache';
 import { parallel, normalizeLK21, extractResults } from '../utils/normalize';
-import { markAvailability, filterAvailable } from '../services/availability';
+import { markAvailability } from '../services/availability';
+import { saringBisaDiputarTmdb, saringBisaDiputarLk21 } from '../services/playable';
 import { saringLayakDiputar } from '../services/catalogRules';
 import { reportRouteError } from '../services/telegram';
 
@@ -66,7 +67,7 @@ router.get('/vixsrc/:type/:tmdbId', async (req: Request, res: Response) => {
      * (goku, flixhq) sudah lama mati sehingga selalu melapor "tidak ada" —
      * route itu ikut dihapus bersama perubahan ini.
      * Akibatnya catatan ketersediaan film tidak pernah terisi, dan
-     * filterAvailable di /movies/home menyaring dari daftar kosong.
+     * penyaringan di /movies/home menyaring dari daftar kosong.
      *
      * Film dicatat dua arah. Serial hanya dicatat saat berhasil: satu episode
      * yang hilang bukan berarti seluruh serialnya tidak bisa ditonton, dan
@@ -133,25 +134,45 @@ router.get('/home', async (req: Request, res: Response) => {
         )
       );
 
+      /**
+       * Tiap bagian diverifikasi ke penyedianya sebelum dikirim.
+       *
+       * Sebelumnya di sini cuma ada penyaringan dari catatan ketersediaan,
+       * yang hanya membuang judul yang SUDAH diketahui gagal — dan yang belum
+       * pernah dicoba selalu lolos. Akibatnya beranda memajang judul yang,
+       * begitu diklik, tidak punya sumber apa pun.
+       *
+       * Urutannya disengaja: bagian yang paling dilihat orang diverifikasi
+       * lebih dulu, supaya bila anggaran waktu habis yang belum sempat
+       * diperiksa adalah yang paling jarang dibuka. Hasilnya menumpuk di
+       * catatan ketersediaan, jadi penyusunan berikutnya hampir seluruhnya
+       * dijawab dari ingatan dan nyaris tanpa jaringan.
+       */
+      const [trending, popularMovies, popularTV] = await Promise.all([
+        saringBisaDiputarTmdb(trendingRes?.results || []),
+        saringBisaDiputarTmdb(popularMoviesRes?.results || []),
+        saringBisaDiputarTmdb(popularTVRes?.results || []),
+      ]);
+
       const genres: Record<string, any> = {};
-      MOVIE_GENRE_SECTIONS.forEach((g, i) => {
+      for (const [i, g] of MOVIE_GENRE_SECTIONS.entries()) {
         const result = genreResults[i];
+        const mentah = result.status === 'fulfilled' && result.value
+          ? result.value.results.slice(0, 20) : [];
         genres[g.key] = {
           label: g.label,
           genreId: g.id,
-          results: result.status === 'fulfilled' && result.value ? result.value.results.slice(0, 20) : [],
+          results: await saringBisaDiputarTmdb(mentah),
         };
-      });
+      }
 
-      return {
-        trending: filterAvailable('movie', trendingRes?.results || []),
-        popularMovies: filterAvailable('movie', popularMoviesRes?.results || []),
-        popularTV: filterAvailable('movie', popularTVRes?.results || []),
-        lk21Popular: filterAvailable('movie', (Array.isArray(lk21PopularRes) ? lk21PopularRes : []).map(normalizeLK21)),
-        lk21Recent: filterAvailable('movie', (Array.isArray(lk21RecentRes) ? lk21RecentRes : []).map(normalizeLK21)),
-        lk21Series: filterAvailable('movie', (Array.isArray(lk21SeriesRes) ? lk21SeriesRes : []).map(normalizeLK21)),
-        genres,
-      };
+      const [lk21Popular, lk21Recent, lk21Series] = await Promise.all([
+        saringBisaDiputarLk21((Array.isArray(lk21PopularRes) ? lk21PopularRes : []).map(normalizeLK21)),
+        saringBisaDiputarLk21((Array.isArray(lk21RecentRes) ? lk21RecentRes : []).map(normalizeLK21)),
+        saringBisaDiputarLk21((Array.isArray(lk21SeriesRes) ? lk21SeriesRes : []).map(normalizeLK21), true),
+      ]);
+
+      return { trending, popularMovies, popularTV, lk21Popular, lk21Recent, lk21Series, genres };
     }, CACHE_TTL.HOME_BUNDLE);
 
     res.json(data);
@@ -233,13 +254,21 @@ router.get('/search', async (req: Request, res: Response) => {
      * Saringan ketersediaan ditaruh DI LUAR cache, bukan di dalam pembangunnya.
      *
      * Isi cache dibekukan sepuluh menit; catatan ketersediaan berubah tiap
-     * kali ada yang mencoba memutar. Kalau disaring di dalam, hasil pencarian
-     * yang sudah terlanjur tersimpan tidak akan pernah ikut belajar sampai
-     * cache-nya kedaluwarsa.
+     * kali ada yang mencoba memutar atau tiap kali beranda disusun ulang.
+     * Kalau disaring di dalam, hasil pencarian yang sudah terlanjur tersimpan
+     * tidak akan pernah ikut belajar sampai cache-nya kedaluwarsa.
+     *
+     * Ongkosnya kecil: daftarnya sudah disaring catalogRules jadi tinggal
+     * beberapa judul, dan sapuan beranda biasanya sudah menjawabnya dari
+     * ingatan.
      */
+    const [tmdbBisa, lk21Bisa] = await Promise.all([
+      saringBisaDiputarTmdb(data.tmdb?.results || []),
+      saringBisaDiputarLk21(data.lk21?.results || []),
+    ]);
     res.json({
-      ...data,
-      tmdb: { ...data.tmdb, results: filterAvailable('movie', data.tmdb?.results || []) },
+      tmdb: { ...data.tmdb, results: tmdbBisa },
+      lk21: { ...data.lk21, results: lk21Bisa },
     });
   } catch (err: any) {
     reportRouteError(req, err, 'movies/search');

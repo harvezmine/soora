@@ -24,6 +24,7 @@ import roomRoutes from './routes/rooms';
 import availabilityRoutes from './routes/availability';
 import { attachWatchParty } from './ws';
 import { contentTypeOf } from './utils/normalize';
+import axios from 'axios';
 
 const app = express();
 
@@ -242,6 +243,29 @@ server.listen(config.port, '0.0.0.0', () => {
   console.log(`   TMDB Key: ${config.tmdbKey ? '✓ configured' : '✗ missing'}`);
   console.log(`   CORS: ${config.corsOrigin}`);
   console.log(`   Environment: ${config.nodeEnv}`);
+  panaskanBeranda();
 });
+
+/**
+ * Susun bundel beranda sekali di latar begitu server siap.
+ *
+ * Penyusunannya memverifikasi tiap judul ke penyedianya, dan pada cache yang
+ * masih kosong itu memakan waktu — cachedSWR baru menyegarkan di latar setelah
+ * ada isinya; permintaan pertama pada cache kosong ditunggu sampai selesai.
+ *
+ * Proses ini dimulai ulang tiap pukul 04.00 oleh PM2, jadi cache kosong itu
+ * keadaan yang pasti berulang, bukan kemungkinan. Tanpa pemanas ini yang
+ * menanggung penantiannya adalah orang pertama yang membuka beranda pagi itu.
+ *
+ * Kegagalannya sengaja diabaikan: ini hanya pemanasan, dan permintaan
+ * sungguhan tetap bisa menyusunnya sendiri.
+ */
+function panaskanBeranda() {
+  setTimeout(() => {
+    axios.get(`http://127.0.0.1:${config.port}/movies/home`, { timeout: 120_000 })
+      .then(() => console.log('   Beranda film sudah dipanaskan'))
+      .catch(() => { /* permintaan sungguhan akan menyusunnya sendiri */ });
+  }, 3000);
+}
 
 export default app;
