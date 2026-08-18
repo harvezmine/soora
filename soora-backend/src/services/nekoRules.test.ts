@@ -31,12 +31,26 @@ const KARTU_BERANDA = `
 <a href="https://iklan.example/promo">Iklan</a>
 `;
 
+/* Urutan atributnya SENGAJA seperti situs aslinya: href ditulis SEBELUM
+   class. Dulu penguraiannya memotong teks pada penanda kelas, sehingga tiap
+   potongan dimulai setelah href miliknya sendiri dan yang terbaca justru href
+   kartu berikutnya — judulnya benar tapi tautannya bergeser satu kartu.
+   Dua kartu dipakai karena dengan satu kartu pergeseran itu tidak kelihatan. */
 const KARTU_DAFTAR = `
-<a class="nk-search-item" href="https://nekopoi.care/judul-tiga/">
+<li><a href="https://nekopoi.care/judul-tiga/" class="nk-search-item">
   <div class="nk-search-thumb" style="background-image:url('https://nekopoi.care/wp/c.jpg')"></div>
-  <h2>Judul Tiga</h2>
-  <p class="nk-search-desc">Ringkasan <b>tiga</b>.</p>
-</a>
+  <div class="nk-search-info">
+    <h2>Judul Tiga</h2>
+    <p class="nk-search-desc">Ringkasan <b>tiga</b>.</p>
+  </div>
+</a></li>
+<li><a href="https://nekopoi.care/judul-empat/" class="nk-search-item">
+  <div class="nk-search-thumb" style="background-image:url('https://nekopoi.care/wp/d.jpg')"></div>
+  <div class="nk-search-info">
+    <h2>Judul Empat</h2>
+    <p class="nk-search-desc">Ringkasan empat.</p>
+  </div>
+</a></li>
 `;
 
 describe('penyaringan pemutar', () => {
@@ -128,8 +142,20 @@ describe('membaca kartu', () => {
 
   it('membaca bentuk kartu kategori beserta ringkasannya', () => {
     const k = bacaKartu(KARTU_DAFTAR);
-    expect(k).toHaveLength(1);
+    expect(k).toHaveLength(2);
     expect(k[0]).toMatchObject({ id: 'judul-tiga', title: 'Judul Tiga', synopsis: 'Ringkasan tiga.' });
+  });
+
+  it('tautan tiap kartu adalah miliknya sendiri, bukan kartu berikutnya', () => {
+    // Inti bug yang pernah terjadi: judul benar, tautan bergeser satu, dan
+    // kartu membuka judul yang salah tanpa ada tanda apa pun bahwa itu salah.
+    const k = bacaKartu(KARTU_DAFTAR);
+    expect(k.map((x) => [x.id, x.title])).toEqual([
+      ['judul-tiga', 'Judul Tiga'],
+      ['judul-empat', 'Judul Empat'],
+    ]);
+    expect(k[0].thumb).toBe('https://nekopoi.care/wp/c.jpg');
+    expect(k[1].thumb).toBe('https://nekopoi.care/wp/d.jpg');
   });
 
   it('slug kembar tidak muncul dua kali walau ada di dua bentuk', () => {

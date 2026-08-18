@@ -158,14 +158,24 @@ export function bacaKartu(html: string): Video[] {
     tambah(tautan[1], tautan[2], gambar ? gambar[1] : '', '', tanggal ? tanggal[0] : '');
   }
 
-  // Bentuk 2 — kartu kategori & pencarian.
-  const blokDaftar = html.split('class="nk-search-item"');
-  for (let i = 1; i < blokDaftar.length; i++) {
-    const b = blokDaftar[i];
-    const tautan = b.match(/href="([^"]+)"/);
-    const gambar = b.match(/background-image:\s*url\(['"]?([^'")]+)['"]?\)/);
-    const judul = b.match(/<h2>([\s\S]*?)<\/h2>/);
-    const desc = b.match(/<p[^>]*class="nk-search-desc"[^>]*>([\s\S]*?)<\/p>/);
+  /* Bentuk 2 — kartu kategori & pencarian.
+     Seluruh elemen <a> dicocokkan sekaligus, BUKAN dipotong pada penanda
+     kelasnya. Di bentuk ini penandanya ada di dalam tag pembuka dan href
+     ditulis SEBELUMNYA:
+         <a href="alamat-item-ini" class="nk-search-item"> ... </a>
+     Memotong pada kelas membuat tiap potongan dimulai setelah href miliknya
+     sendiri, sehingga href pertama yang ditemukan di dalamnya justru milik
+     kartu BERIKUTNYA — judul dan gambar benar, tapi tautannya bergeser satu.
+     Kartu jadi membuka judul yang salah. */
+  const reAnchor = /<a\s([^>]*class="nk-search-item"[^>]*)>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = reAnchor.exec(html)) !== null) {
+    const atribut = m[1];
+    const isi = m[2];
+    const tautan = atribut.match(/href="([^"]+)"/);
+    const gambar = isi.match(/background-image:\s*url\(['"]?([^'")]+)['"]?\)/);
+    const judul = isi.match(/<h2>([\s\S]*?)<\/h2>/);
+    const desc = isi.match(/<p[^>]*class="nk-search-desc"[^>]*>([\s\S]*?)<\/p>/);
     tambah(
       tautan ? tautan[1] : '',
       judul ? judul[1] : '',
