@@ -15351,6 +15351,11 @@ a:hover {
   padding: 2rem 1rem calc(3rem + env(safe-area-inset-bottom));
 }
 
+/* af-panel membawa padding 0 4% untuk halaman selebar layar; di sini .kp-page
+   sudah memberi padding yang sama, jadi tanpa ini panelnya menjorok dua kali
+   dan tidak sejajar dengan grid di bawahnya. */
+.kp-page .af-panel { padding: 0; }
+
 /* ── Keadaan aktif yang dipakai bersama ── */
 .af-chip.aktif {
   border-color: var(--accent);

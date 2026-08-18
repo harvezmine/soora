@@ -460,9 +460,15 @@ export default function SooramicsPlus() {
         </div>
 
         {filterBuka && (
+          /* Susunan af-panel > af-card.open > af-body > af-body-inner harus
+             utuh. Akordeonnya diatur CSS lewat kelas `open`; tanpa itu isinya
+             tetap terkatup (grid-template-rows: 0fr, max-height: 0) — panelnya
+             terlihat terbuka tapi kosong, dan chip-nya yang terpotong justru
+             menutupi grid di bawahnya sehingga tidak bisa diklik. */
           <div className="af-panel">
-            <div className="af-body">
-              <div className="af-body-inner">
+            <div className="af-card open">
+              <div className="af-body">
+                <div className="af-body-inner">
                 <div className="af-group">
                   <span className="af-label">Jenis</span>
                   <div className="af-pills">
@@ -518,6 +524,7 @@ export default function SooramicsPlus() {
                     Atur ulang filter
                   </button>
                 )}
+                </div>
               </div>
             </div>
           </div>
