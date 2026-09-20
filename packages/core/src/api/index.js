@@ -975,7 +975,8 @@ export const getKomikuInfo = (id) =>
   }, MANGA_CACHE_TTL);
 
 export const getKomikuChapterPages = (chapterId) =>
-  cachedGet(`komiku:read:${chapterId}`, async () => {
+  // Ignore persisted chapter lists produced by the old single-CDN parser.
+  cachedGet(`komiku:read:v2:${chapterId}`, async () => {
     return api.get(`/manga/komiku/read/${encodeURIComponent(chapterId)}`);
   }, MANGA_CACHE_TTL);
 

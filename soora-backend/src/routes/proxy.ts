@@ -228,7 +228,7 @@ router.get('/', async (req: Request, res: Response) => {
 function refererFor(targetUrl: string): string {
   try {
     const host = new URL(targetUrl).hostname.toLowerCase();
-    if (host.endsWith('komiku.org') || host.endsWith('komiku.id')) return 'https://komiku.org/';
+    if (/(^|\.)komiku\.(org|id|to)$/.test(host)) return 'https://komiku.org/';
     if (host.endsWith('mangapill.com')) return 'https://mangapill.com/';
     if (host.endsWith('mangadex.org')) return 'https://mangadex.org/';
   } catch { /* fall through */ }

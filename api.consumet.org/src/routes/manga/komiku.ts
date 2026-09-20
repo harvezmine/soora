@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply, FastifyInstance, RegisterOptions } from 'fastify';
+import { load } from 'cheerio';
 
 const BASE = 'https://komiku.org';
 const API_BASE = 'https://api.komiku.org';
@@ -119,19 +120,28 @@ function parseMangaInfo(html: string, slug: string) {
   };
 }
 
-// Parse chapter page images
-function parseChapterPages(html: string) {
-  const pages: any[] = [];
-  // Images from img.komiku.org
-  const imgRegex = /<img[^>]*src=["'](https?:\/\/img\.komiku\.org[^"']+)["']/gi;
-  let match;
-  let idx = 1;
-  while ((match = imgRegex.exec(html)) !== null) {
-    pages.push({
-      img: match[1],
-      page: idx++,
-    });
-  }
+// Komiku distributes a chapter across img.komiku.org and imageN.komiku.to.
+// Read the numbered reader images in document order, including every _partN
+// slice. Matching only one CDN silently dropped most of some chapters.
+export function parseChapterPages(html: string) {
+  const $ = load(html);
+  const pages: { img: string; page: number }[] = [];
+  $('#Baca_Komik img').each((_, element) => {
+    const img = $(element);
+    // Promotions also appear inside the reader, but have no page markers.
+    if (!/^\d+$/.test(img.attr('id') || '') && !img.hasClass('ww') && !img.hasClass('klazy')) return;
+
+    for (const attr of ['data-src', 'data-original', 'src']) {
+      const value = img.attr(attr)?.trim();
+      if (!value) continue;
+      try {
+        const url = new URL(value, BASE);
+        if (!/^https?:$/.test(url.protocol) || !/(^|\.)komiku\.(org|id|to)$/.test(url.hostname)) continue;
+        pages.push({ img: url.href, page: pages.length + 1 });
+        break;
+      } catch { /* Try the next source attribute if a lazy source is invalid. */ }
+    }
+  });
   return pages;
 }
 

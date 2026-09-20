@@ -31,6 +31,24 @@ describe('normalizeChapterPages', () => {
     expect(out[0].uri).toContain('1.jpg');
   });
 
+  it('mempertahankan semua potongan Komiku lintas CDN dengan Referer yang benar', () => {
+    const urls = [
+      'https://image2.komiku.to/uploads2/ch-1_part1.jpg',
+      'https://image14.komiku.to/uploads2/ch-1_part2.jpg',
+      'https://img.komiku.org/uploads2/ch-2.jpg',
+      'https://img.komiku.id/uploads/ch-3.jpg',
+    ];
+    const pages = urls.map((img, i) => ({ img, page: i + 1 }));
+    expect(normalizeChapterPages(pages)).toEqual(urls.map((uri) => ({
+      uri, headers: { Referer: 'https://komiku.org/' },
+    })));
+
+    configureCore({ imageStrategy: 'proxy', imgProxyBase: 'https://soora.test' });
+    expect(normalizeChapterPages(pages)).toEqual(urls.map((url) => ({
+      uri: `https://soora.test/manga-img?url=${encodeURIComponent(url)}`,
+    })));
+  });
+
   it('membuang entri tanpa URL, bukan menjadikannya halaman kosong', () => {
     // Halaman kosong di tengah chapter terbaca sebagai gambar rusak.
     const out = normalizeChapterPages([{ img: '' }, null, undefined, { page: 3 }, 'https://x/y.jpg']);

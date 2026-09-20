@@ -233,7 +233,8 @@ router.get('/komiku/info/:id', async (req: Request, res: Response) => {
  */
 router.get('/komiku/read/:chapterId', async (req: Request, res: Response) => {
   try {
-    const data = await cached(`manga:komiku:read:${req.params.chapterId}`,
+    // Old cached lists omitted pages hosted on imageN.komiku.to.
+    const data = await cached(`manga:komiku:read:v2:${req.params.chapterId}`,
       () => consumet.komikuRead(qs(req.params.chapterId)), CACHE_TTL.MANGA_READ, 'long');
     res.json(data);
   } catch (err: any) {

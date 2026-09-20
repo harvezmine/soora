@@ -6,6 +6,7 @@
         "start": "ts-node src/main.ts",
         "dev": "nodemon src/main.ts",
         "build": "tsc",
+        "test:komiku": "ts-node tests/komiku.test.ts",
         "lint": "prettier --write \"src/**/*.ts\""
     },
     "engines": {

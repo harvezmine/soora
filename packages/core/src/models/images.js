@@ -24,7 +24,7 @@ import { getRuntime } from '../runtime.js';
 export const REFERER_RULES = [
   { match: 'readdetectiveconan.com', referer: 'https://mangapill.com/' },
   { match: 'mangapill', referer: 'https://mangapill.com/' },
-  { match: 'komiku.', referer: 'https://komiku.id/' },
+  { match: 'komiku.', referer: 'https://komiku.org/' },
   { match: 'doujindesu', referer: 'https://doujindesu.tv/' },
 ];
 

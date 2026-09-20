@@ -4,10 +4,10 @@
  * Proxies manga images with required Referer header for CDNs.
  */
 // Per-host Referer — komiku's CDN 403s hotlinks unless Referer is its own origin.
-function refererFor(target) {
+export function refererFor(target) {
   try {
     const host = new URL(target).hostname.toLowerCase();
-    if (host.endsWith('komiku.org') || host.endsWith('komiku.id')) return 'https://komiku.org/';
+    if (/(^|\.)komiku\.(org|id|to)$/.test(host)) return 'https://komiku.org/';
     if (host.endsWith('mangadex.org')) return 'https://mangadex.org/';
     if (host.endsWith('mangapill.com')) return 'https://mangapill.com/';
   } catch { /* fall through */ }

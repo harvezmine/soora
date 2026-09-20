@@ -137,7 +137,7 @@ app.get('/manga-img', async (req, res) => {
   let referer = 'https://mangapill.com/';
   try {
     const host = new URL(targetUrl).hostname.toLowerCase();
-    if (host.endsWith('komiku.org') || host.endsWith('komiku.id')) referer = 'https://komiku.org/';
+    if (/(^|\.)komiku\.(org|id|to)$/.test(host)) referer = 'https://komiku.org/';
     else if (host.endsWith('mangadex.org')) referer = 'https://mangadex.org/';
   } catch { /* keep default */ }
   try {
