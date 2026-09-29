@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { refererFor } from './api/manga-img.js'
+import { fetchImage } from './api/manga-img.js'
 
 export default defineConfig({
   build: {
@@ -19,7 +19,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    // Use the same CDN Referer rules as the production image proxy.
+    // Use the same CDN Referer and mirror rules as the production image proxy.
     {
       name: 'manga-image-proxy',
       configureServer(server) {
@@ -28,14 +28,10 @@ export default defineConfig({
           const url = params.get('url');
           if (!url) { res.statusCode = 400; res.end('Missing url'); return; }
           try {
-            const response = await fetch(url, {
-              headers: { 'Referer': refererFor(url) },
-            });
-            if (!response.ok) throw new Error(`CDN ${response.status}`);
-            res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+            const image = await fetchImage(url);
+            res.setHeader('Content-Type', image.contentType);
             res.setHeader('Cache-Control', 'public, max-age=86400');
-            const buffer = await response.arrayBuffer();
-            res.end(Buffer.from(buffer));
+            res.end(image.body);
           } catch {
             res.statusCode = 502;
             res.end('Image proxy error');

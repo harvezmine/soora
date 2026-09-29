@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { isUrlAllowed } from '../utils/ssrfGuard';
 import { contentTypeOf } from '../utils/normalize';
+import { fetchMangaImage } from '../utils/mangaImage';
 
 const router = Router();
 
@@ -221,39 +222,19 @@ router.get('/', async (req: Request, res: Response) => {
 
 /**
  * GET /manga-img?url=...
- * Manga image proxy with Referer header.
+ * Manga image proxy with Referer header and mirror fallback.
  */
-// Per-host Referer — some CDNs (komiku) 403 hotlinks unless the Referer matches
-// their own origin. Default to mangapill for everything else.
-function refererFor(targetUrl: string): string {
-  try {
-    const host = new URL(targetUrl).hostname.toLowerCase();
-    if (/(^|\.)komiku\.(org|id|to)$/.test(host)) return 'https://komiku.org/';
-    if (host.endsWith('mangapill.com')) return 'https://mangapill.com/';
-    if (host.endsWith('mangadex.org')) return 'https://mangadex.org/';
-  } catch { /* fall through */ }
-  return 'https://mangapill.com/';
-}
-
 router.get('/manga-img', async (req: Request, res: Response) => {
   const targetUrl = String(req.query.url || '');
   if (!targetUrl) return res.status(400).send('Missing url');
   if (!isUrlAllowed(targetUrl)) return res.status(403).send('Forbidden target');
 
   try {
-    const response = await axios.get(targetUrl, {
-      headers: {
-        'Referer': refererFor(targetUrl),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      responseType: 'arraybuffer',
-      timeout: 15000,
-    });
-
-    res.setHeader('Content-Type', contentTypeOf(response.headers['content-type'], 'image/jpeg'));
+    const image = await fetchMangaImage(targetUrl);
+    res.setHeader('Content-Type', image.contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.send(Buffer.from(response.data));
+    res.send(image.body);
   } catch {
     res.status(502).send('Image proxy error');
   }

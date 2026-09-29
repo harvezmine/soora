@@ -7,6 +7,7 @@ import { config } from './config';
 import { clearCache, getCacheStats } from './services/cache';
 import { notifyError } from './services/telegram';
 import { isUrlAllowed } from './utils/ssrfGuard';
+import { fetchMangaImage } from './utils/mangaImage';
 
 // Routes
 import animeRoutes from './routes/anime';
@@ -25,7 +26,6 @@ import commentRoutes from './routes/comments';
 import roomRoutes from './routes/rooms';
 import availabilityRoutes from './routes/availability';
 import { attachWatchParty } from './ws';
-import { contentTypeOf } from './utils/normalize';
 import axios from 'axios';
 import { jalurTmdbBerdaftar, saringHasilTmdbMentah } from './services/playable';
 
@@ -133,23 +133,12 @@ app.get('/manga-img', async (req, res) => {
   const targetUrl = String(req.query.url || '');
   if (!targetUrl) return res.status(400).send('Missing url');
   if (!isUrlAllowed(targetUrl)) return res.status(403).send('Forbidden target');
-  // Per-host Referer — komiku's CDN 403s hotlinks unless Referer is its own origin.
-  let referer = 'https://mangapill.com/';
   try {
-    const host = new URL(targetUrl).hostname.toLowerCase();
-    if (/(^|\.)komiku\.(org|id|to)$/.test(host)) referer = 'https://komiku.org/';
-    else if (host.endsWith('mangadex.org')) referer = 'https://mangadex.org/';
-  } catch { /* keep default */ }
-  try {
-    const axios = (await import('axios')).default;
-    const response = await axios.get(targetUrl, {
-      headers: { 'Referer': referer, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      responseType: 'arraybuffer', timeout: 15000,
-    });
-    res.setHeader('Content-Type', contentTypeOf(response.headers['content-type'], 'image/jpeg'));
+    const image = await fetchMangaImage(targetUrl);
+    res.setHeader('Content-Type', image.contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.send(Buffer.from(response.data));
+    res.send(image.body);
   } catch { res.status(502).send('Image proxy error'); }
 });
 

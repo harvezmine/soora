@@ -68,6 +68,24 @@ export function resolveImage(url) {
 }
 
 /**
+ * Alamat cermin untuk gambar CDN yang gagal dimuat, atau null kalau tidak ada.
+ *
+ * Komiku membagi halaman chapter ke imageN.komiku.to — semuanya cermin dari
+ * penyimpanan yang sama — dan pembacanya sendiri pindah ke img.komiku.org
+ * saat satu shard gagal:
+ *   onerror="this.src=this.src.replace('image5.komiku.to','img.komiku.org')"
+ * Proxy web sudah melakukannya di server; native memuat langsung dari CDN,
+ * jadi cadangan yang sama harus dijalankan di klien.
+ *
+ * @param {string} url
+ * @returns {string | null}
+ */
+export function mirrorFallback(url) {
+  const cadangan = (url || '').replace(/^(https?:\/\/)image\d+\.komiku\.to(?=[/:?#]|$)/i, '$1img.komiku.org');
+  return cadangan !== url && cadangan ? cadangan : null;
+}
+
+/**
  * Mengganti ukuran gambar TMDB.
  *
  * TMDB menyajikan beberapa ukuran dari path yang sama. Kartu katalog hanya

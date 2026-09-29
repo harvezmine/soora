@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import { StyleSheet, View, Text } from 'react-native';
+import { mirrorFallback } from '@soora/core/models';
 import { colors, font, space } from '../theme/tokens';
 
 export type PageSource = { uri: string; headers?: Record<string, string> };
@@ -27,6 +28,10 @@ type Props = {
 export function MangaPage({ source, width, index }: Props) {
   const [ratio, setRatio] = useState(DUGAAN_RASIO);
   const [gagal, setGagal] = useState(false);
+  // Cermin dicatat bersama alamat aslinya: FlashList mendaur ulang komponen
+  // ini untuk halaman lain, dan cermin halaman lama tidak boleh terbawa.
+  const [cermin, setCermin] = useState<{ dari: string; ke: string } | null>(null);
+  const uri = cermin?.dari === source.uri ? cermin.ke : source.uri;
 
   const height = Math.round(width / ratio);
 
@@ -41,7 +46,7 @@ export function MangaPage({ source, width, index }: Props) {
 
   return (
     <Image
-      source={source}
+      source={{ ...source, uri }}
       style={{ width, height }}
       // `contain` bukan `cover`: memotong panel manga berarti memotong dialog.
       contentFit="contain"
@@ -54,7 +59,12 @@ export function MangaPage({ source, width, index }: Props) {
         const { width: w, height: h } = e.source ?? {};
         if (w && h) setRatio(w / h);
       }}
-      onError={() => setGagal(true)}
+      onError={() => {
+        // Shard CDN yang mati dicoba sekali lewat cermin, seperti pembaca komiku.
+        const ke = uri === source.uri ? mirrorFallback(source.uri) : null;
+        if (ke) setCermin({ dari: source.uri, ke });
+        else setGagal(true);
+      }}
     />
   );
 }
