@@ -1,68 +1,69 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { loadGoogleIdentity } from '../utils/googleIdentity';
 
-const GIS_SRC = 'https://accounts.google.com/gsi/client';
-// Google Client ID is public (not a secret). Fallback constant so prod works
-// even without the Vercel env var set (repo .env is gitignored).
+// OAuth client IDs are public. Keep the existing production fallback.
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
   || '1046486298812-a3oh36rdeicvjmdr7l38ia174264iq1g.apps.googleusercontent.com';
 
-let gisPromise = null;
-function loadGIS() {
-  if (window.google?.accounts?.id) return Promise.resolve();
-  if (gisPromise) return gisPromise;
-  gisPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = GIS_SRC; s.async = true; s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Failed to load Google script'));
-    document.head.appendChild(s);
-  });
-  return gisPromise;
-}
-
-/**
- * Google Identity Services login.
- * onToken(idToken) is called with the Google ID token after the user signs in.
- * Returns { trigger, ready }. trigger() opens the Google account chooser popup.
- */
+/** Render Google's actual button: its popup requires a direct user click. */
 export function useGoogleLogin(onToken) {
-  const [ready, setReady] = useState(false);
+  const buttonRef = useRef(null);
   const cbRef = useRef(onToken);
-  cbRef.current = onToken;
+  const [status, setStatus] = useState('loading');
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => { cbRef.current = onToken; }, [onToken]);
 
   useEffect(() => {
-    if (!CLIENT_ID) return;
+    const holder = buttonRef.current;
+    if (!holder) return;
     let cancelled = false;
-    loadGIS().then(() => {
-      if (cancelled || !window.google?.accounts?.id) return;
-      window.google.accounts.id.initialize({
+    let observer;
+
+    loadGoogleIdentity().then((googleId) => {
+      if (cancelled) return;
+      googleId.initialize({
         client_id: CLIENT_ID,
-        callback: (resp) => { if (resp?.credential) cbRef.current?.(resp.credential); },
+        callback: (resp) => {
+          if (!cancelled && resp?.credential) cbRef.current?.(resp.credential);
+        },
         ux_mode: 'popup',
         auto_select: false,
       });
-      setReady(true);
-    }).catch(() => { /* button stays disabled */ });
-    return () => { cancelled = true; };
-  }, []);
 
-  const trigger = useCallback(() => {
-    if (!window.google?.accounts?.id) return;
-    // Render an invisible button and click it — most reliable popup trigger
-    // (One Tap prompt can be suppressed by the browser).
-    let holder = document.getElementById('gis-hidden-btn');
-    if (!holder) {
-      holder = document.createElement('div');
-      holder.id = 'gis-hidden-btn';
-      holder.style.cssText = 'position:fixed;opacity:0;pointer-events:none;z-index:-1;top:-1000px;left:-1000px';
-      document.body.appendChild(holder);
-    }
-    holder.innerHTML = '';
-    window.google.accounts.id.renderButton(holder, { type: 'standard', size: 'large' });
-    const realBtn = holder.querySelector('div[role=button]') || holder.querySelector('div');
-    if (realBtn) realBtn.click();
-    else window.google.accounts.id.prompt(); // fallback to One Tap
-  }, []);
+      let previousWidth;
+      const render = () => {
+        if (cancelled) return;
+        const width = Math.min(400, Math.floor(holder.getBoundingClientRect().width));
+        if (width <= 0 || width === previousWidth) return;
+        previousWidth = width;
+        try {
+          holder.replaceChildren();
+          googleId.renderButton(holder, {
+            type: 'standard', theme: 'filled_black', size: 'large',
+            text: 'continue_with', shape: 'pill', locale: 'id', width,
+          });
+          setStatus('ready');
+        } catch {
+          setStatus('error');
+        }
+      };
+      render();
+      observer = new ResizeObserver(render);
+      observer.observe(holder);
+    }).catch(() => { if (!cancelled) setStatus('error'); });
 
-  return { trigger, ready };
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      holder.replaceChildren();
+    };
+  }, [attempt]);
+
+  const retry = () => {
+    setStatus('loading');
+    setAttempt((value) => value + 1);
+  };
+
+  return { buttonRef, status, retry };
 }

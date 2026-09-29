@@ -12412,7 +12412,26 @@ a:hover {
   background: rgba(255,255,255,0.015);
   color: rgba(255,255,255,0.6);
 }
-.auth-social-google { flex: 1 1 100%; }
+.auth-google-signin {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+}
+.auth-google-button { width: 100%; max-width: 400px; min-height: 40px; }
+.auth-google-button[inert] { opacity: 0.5; }
+.auth-google-error { display: flex; align-items: center; gap: 0.7rem; }
+.auth-google-error button {
+  background: transparent;
+  border: 0;
+  color: var(--accent, #a99aff);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .auth-social-chip:disabled { opacity: 0.5; cursor: default; transform: none; }
 .auth-social-chip:hover {
   background: rgba(255,255,255,0.04);
